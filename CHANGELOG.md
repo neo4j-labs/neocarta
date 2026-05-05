@@ -3,6 +3,7 @@
 ## Upcoming
 
 ### Fixed
+* Fix demo data: `business_term_info.csv` had duplicate term identity columns (`term_name` as abbreviation and `name` as full readable name); removed `term_name` abbreviation column and renamed `name` → `term_name`. Updated `column_term_info.csv` and `table_term_info.csv` to reference terms by full readable name to match.
 
 ### Changed
 
