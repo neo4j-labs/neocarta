@@ -1,4 +1,4 @@
-# Changelog of neocarta library
+# Changelog of neocarta library and MCP server
 
 ## Upcoming
 
@@ -9,6 +9,7 @@
 
 ### Added
 * Add data model diagram for table views and materialized views
+* Add `claude.md` file
 
 ## v0.3.0
 

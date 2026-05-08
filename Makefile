@@ -68,10 +68,19 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
 	
 test-unit:
-	uv run pytest tests/unit
+	uv run pytest tests/unit -v
+
+test-it:
+	uv run pytest tests/integration -v
 
 test-mcp:
 	uv run pytest tests/integration/_mcp -v
+
+test-smoke:
+	uv run pytest tests/smoke -v
+
+test-all:
+	uv run pytest tests/ -v
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
