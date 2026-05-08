@@ -8,6 +8,7 @@
 ### Changed
 
 ### Added
+* Add data model diagram for table views and materialized views
 
 ## v0.3.0
 
