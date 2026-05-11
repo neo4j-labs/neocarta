@@ -89,6 +89,8 @@ class CSVConnector:
         t.transform_to_references_relationships(e.column_references_info)
         t.transform_to_uses_table_relationships(e.query_table_info)
         t.transform_to_uses_column_relationships(e.query_column_info)
+        t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
+        t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
 
     def load_metadata(self) -> None:
         """
@@ -196,6 +198,22 @@ class CSVConnector:
         if t.uses_column_relationships:
             print(f"Loading {len(t.uses_column_relationships)} USES_COLUMN relationships...")
             print(self.loader.load_uses_column_relationships(t.uses_column_relationships))
+        if t.column_tagged_with_relationships:
+            print(
+                f"Loading {len(t.column_tagged_with_relationships)} column TAGGED_WITH relationships..."
+            )
+            print(
+                self.loader.load_column_tagged_with_relationships(
+                    t.column_tagged_with_relationships
+                )
+            )
+        if t.table_tagged_with_relationships:
+            print(
+                f"Loading {len(t.table_tagged_with_relationships)} table TAGGED_WITH relationships..."
+            )
+            print(
+                self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
+            )
 
     def run(
         self,

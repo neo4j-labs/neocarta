@@ -20,6 +20,7 @@ from ...data_model.rdbms.expanded import (
     HasCategory,
     HasValue,
     Query,
+    TaggedWith,
     UsesColumn,
     UsesTable,
     Value,
@@ -207,6 +208,16 @@ class CSVTransformer:
         """Return cached USES_COLUMN relationships."""
         return self._relationships_cache.get("uses_column_relationships", [])
 
+    @property
+    def column_tagged_with_relationships(self) -> list[TaggedWith]:
+        """Return cached (:Column)-[:TAGGED_WITH]->(:BusinessTerm) relationships."""
+        return self._relationships_cache.get("column_tagged_with_relationships", [])
+
+    @property
+    def table_tagged_with_relationships(self) -> list[TaggedWith]:
+        """Return cached (:Table)-[:TAGGED_WITH]->(:BusinessTerm) relationships."""
+        return self._relationships_cache.get("table_tagged_with_relationships", [])
+
     # ------------------------------------------------------------------
     # Transform methods — nodes
     # ------------------------------------------------------------------
@@ -342,14 +353,14 @@ class CSVTransformer:
         nodes = [
             Glossary(
                 id=row.glossary_id,
-                name=getattr(row, "name", row.glossary_id) or row.glossary_id,
+                name=getattr(row, "name", row.glossary_name) or row.glossary_name,
                 description=getattr(row, "description", None),
             )
             for row in df.itertuples(index=False)
         ]
         self._node_cache["glossary_nodes"] = nodes
         self._properties["glossary_nodes"] = _available_properties(
-            df, exclude=["glossary_id"], always_include=["name"]
+            df, exclude=["glossary_name"], always_include=["name"]
         )
         return nodes
 
@@ -361,14 +372,14 @@ class CSVTransformer:
         nodes = [
             Category(
                 id=row.category_id,
-                name=getattr(row, "name", row.category_id) or row.category_id,
+                name=getattr(row, "name", row.category_name) or row.category_name,
                 description=getattr(row, "description", None),
             )
             for row in df.itertuples(index=False)
         ]
         self._node_cache["category_nodes"] = nodes
         self._properties["category_nodes"] = _available_properties(
-            df, exclude=[], always_include=["name"]
+            df, exclude=["glossary_name", "category_name"], always_include=["name"]
         )
         return nodes
 
@@ -379,15 +390,15 @@ class CSVTransformer:
 
         nodes = [
             BusinessTerm(
-                id=row.term_id,
-                name=getattr(row, "name", row.term_id) or row.term_id,
+                id=row.business_term_id,
+                name=getattr(row, "name", row.term_name) or row.term_name,
                 description=getattr(row, "description", None),
             )
             for row in df.itertuples(index=False)
         ]
         self._node_cache["business_term_nodes"] = nodes
         self._properties["business_term_nodes"] = _available_properties(
-            df, exclude=[], always_include=["name"]
+            df, exclude=["glossary_name", "category_name", "term_name"], always_include=["name"]
         )
         return nodes
 
@@ -480,7 +491,7 @@ class CSVTransformer:
         relationships = [
             HasBusinessTerm(
                 category_id=row.category_id,
-                business_term_id=row.term_id,
+                business_term_id=row.business_term_id,
             )
             for row in df.itertuples(index=False)
         ]
@@ -531,4 +542,34 @@ class CSVTransformer:
             for row in df.itertuples(index=False)
         ]
         self._relationships_cache["uses_column_relationships"] = relationships
+        return relationships
+
+    def transform_to_column_tagged_with_relationships(self, df: pd.DataFrame) -> list[TaggedWith]:
+        """Transform column-term mapping DataFrame to (:Column)-[:TAGGED_WITH]->(:BusinessTerm) relationships."""
+        if df is None or df.empty:
+            return []
+
+        relationships = [
+            TaggedWith(
+                entity_id=row.column_id,
+                business_term_id=row.business_term_id,
+            )
+            for row in df.itertuples(index=False)
+        ]
+        self._relationships_cache["column_tagged_with_relationships"] = relationships
+        return relationships
+
+    def transform_to_table_tagged_with_relationships(self, df: pd.DataFrame) -> list[TaggedWith]:
+        """Transform table-term mapping DataFrame to (:Table)-[:TAGGED_WITH]->(:BusinessTerm) relationships."""
+        if df is None or df.empty:
+            return []
+
+        relationships = [
+            TaggedWith(
+                entity_id=row.table_id,
+                business_term_id=row.business_term_id,
+            )
+            for row in df.itertuples(index=False)
+        ]
+        self._relationships_cache["table_tagged_with_relationships"] = relationships
         return relationships

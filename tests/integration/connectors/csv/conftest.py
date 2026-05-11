@@ -136,7 +136,7 @@ q002,my_project.sales.orders.customer_id
 @pytest.fixture
 def sample_glossary_csv(temp_csv_dir):
     """Create sample glossary_info.csv file."""
-    csv_content = """glossary_id,name,description
+    csv_content = """glossary_name,name,description
 sales_glossary,Sales Glossary,Sales business terms
 """
     csv_path = temp_csv_dir / "glossary_info.csv"
@@ -147,7 +147,7 @@ sales_glossary,Sales Glossary,Sales business terms
 @pytest.fixture
 def sample_category_csv(temp_csv_dir):
     """Create sample category_info.csv file."""
-    csv_content = """glossary_id,category_id,name,description
+    csv_content = """glossary_name,category_name,name,description
 sales_glossary,metrics,Metrics,Sales metrics
 """
     csv_path = temp_csv_dir / "category_info.csv"
@@ -158,8 +158,8 @@ sales_glossary,metrics,Metrics,Sales metrics
 @pytest.fixture
 def sample_business_term_csv(temp_csv_dir):
     """Create sample business_term_info.csv file."""
-    csv_content = """category_id,term_id,name,description
-metrics,arr,Annual Recurring Revenue,Yearly revenue
+    csv_content = """glossary_name,category_name,term_name,name,description
+sales_glossary,metrics,arr,Annual Recurring Revenue,Yearly revenue
 """
     csv_path = temp_csv_dir / "business_term_info.csv"
     csv_path.write_text(csv_content)

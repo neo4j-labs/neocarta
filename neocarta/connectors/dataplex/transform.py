@@ -19,11 +19,15 @@ from ...data_model.rdbms import (
 )
 from ..models import NodesCache, RelationshipsCache
 from ..utils.generate_id import (
+    generate_business_term_id,
+    generate_category_id,
     generate_column_id,
     generate_database_id,
+    generate_glossary_id,
     generate_schema_id,
     generate_table_id,
 )
+from .utils import parse_business_term_slug, parse_category_slug
 
 
 class DataplexTransformer:
@@ -312,9 +316,10 @@ class DataplexTransformer:
         """
         nodes = [
             Glossary(
-                id=row.glossary_id,
+                id=generate_glossary_id(row.glossary_id),
                 name=row.glossary_name,
                 description=None,  # no description in extraction step
+                resource_path=row.glossary_resource_path,
             )
             for _, row in glossary_info.iterrows()
         ]
@@ -345,9 +350,10 @@ class DataplexTransformer:
         """
         nodes = [
             Category(
-                id=row.category_id,
-                name=row.category_id,
+                id=generate_category_id(row.glossary_id, parse_category_slug(row.category_id)),
+                name=parse_category_slug(row.category_id),
                 description=None,  # no description in extraction step
+                resource_path=row.category_id,
             )
             for _, row in category_info.iterrows()
         ]
@@ -378,9 +384,14 @@ class DataplexTransformer:
         """
         nodes = [
             BusinessTerm(
-                id=row.term_id,
+                id=generate_business_term_id(
+                    row.glossary_id,
+                    parse_category_slug(row.category_id),
+                    parse_business_term_slug(row.term_id),
+                ),
                 name=row.term_name,
                 description=row.term_description,
+                resource_path=row.term_id,
             )
             for _, row in business_term_info.iterrows()
         ]
@@ -510,8 +521,10 @@ class DataplexTransformer:
         """
         relationships = [
             HasCategory(
-                glossary_id=row.glossary_id,
-                category_id=row.category_id,
+                glossary_id=generate_glossary_id(row.glossary_id),
+                category_id=generate_category_id(
+                    row.glossary_id, parse_category_slug(row.category_id)
+                ),
             )
             for _, row in category_info.iterrows()
         ]
@@ -543,8 +556,14 @@ class DataplexTransformer:
         """
         relationships = [
             HasBusinessTerm(
-                category_id=row.category_id,
-                business_term_id=row.term_id,
+                category_id=generate_category_id(
+                    row.glossary_id, parse_category_slug(row.category_id)
+                ),
+                business_term_id=generate_business_term_id(
+                    row.glossary_id,
+                    parse_category_slug(row.category_id),
+                    parse_business_term_slug(row.term_id),
+                ),
             )
             for _, row in business_term_info.iterrows()
         ]
@@ -573,7 +592,7 @@ class DataplexTransformer:
         list[TaggedWith]
         """
         relationships = [
-            TaggedWith(entity_id=row.entity_id, business_term_id=row.term_id)
+            TaggedWith(entity_id=row.entity_id, business_term_id=row.business_term_id)
             for _, row in column_term_info.iterrows()
         ]
 
@@ -592,7 +611,7 @@ class DataplexTransformer:
         Parameters
         ----------
         table_term_info: pd.DataFrame
-            A Pandas DataFrame with columns `entity_id` (Table node id) and `term_id` (BusinessTerm node id).
+            A Pandas DataFrame with columns `entity_id` (Table node id) and `business_term_id` (BusinessTerm node id).
         cache: bool = True
             Whether to cache the transform.
 
@@ -601,7 +620,7 @@ class DataplexTransformer:
         list[TaggedWith]
         """
         relationships = [
-            TaggedWith(entity_id=row.entity_id, business_term_id=row.term_id)
+            TaggedWith(entity_id=row.entity_id, business_term_id=row.business_term_id)
             for _, row in table_term_info.iterrows()
         ]
 

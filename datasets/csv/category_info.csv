@@ -1,4 +1,4 @@
-glossary_id,category_id,name,description
+glossary_name,category_name,name,description
 ecommerce_glossary,revenue_metrics,Revenue Metrics,Key revenue and financial metrics
 ecommerce_glossary,customer_metrics,Customer Metrics,Customer behavior and engagement metrics
 ecommerce_glossary,product_metrics,Product Metrics,Product performance and inventory metrics

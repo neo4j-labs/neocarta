@@ -353,13 +353,13 @@ def test_query_only_loads_provided_columns(neo4j_driver, temp_csv_dir):
 def test_load_glossary_entities(neo4j_driver, temp_csv_dir):
     """Test that glossary entities are loaded correctly."""
     (temp_csv_dir / "glossary_info.csv").write_text(
-        "glossary_id,name,description\nsales_glossary,Sales Glossary,Sales business terms\n"
+        "glossary_name,name,description\nsales_glossary,Sales Glossary,Sales business terms\n"
     )
     (temp_csv_dir / "category_info.csv").write_text(
-        "glossary_id,category_id,name,description\nsales_glossary,metrics,Metrics,Sales metrics\n"
+        "glossary_name,category_name,name,description\nsales_glossary,metrics,Metrics,Sales metrics\n"
     )
     (temp_csv_dir / "business_term_info.csv").write_text(
-        "category_id,term_id,name,description\nmetrics,arr,Annual Recurring Revenue,Yearly revenue\n"
+        "glossary_name,category_name,term_name,name,description\nsales_glossary,metrics,arr,Annual Recurring Revenue,Yearly revenue\n"
     )
 
     connector = CSVConnector(

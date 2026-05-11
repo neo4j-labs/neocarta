@@ -1,6 +1,17 @@
-# Changelog of neocarta library
+# Changelog of neocarta library and MCP server
 
 ## Upcoming
+
+### Fixed
+* Fix demo data: `business_term_info.csv` had duplicate term identity columns (`term_name` as abbreviation and `name` as full readable name); removed `term_name` abbreviation column and renamed `name` → `term_name`. Updated `column_term_info.csv` and `table_term_info.csv` to reference terms by full readable name to match.
+
+### Changed
+
+### Added
+* Add data model diagram for table views and materialized views
+* Add `claude.md` file
+
+## v0.3.0
 
 ### Fixed
 * Add column data types `["GEOGRAPHY", "JSON", "BIGNUMERIC"]` to skipped list for `Value` node creation. These types will throw an error otherwise.
@@ -11,9 +22,13 @@
 * Fixed query parser reading CTEs as real tables
 * Fixed query parser reading `.*` projections as a real column named `*`
 * Fixed query parser reading self referential joins as real FKs
+* CSV connector `business_term_info.csv` now requires `glossary_name` and `category_name` in addition to `term_name`, ensuring business term IDs are globally unique within a CSV dataset (previously `term_id` alone was not uniquely scoped)
+* Dataplex connector `Category` nodes previously used the full GCP resource path as both `id` and `name`; `id` is now a normalised dot-separated slug and `name` is the category slug
+
 
 ### Changed
 * Replace `RESOLVES_TO` relationship with `TAGGED_WITH` across RDBMS and LPG data models
+* **Breaking:** CSV connector glossary CSV files now use `*_name` columns as required inputs (matching the database hierarchy convention) — `glossary_id` → `glossary_name` in `glossary_info.csv`; `glossary_id`, `category_id` → `glossary_name`, `category_name` in `category_info.csv`; `category_id`, `term_id` → `glossary_name`, `category_name`, `term_name` in `business_term_info.csv`. IDs are now auto-generated as a dot-separated hierarchy from these name columns. Explicit `*_id` columns are still accepted as overrides.
 
 ### Added
 * Add `TAGGED_WITH` relationship type to `RelationshipType` enum
@@ -25,6 +40,13 @@
 * Add acme dataset and update example dataset loader function to accomodate ecommerce and acme datasets
 * Add `CTE` node to capture CTEs from queries 
 * Add `(:Query)-[:DEFINES]->(:CTE)` relationship
+* Add optional `resource_path` property to `Glossary`, `Category`, and `BusinessTerm` nodes — intended to hold the full Dataplex resource path when loaded via the Dataplex connector
+* Add `generate_glossary_id()`, `generate_category_id()`, and `generate_business_term_id()` to ID generation utilities
+* CSV connector now supports loading glossary, category, and business term data; glossary entities follow the same `*_name` column convention as the database hierarchy, with IDs auto-generated as a dot-separated hierarchy (`glossary_name.category_name.term_name`)
+* CSV connector now supports `(:Column)-[:TAGGED_WITH]->(:BusinessTerm)` and `(:Table)-[:TAGGED_WITH]->(:BusinessTerm)` relationships via `column_term_info.csv` and `table_term_info.csv`; both files support auto-generated or explicit IDs
+* Add sample `column_term_info.csv` and `table_term_info.csv` to the ecommerce dataset
+* Dataplex connector now uses `generate_glossary_id()`, `generate_category_id()`, and `generate_business_term_id()` for consistent dot-separated node IDs — IDs produced by the Dataplex and CSV connectors are now interoperable when glossary/category/term slugs match
+* Dataplex connector sets `resource_path` on `Glossary`, `Category`, and `BusinessTerm` nodes with the original GCP resource path; glossary `resource_path` is inferred from the category resource path
 
 ## v0.2.1
 

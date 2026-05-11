@@ -2,8 +2,11 @@ import pytest
 
 from neocarta.connectors.csv.extract import NODE_ENTITIES, REL_ENTITIES, CSVExtractor
 from neocarta.connectors.utils.generate_id import (
+    generate_business_term_id,
+    generate_category_id,
     generate_column_id,
     generate_database_id,
+    generate_glossary_id,
     generate_schema_id,
     generate_table_id,
     generate_value_id,
@@ -353,3 +356,72 @@ class TestIdComputation:
         df = CSVExtractor(str(tmp_path)).extract_column_references_info()
         assert df["source_column_id"].iloc[0] == "custom-src-id"
         assert df["target_column_id"].iloc[0] == "custom-tgt-id"
+
+    # --- glossary ---
+
+    def test_glossary_id_auto_generated(self, tmp_path):
+        (tmp_path / "glossary_info.csv").write_text("glossary_name\necommerce_glossary\n")
+        df = CSVExtractor(str(tmp_path)).extract_glossary_info()
+        assert df["glossary_id"].iloc[0] == generate_glossary_id("ecommerce_glossary")
+
+    def test_glossary_id_explicit_preserved(self, tmp_path):
+        (tmp_path / "glossary_info.csv").write_text(
+            "glossary_name,glossary_id\necommerce_glossary,custom-gloss-id\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_glossary_info()
+        assert df["glossary_id"].iloc[0] == "custom-gloss-id"
+
+    # --- category ---
+
+    def test_category_id_auto_generated(self, tmp_path):
+        (tmp_path / "category_info.csv").write_text(
+            "glossary_name,category_name\necommerce_glossary,revenue_metrics\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_category_info()
+        assert df["category_id"].iloc[0] == generate_category_id(
+            "ecommerce_glossary", "revenue_metrics"
+        )
+
+    def test_category_glossary_id_auto_generated(self, tmp_path):
+        """glossary_id (parent FK) is computed on category_info for relationship use."""
+        (tmp_path / "category_info.csv").write_text(
+            "glossary_name,category_name\necommerce_glossary,revenue_metrics\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_category_info()
+        assert df["glossary_id"].iloc[0] == generate_glossary_id("ecommerce_glossary")
+
+    def test_category_id_explicit_preserved(self, tmp_path):
+        (tmp_path / "category_info.csv").write_text(
+            "glossary_name,category_name,category_id\necommerce_glossary,revenue_metrics,custom-cat-id\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_category_info()
+        assert df["category_id"].iloc[0] == "custom-cat-id"
+
+    # --- business term ---
+
+    def test_business_term_id_auto_generated(self, tmp_path):
+        (tmp_path / "business_term_info.csv").write_text(
+            "glossary_name,category_name,term_name\necommerce_glossary,revenue_metrics,gmv\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_business_term_info()
+        assert df["business_term_id"].iloc[0] == generate_business_term_id(
+            "ecommerce_glossary", "revenue_metrics", "gmv"
+        )
+
+    def test_business_term_category_id_auto_generated(self, tmp_path):
+        """category_id (parent FK) is computed on business_term_info for relationship use."""
+        (tmp_path / "business_term_info.csv").write_text(
+            "glossary_name,category_name,term_name\necommerce_glossary,revenue_metrics,gmv\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_business_term_info()
+        assert df["category_id"].iloc[0] == generate_category_id(
+            "ecommerce_glossary", "revenue_metrics"
+        )
+
+    def test_business_term_id_explicit_preserved(self, tmp_path):
+        (tmp_path / "business_term_info.csv").write_text(
+            "glossary_name,category_name,term_name,business_term_id\n"
+            "ecommerce_glossary,revenue_metrics,gmv,custom-term-id\n"
+        )
+        df = CSVExtractor(str(tmp_path)).extract_business_term_info()
+        assert df["business_term_id"].iloc[0] == "custom-term-id"

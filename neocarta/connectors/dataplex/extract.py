@@ -6,13 +6,14 @@ import pandas as pd
 import requests
 from google.cloud import dataplex_v1
 
-from ..utils.generate_id import generate_column_id, generate_table_id
+from ..utils.generate_id import generate_business_term_id, generate_column_id, generate_table_id
 from .models import (
     BigQueryMetadataInfoResponse,
     DataplexExtractorCache,
     EntryLinkInfoResponse,
     GlossaryInfoResponse,
 )
+from .utils import parse_business_term_slug, parse_category_slug, parse_glossary_resource_path
 
 
 class DataplexExtractor:
@@ -97,48 +98,81 @@ class DataplexExtractor:
     @property
     def glossary_info(self) -> pd.DataFrame:
         """Get the glossary information DataFrame."""
-        cols = ["glossary_id", "glossary_name"]
-        return self._cache.get("glossary_info", pd.DataFrame(columns=cols)).drop_duplicates(
-            subset=["glossary_id"]
-        )[cols]
+        cols = ["glossary_id", "glossary_name", "glossary_resource_path"]
+        df = self._cache.get(
+            "glossary_info", pd.DataFrame(columns=["glossary_id", "glossary_name", "category_id"])
+        )
+        df = df[df["category_id"].str.contains("/categories/", na=False)].copy()
+        df["glossary_resource_path"] = df["category_id"].apply(parse_glossary_resource_path)
+        return df.drop_duplicates(subset=["glossary_id"])[cols]
 
     @property
     def category_info(self) -> pd.DataFrame:
         """Get the category information DataFrame."""
         cols = ["glossary_id", "category_id"]
-        return self._cache.get("glossary_info", pd.DataFrame(columns=cols)).drop_duplicates(
-            subset=["glossary_id", "category_id"]
-        )[cols]
+        df = self._cache.get("glossary_info", pd.DataFrame(columns=cols))
+        df = df[df["category_id"].str.contains("/categories/", na=False)]
+        return df.drop_duplicates(subset=["glossary_id", "category_id"])[cols]
 
     @property
     def business_term_info(self) -> pd.DataFrame:
         """Get the business term information DataFrame."""
         cols = ["glossary_id", "category_id", "term_id", "term_name", "term_description"]
-        return self._cache.get("glossary_info", pd.DataFrame(columns=cols)).drop_duplicates(
-            subset=["glossary_id", "category_id", "term_id"]
-        )[cols]
+        df = self._cache.get("glossary_info", pd.DataFrame(columns=cols))
+        df = df[df["category_id"].str.contains("/categories/", na=False)]
+        return df.drop_duplicates(subset=["glossary_id", "category_id", "term_id"])[cols]
 
     @property
     def column_term_info(self) -> pd.DataFrame:
         """Get entry links where a Column is tagged with a BusinessTerm."""
-        cols = ["entity_id", "term_id"]
-        df = self._cache.get(
+        cols = ["entity_id", "term_id", "business_term_id"]
+        entry_df = self._cache.get(
             "entry_link_info", pd.DataFrame(columns=["entity_id", "entity_type", "term_id"])
         )
-        return df[df["entity_type"] == "COLUMN"].drop_duplicates(subset=["entity_id", "term_id"])[
-            cols
-        ]
+        col_df = entry_df[entry_df["entity_type"] == "COLUMN"].drop_duplicates(
+            subset=["entity_id", "term_id"]
+        )[["entity_id", "term_id"]]
+        if col_df.empty:
+            return pd.DataFrame(columns=cols)
+        glossary_df = self._cache.get(
+            "glossary_info", pd.DataFrame(columns=["glossary_id", "category_id", "term_id"])
+        )[["glossary_id", "category_id", "term_id"]].drop_duplicates(subset=["term_id"])
+        merged = col_df.merge(glossary_df, on="term_id", how="left")
+        merged["business_term_id"] = merged.apply(
+            lambda row: generate_business_term_id(
+                row["glossary_id"],
+                parse_category_slug(row["category_id"]),
+                parse_business_term_slug(row["term_id"]),
+            ),
+            axis=1,
+        )
+        return merged[cols]
 
     @property
     def table_term_info(self) -> pd.DataFrame:
         """Get entry links where a Table is tagged with a BusinessTerm."""
-        cols = ["entity_id", "term_id"]
-        df = self._cache.get(
+        cols = ["entity_id", "term_id", "business_term_id"]
+        entry_df = self._cache.get(
             "entry_link_info", pd.DataFrame(columns=["entity_id", "entity_type", "term_id"])
         )
-        return df[df["entity_type"] == "TABLE"].drop_duplicates(subset=["entity_id", "term_id"])[
-            cols
-        ]
+        tbl_df = entry_df[entry_df["entity_type"] == "TABLE"].drop_duplicates(
+            subset=["entity_id", "term_id"]
+        )[["entity_id", "term_id"]]
+        if tbl_df.empty:
+            return pd.DataFrame(columns=cols)
+        glossary_df = self._cache.get(
+            "glossary_info", pd.DataFrame(columns=["glossary_id", "category_id", "term_id"])
+        )[["glossary_id", "category_id", "term_id"]].drop_duplicates(subset=["term_id"])
+        merged = tbl_df.merge(glossary_df, on="term_id", how="left")
+        merged["business_term_id"] = merged.apply(
+            lambda row: generate_business_term_id(
+                row["glossary_id"],
+                parse_category_slug(row["category_id"]),
+                parse_business_term_slug(row["term_id"]),
+            ),
+            axis=1,
+        )
+        return merged[cols]
 
     def _get_dataset_id(self, dataset_id: str | None = None) -> str:
         """

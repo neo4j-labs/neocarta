@@ -37,6 +37,10 @@ class Glossary(BaseModel):
     id: str = Field(..., description="The unique identifier for the glossary")
     name: str = Field(..., description="The name of the glossary")
     description: str | None = Field(default=None, description="The description of the glossary")
+    resource_path: str | None = Field(
+        default=None,
+        description="The full resource path for the glossary (e.g. the Dataplex resource name)",
+    )
 
 
 class Category(BaseModel):
@@ -45,6 +49,10 @@ class Category(BaseModel):
     id: str = Field(..., description="The unique identifier for the category")
     name: str = Field(..., description="The name of the category")
     description: str | None = Field(default=None, description="The description of the category")
+    resource_path: str | None = Field(
+        default=None,
+        description="The full resource path for the category (e.g. the Dataplex resource name)",
+    )
 
 
 class BusinessTerm(BaseModel):
@@ -57,6 +65,10 @@ class BusinessTerm(BaseModel):
     )
     embedding: list[float] | None = Field(
         default=None, description="The embedding of the business term description"
+    )
+    resource_path: str | None = Field(
+        default=None,
+        description="The full resource path for the business term (e.g. the Dataplex resource name)",
     )
 
 

@@ -121,9 +121,24 @@ class DataplexConnector:
             )
 
         if self.include_glossary:
-            print(self.loader.load_glossary_nodes(self.transformer.glossary_nodes))
-            print(self.loader.load_category_nodes(self.transformer.category_nodes))
-            print(self.loader.load_business_term_nodes(self.transformer.business_term_nodes))
+            print(
+                self.loader.load_glossary_nodes(
+                    self.transformer.glossary_nodes,
+                    properties_list=["name", "description", "resource_path"],
+                )
+            )
+            print(
+                self.loader.load_category_nodes(
+                    self.transformer.category_nodes,
+                    properties_list=["name", "description", "resource_path"],
+                )
+            )
+            print(
+                self.loader.load_business_term_nodes(
+                    self.transformer.business_term_nodes,
+                    properties_list=["name", "description", "resource_path"],
+                )
+            )
 
             print(
                 self.loader.load_has_category_relationships(

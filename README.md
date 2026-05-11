@@ -427,7 +427,7 @@ Custom file names can be specified using the `csv_file_map` parameter.
 
 **ID Strategy:**
 
-Entity IDs are automatically generated from name columns using a dot-separated hierarchy (e.g., `database_name.schema_name.table_name`). To use custom IDs instead, supply explicit `*_id` columns (`database_id`, `schema_id`, `table_id`, `column_id`, `value_id`) in every CSV file in the hierarchy. Do not mix strategies across files. See the [CSV Connector README](neocarta/connectors/csv/README.md) for full details.
+Entity IDs are automatically generated from name columns using a dot-separated hierarchy (e.g., `database_name.schema_name.table_name` for tables, `glossary_name.category_name.term_name` for business terms). To use custom IDs instead, supply explicit `*_id` columns in every CSV file in the hierarchy. Do not mix strategies across files. If loading glossary data from both the CSV and Dataplex connectors into the same graph, you must supply explicit IDs in the CSV that match the Dataplex resource paths. See the [CSV Connector README](neocarta/connectors/csv/README.md) for full details.
 
 This connector requires the following variables to be set in the `.env` file:
 * NEO4J_USERNAME=neo4j-username
@@ -703,7 +703,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.2.1",
+        "neocarta[mcp]@0.3.0",
         "neocarta-mcp"
       ],
       "env": {

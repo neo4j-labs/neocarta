@@ -1,6 +1,6 @@
 [project]
 name = "neocarta"
-version = "0.2.1"
+version = "0.3.0"
 description = "Library that facilitates the creation of semantic layer metadata graph in Neo4j."
 readme = "README.md"
 license = { file = "LICENSE" }

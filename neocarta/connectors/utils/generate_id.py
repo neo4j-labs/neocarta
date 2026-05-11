@@ -143,6 +143,86 @@ def generate_value_id(database: str, schema: str, table: str, column: str, value
     return f"{_normalize(database)}.{_normalize(schema)}.{_normalize(table)}.{_normalize(column)}.{value_hash}"
 
 
+def generate_glossary_id(glossary: str) -> str:
+    """
+    Generate a glossary ID.
+
+    Parameters
+    ----------
+    glossary : str
+        The glossary identifier (name or slug)
+
+    Returns:
+    -------
+    str
+        The glossary ID
+
+    Examples:
+    --------
+    >>> generate_glossary_id("ecommerce_glossary")
+    'ecommerce_glossary'
+    """
+    return _normalize(glossary)
+
+
+def generate_category_id(glossary: str, category: str) -> str:
+    """
+    Generate a category ID from glossary and category identifiers.
+
+    Parameters
+    ----------
+    glossary : str
+        The glossary identifier
+    category : str
+        The category identifier
+
+    Returns:
+    -------
+    str
+        The category ID in format: {glossary}.{category}
+
+    Examples:
+    --------
+    >>> generate_category_id("ecommerce_glossary", "revenue_metrics")
+    'ecommerce_glossary.revenue_metrics'
+    """
+    return f"{_normalize(glossary)}.{_normalize(category)}"
+
+
+def generate_business_term_id(glossary: str, category: str, term: str) -> str:
+    """
+    Generate a business term ID from glossary, category, and term identifiers.
+
+    This produces a dot-separated hierarchical ID (e.g.
+    ``ecommerce_glossary.revenue_metrics.gmv``) suitable for the CSV connector.
+    It is NOT the same format as the full GCP resource path IDs produced by the
+    Dataplex connector (e.g. ``projects/.../glossaries/.../terms/...``). If you
+    intend to load glossary data from both the CSV and Dataplex connectors into
+    the same graph, supply explicit ``*_id`` values in the CSV that match the
+    Dataplex resource paths rather than relying on auto-generation.
+
+    Parameters
+    ----------
+    glossary : str
+        The glossary identifier
+    category : str
+        The category identifier
+    term : str
+        The term identifier
+
+    Returns:
+    -------
+    str
+        The business term ID in format: {glossary}.{category}.{term}
+
+    Examples:
+    --------
+    >>> generate_business_term_id("ecommerce_glossary", "revenue_metrics", "gmv")
+    'ecommerce_glossary.revenue_metrics.gmv'
+    """
+    return f"{_normalize(glossary)}.{_normalize(category)}.{_normalize(term)}"
+
+
 def create_query_id(query: str) -> str:
     """Create a query ID from a query string."""
     return hashlib.sha256(query.encode()).hexdigest()

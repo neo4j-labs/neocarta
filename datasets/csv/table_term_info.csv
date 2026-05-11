@@ -1,0 +1,5 @@
+database_name,schema_name,table_name,glossary_name,category_name,term_name
+Demo E-commerce,demo_ecommerce,orders,ecommerce_glossary,revenue_metrics,Average Order Value
+Demo E-commerce,demo_ecommerce,order_items,ecommerce_glossary,revenue_metrics,Gross Merchandise Value
+Demo E-commerce,demo_ecommerce,customers,ecommerce_glossary,customer_metrics,Customer Lifetime Value
+Demo E-commerce,demo_ecommerce,products,ecommerce_glossary,product_metrics,Sell-Through Rate

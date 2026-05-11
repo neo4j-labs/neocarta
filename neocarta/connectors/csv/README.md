@@ -14,18 +14,23 @@ The connector automatically computes all entity IDs from the name columns. **Cho
 
 Omit all `*_id` columns. The connector builds deterministic, dot-separated IDs from the name columns:
 
-| Entity | ID |
-|---|---|
-| Database | `{database_name}` |
-| Schema | `{database_name}.{schema_name}` |
-| Table | `{database_name}.{schema_name}.{table_name}` |
-| Column | `{database_name}.{schema_name}.{table_name}.{column_name}` |
+| Entity | Required name columns | Auto-generated ID |
+|---|---|---|
+| Database | `database_name` | `{database_name}` |
+| Schema | `database_name`, `schema_name` | `{database_name}.{schema_name}` |
+| Table | `database_name`, `schema_name`, `table_name` | `{database_name}.{schema_name}.{table_name}` |
+| Column | `database_name`, `schema_name`, `table_name`, `column_name` | `{database_name}.{schema_name}.{table_name}.{column_name}` |
+| Glossary | `glossary_name` | `{glossary_name}` |
+| Category | `glossary_name`, `category_name` | `{glossary_name}.{category_name}` |
+| BusinessTerm | `glossary_name`, `category_name`, `term_name` | `{glossary_name}.{category_name}.{term_name}` |
 
 ### Explicit IDs
 
-Supply the corresponding `*_id` column (`database_id`, `schema_id`, `table_id`, `column_id`, `value_id`) in **every** CSV file in the hierarchy. Explicit IDs are used as-is and must be consistent across files — for example, the `database_id` value in `schema_info.csv` must match the `database_id` in `database_info.csv`.
+Supply the corresponding `*_id` column (`database_id`, `schema_id`, `table_id`, `column_id`, `value_id`, `glossary_id`, `category_id`, `business_term_id`) in **every** CSV file in the hierarchy. Explicit IDs are used as-is and must be consistent across files — for example, the `glossary_id` value in `category_info.csv` must match the `glossary_id` in `glossary_info.csv`.
 
 > **Warning:** Mixing explicit and auto-generated IDs across files in the same hierarchy is not supported and will produce inconsistent node references.
+
+> **Dataplex compatibility:** If you load glossary data from both the CSV connector and the Dataplex connector into the same graph, you must supply explicit `glossary_id`, `category_id`, and `business_term_id` values in the CSV files that match the Dataplex resource paths (e.g. `projects/.../glossaries/.../terms/...`). Auto-generated IDs use a different format and will not align with Dataplex IDs.
 
 ## CSV File Formats
 
@@ -254,17 +259,17 @@ q002,my-project.sales.orders.total_amount
 Creates `:Glossary` nodes representing business glossaries.
 
 **Required columns:**
-- `glossary_id` (string): Unique identifier for the glossary
+- `glossary_name` (string): Glossary identifier — used as the node's `name` property and to auto-generate `glossary_id`
 
 **Optional columns:**
-- `name` (string): Display name (defaults to `glossary_id`)
+- `glossary_id` (string): Explicit ID override (see [ID Strategy](#id-strategy))
+- `name` (string): Display name override (defaults to `glossary_name`)
 - `description` (string): Glossary description
 
 **Example:**
 ```csv
-glossary_id,name,description
-sales_glossary,Sales Glossary,Business terms for sales domain
-product_glossary,Product Glossary,Product and inventory terminology
+glossary_name,name,description
+ecommerce_glossary,E-commerce Business Glossary,Standard business terms for e-commerce
 ```
 
 ---
@@ -274,18 +279,20 @@ product_glossary,Product Glossary,Product and inventory terminology
 Creates `:Category` nodes and `(:Glossary)-[:HAS_CATEGORY]->(:Category)` relationships.
 
 **Required columns:**
-- `glossary_id` (string): Parent glossary identifier
-- `category_id` (string): Category identifier
+- `glossary_name` (string): Parent glossary identifier
+- `category_name` (string): Category identifier — used as the node's `name` property and to auto-generate `category_id`
 
 **Optional columns:**
-- `name` (string): Display name (defaults to `category_id`)
+- `glossary_id` (string): Explicit parent glossary ID override
+- `category_id` (string): Explicit category ID override
+- `name` (string): Display name override (defaults to `category_name`)
 - `description` (string): Category description
 
 **Example:**
 ```csv
-glossary_id,category_id,name,description
-sales_glossary,customer_metrics,Customer Metrics,Metrics related to customer behavior
-sales_glossary,revenue,Revenue,Revenue and financial metrics
+glossary_name,category_name,name,description
+ecommerce_glossary,revenue_metrics,Revenue Metrics,Key revenue and financial metrics
+ecommerce_glossary,customer_metrics,Customer Metrics,Customer behavior metrics
 ```
 
 ---
@@ -295,19 +302,22 @@ sales_glossary,revenue,Revenue,Revenue and financial metrics
 Creates `:BusinessTerm` nodes and `(:Category)-[:HAS_BUSINESS_TERM]->(:BusinessTerm)` relationships.
 
 **Required columns:**
-- `category_id` (string): Parent category identifier
-- `term_id` (string): Business term identifier
+- `glossary_name` (string): Parent glossary identifier
+- `category_name` (string): Parent category identifier
+- `term_name` (string): Term identifier — used as the node's `name` property and to auto-generate `business_term_id`
 
 **Optional columns:**
-- `name` (string): Display name (defaults to `term_id`)
+- `category_id` (string): Explicit parent category ID override
+- `business_term_id` (string): Explicit business term ID override
+- `name` (string): Display name override (defaults to `term_name`)
 - `description` (string): Business term description
 
 **Example:**
 ```csv
-category_id,term_id,name,description
-customer_metrics,ltv,Customer Lifetime Value,Total revenue expected from a customer over their lifetime
-customer_metrics,cac,Customer Acquisition Cost,Average cost to acquire a new customer
-revenue,arr,Annual Recurring Revenue,Predictable revenue normalized to a yearly amount
+glossary_name,category_name,term_name,name,description
+ecommerce_glossary,revenue_metrics,gmv,Gross Merchandise Value,Total sales value of merchandise sold
+ecommerce_glossary,customer_metrics,ltv,Customer Lifetime Value,Total revenue expected from a customer
+ecommerce_glossary,customer_metrics,cac,Customer Acquisition Cost,Average cost to acquire a new customer
 ```
 
 ---
