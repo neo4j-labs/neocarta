@@ -4,12 +4,17 @@
 
 ### Fixed
 * Fix demo data: `business_term_info.csv` had duplicate term identity columns (`term_name` as abbreviation and `name` as full readable name); removed `term_name` abbreviation column and renamed `name` → `term_name`. Updated `column_term_info.csv` and `table_term_info.csv` to reference terms by full readable name to match.
+* Fixed query parser reading CTEs as real tables
+* Fixed query parser reading `.*` projections as a real column named `*`
+* Fixed query parser reading self referential joins as real FKs
 
 ### Changed
 
 ### Added
 * Add data model diagram for table views and materialized views
 * Add `claude.md` file
+* Add `CTE` node to capture CTEs from queries 
+* Add `(:Query)-[:DEFINES]->(:CTE)` relationship
 
 ## v0.3.0
 
@@ -19,12 +24,8 @@
 * Fixed bug where value retrieval would yield empty arrays when all values in column are `NULL`
 * Fixed bug where `description='false'` when querying table info due to inaccurate `INFORMATION_SCHEMA.TABLE_OPTIONS` filtering
 * Update agent code to use new MCP configuration
-* Fixed query parser reading CTEs as real tables
-* Fixed query parser reading `.*` projections as a real column named `*`
-* Fixed query parser reading self referential joins as real FKs
 * CSV connector `business_term_info.csv` now requires `glossary_name` and `category_name` in addition to `term_name`, ensuring business term IDs are globally unique within a CSV dataset (previously `term_id` alone was not uniquely scoped)
 * Dataplex connector `Category` nodes previously used the full GCP resource path as both `id` and `name`; `id` is now a normalised dot-separated slug and `name` is the category slug
-
 
 ### Changed
 * Replace `RESOLVES_TO` relationship with `TAGGED_WITH` across RDBMS and LPG data models
@@ -38,8 +39,6 @@
 * Add `load_column_tagged_with_relationships()` and `load_table_tagged_with_relationships()` to Neo4j loader
 * `DataplexConnector` now creates `(:Column)-[:TAGGED_WITH]->(:BusinessTerm)` and `(:Table)-[:TAGGED_WITH]->(:BusinessTerm)` relationships when both `include_schema` and `include_glossary` are enabled
 * Add acme dataset and update example dataset loader function to accomodate ecommerce and acme datasets
-* Add `CTE` node to capture CTEs from queries 
-* Add `(:Query)-[:DEFINES]->(:CTE)` relationship
 * Add optional `resource_path` property to `Glossary`, `Category`, and `BusinessTerm` nodes — intended to hold the full Dataplex resource path when loaded via the Dataplex connector
 * Add `generate_glossary_id()`, `generate_category_id()`, and `generate_business_term_id()` to ID generation utilities
 * CSV connector now supports loading glossary, category, and business term data; glossary entities follow the same `*_name` column convention as the database hierarchy, with IDs auto-generated as a dot-separated hierarchy (`glossary_name.category_name.term_name`)
