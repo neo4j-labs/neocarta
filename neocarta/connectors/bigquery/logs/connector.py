@@ -94,6 +94,7 @@ class BigQueryLogsConnector:
         self.transformer.transform_to_table_nodes(self.extractor.table_info)
         self.transformer.transform_to_column_nodes(self.extractor.column_info)
         self.transformer.transform_to_query_nodes(self.extractor.query_info)
+        self.transformer.transform_to_cte_nodes(self.extractor.cte_info)
 
         # Transform relationships
         self.transformer.transform_to_has_schema_relationships(self.extractor.schema_info)
@@ -104,6 +105,7 @@ class BigQueryLogsConnector:
         )
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
+        self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
 
     def load_metadata(self) -> None:
         """
@@ -124,6 +126,7 @@ class BigQueryLogsConnector:
             self.loader.load_column_nodes(self.transformer.column_nodes, properties_list=["name"])
         )
         print(self.loader.load_query_nodes(self.transformer.query_nodes))
+        print(self.loader.load_cte_nodes(self.transformer.cte_nodes))
 
         # Load relationships
         print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
@@ -134,6 +137,7 @@ class BigQueryLogsConnector:
         print(
             self.loader.load_uses_column_relationships(self.transformer.uses_column_relationships)
         )
+        print(self.loader.load_defines_relationships(self.transformer.defines_relationships))
 
     def run(
         self,

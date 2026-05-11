@@ -3,8 +3,10 @@
 import pandas as pd
 
 from ...data_model.rdbms import (
+    CTE,
     Column,
     Database,
+    Defines,
     HasColumn,
     HasSchema,
     HasTable,
@@ -66,6 +68,22 @@ class QueryLogTransformer:
         (:Query).
         """
         return self._node_cache.get("query_nodes", [])
+
+    @property
+    def cte_nodes(self) -> list[CTE]:
+        """
+        Get the CTE nodes.
+        (:CTE).
+        """
+        return self._node_cache.get("cte_nodes", [])
+
+    @property
+    def defines_relationships(self) -> list[Defines]:
+        """
+        Get the defines relationships.
+        (:Query)-[:DEFINES]->(:CTE).
+        """
+        return self._relationships_cache.get("defines_relationships", [])
 
     @property
     def has_schema_relationships(self) -> list[HasSchema]:
@@ -255,6 +273,42 @@ class QueryLogTransformer:
             self._relationships_cache["uses_table_relationships"] = uses_table_relationships
 
         return uses_table_relationships
+
+    def transform_to_cte_nodes(self, cte_info: pd.DataFrame, cache: bool = True) -> list[CTE]:
+        """Transform CTE info into CTE nodes."""
+        if cte_info is None or cte_info.empty:
+            cte_nodes: list[CTE] = []
+        else:
+            cte_nodes = [
+                CTE(
+                    id=row.cte_id,
+                    name=row.cte_name,
+                    definition=row.definition,
+                    query_id=row.query_id,
+                )
+                for _, row in cte_info.iterrows()
+            ]
+
+        if cache:
+            self._node_cache["cte_nodes"] = cte_nodes
+
+        return cte_nodes
+
+    def transform_to_defines_relationships(
+        self, cte_info: pd.DataFrame, cache: bool = True
+    ) -> list[Defines]:
+        """Transform CTE info into (:Query)-[:DEFINES]->(:CTE) relationships."""
+        if cte_info is None or cte_info.empty:
+            defines_relationships: list[Defines] = []
+        else:
+            defines_relationships = [
+                Defines(query_id=row.query_id, cte_id=row.cte_id) for _, row in cte_info.iterrows()
+            ]
+
+        if cache:
+            self._relationships_cache["defines_relationships"] = defines_relationships
+
+        return defines_relationships
 
     def transform_to_uses_column_relationships(
         self, query_column_info: pd.DataFrame, cache: bool = True

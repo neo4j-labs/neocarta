@@ -509,3 +509,57 @@ def test_get_uses_column_relationships(query_log_transformer_with_cache: QueryLo
         query_log_transformer_with_cache.uses_column_relationships[1].column_id
         == "example_project_id.demo_ecommerce.orders.order_date"
     )
+
+
+def test_transform_to_cte_nodes(query_log_transformer: QueryLogTransformer):
+    import pandas as pd
+
+    cte_info = pd.DataFrame(
+        [
+            {
+                "cte_id": "qid-1.paid",
+                "cte_name": "paid",
+                "definition": "SELECT invoice_id FROM proj.ds.invoices WHERE status = 'PAID'",
+                "query_id": "qid-1",
+            },
+            {
+                "cte_id": "qid-1.won",
+                "cte_name": "won",
+                "definition": "SELECT opp_id FROM proj.ds.opportunities WHERE stage = 'WON'",
+                "query_id": "qid-1",
+            },
+        ]
+    )
+    nodes = query_log_transformer.transform_to_cte_nodes(cte_info, cache=True)
+
+    assert len(nodes) == 2
+    assert nodes[0].id == "qid-1.paid"
+    assert nodes[0].name == "paid"
+    assert "invoices" in nodes[0].definition
+    assert nodes[0].query_id == "qid-1"
+
+
+def test_transform_to_cte_nodes_empty(query_log_transformer: QueryLogTransformer):
+    import pandas as pd
+
+    nodes = query_log_transformer.transform_to_cte_nodes(pd.DataFrame(), cache=True)
+    assert nodes == []
+
+
+def test_transform_to_defines_relationships(query_log_transformer: QueryLogTransformer):
+    import pandas as pd
+
+    cte_info = pd.DataFrame(
+        [
+            {
+                "cte_id": "qid-1.paid",
+                "cte_name": "paid",
+                "definition": "SELECT 1",
+                "query_id": "qid-1",
+            }
+        ]
+    )
+    rels = query_log_transformer.transform_to_defines_relationships(cte_info, cache=True)
+    assert len(rels) == 1
+    assert rels[0].query_id == "qid-1"
+    assert rels[0].cte_id == "qid-1.paid"

@@ -15,6 +15,7 @@ class NodeLabel(str, Enum):
     CATEGORY = "Category"
     BUSINESS_TERM = "BusinessTerm"
     QUERY = "Query"
+    CTE = "CTE"
 
     def __str__(self) -> str:
         """Return the enum value as a plain string."""
@@ -38,6 +39,7 @@ class RelationshipType(str, Enum):
     TAGGED_WITH = "TAGGED_WITH"
     USES_TABLE = "USES_TABLE"
     USES_COLUMN = "USES_COLUMN"
+    DEFINES = "DEFINES"
 
     def __str__(self) -> str:
         """Return the enum value as a plain string."""

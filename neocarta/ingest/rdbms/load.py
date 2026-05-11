@@ -5,10 +5,12 @@ from functools import partial
 from neo4j import Driver, RoutingControl
 
 from ...data_model.rdbms import (
+    CTE,
     BusinessTerm,
     Category,
     Column,
     Database,
+    Defines,
     Glossary,
     HasBusinessTerm,
     HasCategory,
@@ -490,6 +492,54 @@ class Neo4jRDBMSLoader:
         _, summary, _ = self.neo4j_driver.execute_query(
             query_=query,
             parameters_={"rows": [n.model_dump() for n in query_nodes]},
+            routing_=RoutingControl.WRITE,
+            database_=self.database_name,
+        )
+        return summary.counters.__dict__
+
+    def load_cte_nodes(
+        self,
+        cte_nodes: list[CTE],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = ["name", "definition", "query_id"],
+    ) -> dict:
+        """Load CTE nodes into Neo4j."""
+        _validate_properties_list(CTE, properties_list)
+
+        self._write_node_constraint(node_labels=[NodeLabel.CTE])
+        query = _build_node_ingest_query(NodeLabel.CTE, overwrite_existing, properties_list)
+
+        _, summary, _ = self.neo4j_driver.execute_query(
+            query_=query,
+            parameters_={"rows": [n.model_dump() for n in cte_nodes]},
+            routing_=RoutingControl.WRITE,
+            database_=self.database_name,
+        )
+        return summary.counters.__dict__
+
+    def load_defines_relationships(
+        self,
+        defines_relationships: list[Defines],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:Query)-[:DEFINES]->(:CTE) relationships into Neo4j."""
+        if properties_list:
+            _validate_properties_list(Defines, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.DEFINES,
+            NodeLabel.QUERY,
+            NodeLabel.CTE,
+            "query_id",
+            "cte_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        _, summary, _ = self.neo4j_driver.execute_query(
+            query_=query,
+            parameters_={"rows": [n.model_dump() for n in defines_relationships]},
             routing_=RoutingControl.WRITE,
             database_=self.database_name,
         )

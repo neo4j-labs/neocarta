@@ -210,6 +210,73 @@ def test_transform_to_references_relationships(
     )
 
 
+def test_transform_to_references_relationships_drops_self_fk(
+    bigquery_transformer: BigQuerySchemaTransformer,
+):
+    """Self-referencing FK rows (col -> same col on same table) must be dropped."""
+    import pandas as pd
+
+    column_references_info = pd.DataFrame(
+        [
+            # Bogus self-FK: orders.customer_id -> orders.customer_id
+            {
+                "constraint_catalog": "test-project-id",
+                "constraint_schema": "test_dataset",
+                "constraint_name": "fk_bogus",
+                "constraint_type": "FOREIGN KEY",
+                "table_name": "orders",
+                "column_name": "customer_id",
+                "ordinal_position": 1,
+                "referenced_table": "orders",
+                "referenced_column": "customer_id",
+            },
+            # Legitimate FK: orders.customer_id -> customers.customer_id
+            {
+                "constraint_catalog": "test-project-id",
+                "constraint_schema": "test_dataset",
+                "constraint_name": "fk_customer",
+                "constraint_type": "FOREIGN KEY",
+                "table_name": "orders",
+                "column_name": "customer_id",
+                "ordinal_position": 1,
+                "referenced_table": "customers",
+                "referenced_column": "customer_id",
+            },
+            # Legitimate self-reference across columns: employees.manager_id -> employees.employee_id
+            {
+                "constraint_catalog": "test-project-id",
+                "constraint_schema": "test_dataset",
+                "constraint_name": "fk_manager",
+                "constraint_type": "FOREIGN KEY",
+                "table_name": "employees",
+                "column_name": "manager_id",
+                "ordinal_position": 1,
+                "referenced_table": "employees",
+                "referenced_column": "employee_id",
+            },
+        ]
+    )
+
+    refs = bigquery_transformer.transform_to_references_relationships(
+        column_references_info, cache=False
+    )
+
+    pairs = {(r.source_column_id, r.target_column_id) for r in refs}
+    assert (
+        "test_project_id.test_dataset.orders.customer_id",
+        "test_project_id.test_dataset.orders.customer_id",
+    ) not in pairs
+    assert (
+        "test_project_id.test_dataset.orders.customer_id",
+        "test_project_id.test_dataset.customers.customer_id",
+    ) in pairs
+    assert (
+        "test_project_id.test_dataset.employees.manager_id",
+        "test_project_id.test_dataset.employees.employee_id",
+    ) in pairs
+    assert len(refs) == 2
+
+
 def test_transform_to_has_value_relationships(
     bigquery_transformer: BigQuerySchemaTransformer,
     bigquery_extractor_with_cache: BigQuerySchemaExtractor,

@@ -398,25 +398,34 @@ class BigQuerySchemaTransformer:
         list[References]
             The references relationships.
         """
-        references_relationships = [
-            References(
-                source_column_id=generate_column_id(
-                    row.constraint_catalog,
-                    row.constraint_schema,
-                    row.table_name,
-                    row.column_name,
-                ),
-                target_column_id=generate_column_id(
-                    row.constraint_catalog,
-                    row.constraint_schema,
-                    row.referenced_table,
-                    row.referenced_column,
-                ),
+        fk_rows = column_references_info[column_references_info["constraint_type"] == "FOREIGN KEY"]
+
+        references_relationships = []
+        for _, row in fk_rows.iterrows():
+            source_column_id = generate_column_id(
+                row.constraint_catalog,
+                row.constraint_schema,
+                row.table_name,
+                row.column_name,
             )
-            for _, row in column_references_info[
-                column_references_info["constraint_type"] == "FOREIGN KEY"
-            ].iterrows()
-        ]
+            target_column_id = generate_column_id(
+                row.constraint_catalog,
+                row.constraint_schema,
+                row.referenced_table,
+                row.referenced_column,
+            )
+            # Skip bogus self-FKs (e.g. orders.customer_id -> orders.customer_id).
+            # A column referencing itself is never a real foreign key — it's a quirk
+            # of how INFORMATION_SCHEMA constraint joins collapse when both sides of
+            # the FK constraint resolve to the same column.
+            if source_column_id == target_column_id:
+                continue
+            references_relationships.append(
+                References(
+                    source_column_id=source_column_id,
+                    target_column_id=target_column_id,
+                )
+            )
 
         if cache:
             self._relationships_cache["references_relationships"] = references_relationships

@@ -105,6 +105,93 @@ def test_parse_sql_query_uses_default_project_id():
         assert not col["column_id"].startswith(".")
 
 
+def test_parse_sql_query_skips_cte_aliases_as_tables():
+    """CTE aliases must not be returned as catalog tables."""
+    query = """
+    WITH paid AS (
+        SELECT invoice_id FROM `proj.ds.invoices` WHERE status = 'PAID'
+    ),
+    won AS (
+        SELECT opp_id FROM `proj.ds.opportunities` WHERE stage = 'WON'
+    )
+    SELECT p.invoice_id, w.opp_id
+    FROM paid AS p
+    JOIN won AS w ON p.invoice_id = w.opp_id
+    """
+    parsed = parse_sql_query(query, "qid", "bigquery")
+
+    table_names = {t["table_name"] for t in parsed["table_info"]}
+    assert "paid" not in table_names
+    assert "won" not in table_names
+    assert table_names == {"invoices", "opportunities"}
+
+
+def test_parse_sql_query_captures_ctes_with_definitions():
+    """CTEs are captured in cte_info with their inner SELECT as definition."""
+    query = """
+    WITH paid AS (
+        SELECT invoice_id FROM `proj.ds.invoices` WHERE status = 'PAID'
+    ),
+    won AS (
+        SELECT opp_id FROM `proj.ds.opportunities` WHERE stage = 'WON'
+    )
+    SELECT p.invoice_id FROM paid AS p JOIN won AS w ON p.invoice_id = w.opp_id
+    """
+    parsed = parse_sql_query(query, "qid-1", "bigquery")
+
+    cte_by_name = {c["cte_name"]: c for c in parsed["cte_info"]}
+    assert set(cte_by_name) == {"paid", "won"}
+
+    paid = cte_by_name["paid"]
+    assert paid["query_id"] == "qid-1"
+    assert paid["cte_id"] == "qid-1.paid"
+    # Definition must contain the inner SELECT — not the outer query.
+    assert "invoices" in paid["definition"]
+    assert "PAID" in paid["definition"]
+    assert "opportunities" not in paid["definition"]
+
+
+def test_parse_sql_query_no_ctes_returns_empty_list():
+    query = "SELECT order_id FROM `proj.ds.orders`"
+    parsed = parse_sql_query(query, "qid", "bigquery")
+    assert parsed["cte_info"] == []
+
+
+def test_parse_sql_query_skips_bigquery_pseudo_tables():
+    """BigQuery `__TABLES__` and similar metadata pseudo-tables must be filtered out."""
+    query = "SELECT * FROM `proj.ds.__TABLES__`"
+    parsed = parse_sql_query(query, "qid", "bigquery")
+    assert parsed["table_info"] == []
+
+
+def test_parse_sql_query_skips_star_columns():
+    """`SELECT t.*` projections must not be emitted as Column nodes."""
+    query = """
+    SELECT compensation.*, compensation.account_owner_id
+    FROM `proj.ds.compensation` AS compensation
+    """
+    parsed = parse_sql_query(query, "qid", "bigquery")
+
+    column_names = [c["column_name"] for c in parsed["column_info"]]
+    assert "*" not in column_names
+    assert column_names == ["account_owner_id"]
+
+
+def test_parse_sql_query_drops_self_referencing_joins():
+    """Joins where left and right resolve to the same column must be dropped."""
+    # Synthetic case: join condition that would parse as col -> same col on same table.
+    query = """
+    SELECT a.id
+    FROM `proj.ds.t` AS a
+    JOIN `proj.ds.t` AS b ON a.id = a.id
+    """
+    parsed = parse_sql_query(query, "qid", "bigquery")
+    for ref in parsed["references_info"]:
+        assert ref["left_column_id"] != ref["right_column_id"], (
+            f"self-reference leaked through: {ref}"
+        )
+
+
 def test_parse_sql_query_explicit_project_overrides_default():
     """Test that explicit project IDs in queries override the default."""
     query = """

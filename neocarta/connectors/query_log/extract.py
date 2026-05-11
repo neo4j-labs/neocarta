@@ -64,6 +64,11 @@ class QueryLogExtractor:
         return self._cache.get("query_info", pd.DataFrame())
 
     @property
+    def cte_info(self) -> pd.DataFrame:
+        """Get the CTE information."""
+        return self._cache.get("cte_info", pd.DataFrame())
+
+    @property
     def query_table_info(self) -> pd.DataFrame:
         """Get the query table information."""
         return self._cache.get("table_info", pd.DataFrame())[
@@ -113,6 +118,7 @@ class QueryLogExtractor:
         table_info = []
         column_info = []
         references_info = []
+        cte_info = []
 
         for _, row in query_info_df.iterrows():
             query = row["query"]
@@ -127,20 +133,24 @@ class QueryLogExtractor:
                 table_info.extend(parsed_dict["table_info"])
                 column_info.extend(parsed_dict["column_info"])
                 references_info.extend(parsed_dict["references_info"])
+                cte_info.extend(parsed_dict.get("cte_info", []))
 
         table_info_df = pd.DataFrame(table_info)
         column_info_df = pd.DataFrame(column_info)
         references_info_df = pd.DataFrame(references_info)
+        cte_info_df = pd.DataFrame(cte_info)
 
         if cache:
             self._cache["query_info"] = query_info_df
             self._cache["table_info"] = table_info_df
             self._cache["column_info"] = column_info_df
             self._cache["column_references_info"] = references_info_df
+            self._cache["cte_info"] = cte_info_df
 
         return {
             "query_info": query_info_df,
             "table_info": table_info_df,
             "column_info": column_info_df,
             "column_references_info": references_info_df,
+            "cte_info": cte_info_df,
         }

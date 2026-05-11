@@ -14,3 +14,4 @@ class QueryLogExtractorCache(TypedDict):
     column_info: pd.DataFrame | None
     column_references_info: pd.DataFrame | None
     query_info: pd.DataFrame | None
+    cte_info: pd.DataFrame | None

@@ -11,8 +11,10 @@ from .core import (
     Table,
 )
 from .expanded import (
+    CTE,
     BusinessTerm,
     Category,
+    Defines,
     Glossary,
     HasBusinessTerm,
     HasCategory,
@@ -25,10 +27,12 @@ from .expanded import (
 )
 
 __all__ = [
+    "CTE",
     "BusinessTerm",
     "Category",
     "Column",
     "Database",
+    "Defines",
     "Glossary",
     "HasBusinessTerm",
     "HasCategory",

@@ -5,11 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 import sqlglot
-from sqlglot.expressions import Column, Join, Table
+from sqlglot.expressions import CTE, Column, Join, Table
 
 from neocarta.connectors.utils.generate_id import (
     create_query_id,
     generate_column_id,
+    generate_cte_id,
     generate_schema_id,
     generate_table_id,
 )
@@ -119,11 +120,38 @@ def parse_sql_query(
 
         table_ids = set()
 
+        # CTE aliases must not be treated as real tables — sqlglot's `find_all(Table)`
+        # returns both physical tables and CTE references with the same node type.
+        cte_info = []
+        cte_aliases: set[str] = set()
+        for cte in parsed.find_all(CTE):
+            if not cte.alias:
+                continue
+            cte_aliases.add(cte.alias)
+            # `cte.this` is the inner SELECT; render it back to SQL for storage.
+            definition = cte.this.sql(dialect=read) if cte.this is not None else ""
+            cte_info.append(
+                {
+                    "cte_id": generate_cte_id(query_id, cte.alias),
+                    "cte_name": cte.alias,
+                    "definition": definition,
+                    "query_id": query_id,
+                }
+            )
+
         # Table information and defining aliases
         for t in parsed.find_all(Table):
             table = t.this
             table_name = table.name
             table_alias = t.alias
+
+            # Skip CTE references — they are query-local aliases, not catalog tables.
+            if table_name in cte_aliases:
+                continue
+
+            # Skip BigQuery pseudo/metadata tables (e.g. `__TABLES__`, `__TABLES_SUMMARY__`).
+            if table_name.startswith("__") and table_name.endswith("__"):
+                continue
 
             # Use the catalog/project and database/dataset from the table reference, or fall back to defaults
             project_id = t.catalog or default_project_id
@@ -178,6 +206,12 @@ def parse_sql_query(
                 continue
 
             column_name = c.name
+
+            # Skip star projections (e.g. `t.*`) — sqlglot models these as a Column
+            # whose name is "*", but they are projection wildcards, not catalog columns.
+            if column_name == "*" or not column_name:
+                continue
+
             db, schema, tbl = table_id.split(".")
             column_info.append(
                 {
@@ -261,6 +295,9 @@ def parse_sql_query(
             if (
                 to_add.get("left_column_id") is not None
                 and to_add.get("right_column_id") is not None
+                # Skip self-references — a column joining itself is a parser artifact,
+                # not a real foreign-key relationship.
+                and to_add["left_column_id"] != to_add["right_column_id"]
             ):
                 references_info.append(to_add)
 
@@ -268,6 +305,7 @@ def parse_sql_query(
             "table_info": table_info,
             "column_info": column_info,
             "references_info": references_info,
+            "cte_info": cte_info,
         }
     except Exception as e:
         print(f"Error parsing SQL query: {e}")
