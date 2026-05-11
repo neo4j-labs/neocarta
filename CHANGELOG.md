@@ -8,6 +8,9 @@
 * Fixed bug where value retrieval would yield empty arrays when all values in column are `NULL`
 * Fixed bug where `description='false'` when querying table info due to inaccurate `INFORMATION_SCHEMA.TABLE_OPTIONS` filtering
 * Update agent code to use new MCP configuration
+* Fixed query parser reading CTEs as real tables
+* Fixed query parser reading `.*` projections as a real column named `*`
+* Fixed query parser reading self referential joins as real FKs
 
 ### Changed
 * Replace `RESOLVES_TO` relationship with `TAGGED_WITH` across RDBMS and LPG data models
@@ -20,6 +23,8 @@
 * Add `load_column_tagged_with_relationships()` and `load_table_tagged_with_relationships()` to Neo4j loader
 * `DataplexConnector` now creates `(:Column)-[:TAGGED_WITH]->(:BusinessTerm)` and `(:Table)-[:TAGGED_WITH]->(:BusinessTerm)` relationships when both `include_schema` and `include_glossary` are enabled
 * Add acme dataset and update example dataset loader function to accomodate ecommerce and acme datasets
+* Add `CTE` node to capture CTEs from queries 
+* Add `(:Query)-[:DEFINES]->(:CTE)` relationship
 
 ## v0.2.1
 

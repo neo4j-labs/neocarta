@@ -155,6 +155,6 @@ def generate_cte_id(query_id: str, cte_name: str) -> str:
     Examples:
     --------
     >>> generate_cte_id("abc123", "paid")
-    'cte.abc123.paid'
+    'abc123.paid'
     """
-    return f"cte.{query_id}.{_normalize(cte_name)}"
+    return f"{query_id}.{_normalize(cte_name)}"
