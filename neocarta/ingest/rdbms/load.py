@@ -35,7 +35,7 @@ from ..utils import (
     write_neo4j_constraints,
 )
 from .constraints import KEY_CONSTRAINTS_LOOKUP, UNIQUE_CONSTRAINTS_LOOKUP
-
+from ..indexes import create_full_text_index
 
 class Neo4jRDBMSLoader:
     """
@@ -53,6 +53,12 @@ class Neo4jRDBMSLoader:
             neo4j_driver=self.neo4j_driver,
             key_constraints=KEY_CONSTRAINTS_LOOKUP,
             unique_constraints=UNIQUE_CONSTRAINTS_LOOKUP,
+            database_name=self.database_name,
+        )
+
+        self._create_full_text_index = partial(
+            create_full_text_index,
+            neo4j_driver=self.neo4j_driver,
             database_name=self.database_name,
         )
 
@@ -86,6 +92,7 @@ class Neo4jRDBMSLoader:
         _validate_properties_list(Schema, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.SCHEMA])
+        self._create_full_text_index(node_labels=[NodeLabel.SCHEMA])
         query = _build_node_ingest_query(NodeLabel.SCHEMA, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -106,6 +113,7 @@ class Neo4jRDBMSLoader:
         _validate_properties_list(Table, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.TABLE])
+        self._create_full_text_index(node_labels=[NodeLabel.TABLE])
         query = _build_node_ingest_query(NodeLabel.TABLE, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -133,6 +141,7 @@ class Neo4jRDBMSLoader:
         _validate_properties_list(Column, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.COLUMN])
+        self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
         query = _build_node_ingest_query(NodeLabel.COLUMN, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -325,6 +334,7 @@ class Neo4jRDBMSLoader:
         _validate_properties_list(BusinessTerm, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.BUSINESS_TERM])
+        self._create_full_text_index(node_labels=[NodeLabel.BUSINESS_TERM])
         query = _build_node_ingest_query(
             NodeLabel.BUSINESS_TERM, overwrite_existing, properties_list
         )

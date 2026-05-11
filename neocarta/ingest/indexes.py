@@ -8,7 +8,7 @@ def create_vector_index(
     node_label: str,
     dimensions: int = 768,
     database_name: str = "neo4j",
-) -> None:
+) -> dict:
     """
     Create a vector index according to the provided configuration.
 
@@ -48,3 +48,38 @@ CREATE VECTOR INDEX {node_label.lower() + "_vector_index"} IF NOT EXISTS
         database_=database_name,
     )
     return summary.counters.__dict__
+
+def create_full_text_index(
+    neo4j_driver: Driver,
+    node_labels: list[str],
+    property_names: list[str] = ["name", "description"],
+    database_name: str = "neo4j",
+) -> dict:
+    """
+    Create a full text index according to the provided configuration.
+
+    Parameters
+    ----------
+    neo4j_driver: Driver
+        The Neo4j driver to use.
+    node_labels: list[str]
+        The labels of the nodes to create a full text index for.
+    property_names: list[str]
+        The names of the properties to create a full text index for.
+    database_name: str
+        The name of the database to create a full text index for.
+    """
+    labels_lower_sorted = sorted([label.lower() for label in node_labels])
+    query = f"""
+CREATE FULLTEXT INDEX {labels_lower_sorted.join("_") + "_full_text_index"} IF NOT EXISTS
+    FOR (n:{node_labels.join("|")}) 
+    ON EACH [n.{property_names.join(", n.")}]
+    """
+
+    _, summary, _ = neo4j_driver.execute_query(
+        query_=query,
+        routing_=RoutingControl.WRITE,
+        database_=database_name,
+    )
+    return summary.counters.__dict__
+    
