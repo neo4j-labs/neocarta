@@ -144,7 +144,7 @@ def test_parse_sql_query_captures_ctes_with_definitions():
 
     paid = cte_by_name["paid"]
     assert paid["query_id"] == "qid-1"
-    assert paid["cte_id"] == "cte.qid-1.paid"
+    assert paid["cte_id"] == "qid-1.paid"
     # Definition must contain the inner SELECT — not the outer query.
     assert "invoices" in paid["definition"]
     assert "PAID" in paid["definition"]
