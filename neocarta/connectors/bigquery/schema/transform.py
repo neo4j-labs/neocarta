@@ -398,9 +398,7 @@ class BigQuerySchemaTransformer:
         list[References]
             The references relationships.
         """
-        fk_rows = column_references_info[
-            column_references_info["constraint_type"] == "FOREIGN KEY"
-        ]
+        fk_rows = column_references_info[column_references_info["constraint_type"] == "FOREIGN KEY"]
 
         references_relationships = []
         for _, row in fk_rows.iterrows():

@@ -302,8 +302,7 @@ class QueryLogTransformer:
             defines_relationships: list[Defines] = []
         else:
             defines_relationships = [
-                Defines(query_id=row.query_id, cte_id=row.cte_id)
-                for _, row in cte_info.iterrows()
+                Defines(query_id=row.query_id, cte_id=row.cte_id) for _, row in cte_info.iterrows()
             ]
 
         if cache:
