@@ -1,5 +1,34 @@
 """Cypher queries for the Neocarta MCP server."""
 
+def list_indexes_cypher() -> str:
+    """
+    Get the cypher query to list all indexes.
+    """
+    return """
+SHOW INDEXES
+YIELD name, state, populationPercent, type, entityType, labelsOrTypes, properties, indexProvider, owningConstraint
+    """
+
+def list_vector_indexes_cypher() -> str:
+    """
+    Get the cypher query to list all vector indexes.
+    """
+    return f"""
+{list_indexes_cypher()}
+WHERE type = 'VECTOR'
+RETURN *
+    """
+
+def list_full_text_indexes_cypher() -> str:
+    """
+    Get the cypher query to list all full text indexes.
+    """
+
+    return f"""
+{list_indexes_cypher()}
+WHERE type = 'FULLTEXT'
+RETURN *
+    """
 
 def list_schemas_cypher() -> str:
     """
@@ -15,8 +44,8 @@ def list_schemas_cypher() -> str:
         The cypher query to list all schemas and their databases.
     """
     return """
-    MATCH (d:Database)-[:HAS_SCHEMA]->(schema:Schema)
-    RETURN d.name as database_name, schema.name as schema_name
+MATCH (d:Database)-[:HAS_SCHEMA]->(schema:Schema)
+RETURN d.name as database_name, schema.name as schema_name
     """
 
 
@@ -35,8 +64,8 @@ def list_tables_by_schema_cypher() -> str:
         The cypher query to list all tables for a given schema.
     """
     return """
-    MATCH (s:Schema {name: $schemaName})-[:HAS_TABLE]->(t:Table)
-    RETURN s.name as schema_name, collect(t.name) as table_names
+MATCH (s:Schema {name: $schemaName})-[:HAS_TABLE]->(t:Table)
+RETURN s.name as schema_name, collect(t.name) as table_names
     """
 
 

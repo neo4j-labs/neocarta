@@ -87,12 +87,14 @@ class Neo4jRDBMSLoader:
         schema_nodes: list[Schema],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
     ) -> dict:
         """Load Schema nodes into Neo4j."""
         _validate_properties_list(Schema, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.SCHEMA])
-        self._create_full_text_index(node_labels=[NodeLabel.SCHEMA])
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.SCHEMA])
         query = _build_node_ingest_query(NodeLabel.SCHEMA, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -108,12 +110,14 @@ class Neo4jRDBMSLoader:
         table_nodes: list[Table],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
     ) -> dict:
         """Load Table nodes into Neo4j."""
         _validate_properties_list(Table, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.TABLE])
-        self._create_full_text_index(node_labels=[NodeLabel.TABLE])
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.TABLE])
         query = _build_node_ingest_query(NodeLabel.TABLE, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -136,12 +140,14 @@ class Neo4jRDBMSLoader:
             "is_primary_key",
             "is_foreign_key",
         ],
+        create_full_text_index: bool = True,
     ) -> dict:
         """Load Column nodes into Neo4j."""
         _validate_properties_list(Column, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.COLUMN])
-        self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
         query = _build_node_ingest_query(NodeLabel.COLUMN, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -329,12 +335,14 @@ class Neo4jRDBMSLoader:
         business_term_nodes: list[BusinessTerm],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
     ) -> dict:
         """Load BusinessTerm nodes into Neo4j."""
         _validate_properties_list(BusinessTerm, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.BUSINESS_TERM])
-        self._create_full_text_index(node_labels=[NodeLabel.BUSINESS_TERM])
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.BUSINESS_TERM])
         query = _build_node_ingest_query(
             NodeLabel.BUSINESS_TERM, overwrite_existing, properties_list
         )
