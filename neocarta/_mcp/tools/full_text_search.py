@@ -3,6 +3,7 @@
 from fastmcp import FastMCP
 from neo4j import AsyncDriver, RoutingControl
 
+from ...enrichment.embeddings import OpenAIEmbeddingsConnector
 from ..cypher import (
     get_context_by_column_full_text_search_cypher,
     get_context_by_table_full_text_search_cypher,
@@ -14,8 +15,13 @@ def register_table_tool(
     server: FastMCP,
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
+    embedder: OpenAIEmbeddingsConnector,
 ) -> None:
-    """Register the table-level full-text search tool."""
+    """Register the table-level full-text search tool.
+
+    ``embedder`` is unused here but accepted to keep a unified registrar signature
+    across all tool modules so :mod:`neocarta._mcp.server` can dispatch uniformly.
+    """
 
     @server.tool()
     async def get_context_by_table_full_text_search(
@@ -25,9 +31,15 @@ def register_table_tool(
         """
         Find tables by full-text matching on table name and description.
 
+        Anchors on the closest matching tables via a full-text search over table
+        names and descriptions, then expands each anchor with its full set of
+        columns (types, example values, foreign-key references) and its schema
+        and database to return the full table context per hit. No embeddings
+        required.
+
         Prefer this tool when the query contains literal table-name tokens or
         specific keywords likely to appear verbatim in table metadata (e.g.
-        "orders", "fct_revenue"). No embeddings are required.
+        "orders", "fct_revenue").
 
         Parameters
         ----------
@@ -51,8 +63,13 @@ def register_column_tool(
     server: FastMCP,
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
+    embedder: OpenAIEmbeddingsConnector,
 ) -> None:
-    """Register the column-level full-text search tool."""
+    """Register the column-level full-text search tool.
+
+    ``embedder`` is unused here but accepted to keep a unified registrar signature
+    across all tool modules so :mod:`neocarta._mcp.server` can dispatch uniformly.
+    """
 
     @server.tool()
     async def get_context_by_column_full_text_search(
@@ -62,10 +79,15 @@ def register_column_tool(
         """
         Find tables by full-text matching on column name and description.
 
+        Anchors on the closest matching columns via a full-text search over
+        column names and descriptions, then expands each anchor to its parent
+        table — pulling in every column of that table along with data types,
+        example values, and foreign-key references — and returns the full table
+        context per hit. Tables are ranked by the average anchor score across
+        their matching columns. No embeddings required.
+
         Prefer this tool when the query references specific column-name tokens
-        (e.g. "customer_id", "total_amount"). Matching columns are aggregated up
-        to their parent tables and ranked by average column score. No embeddings
-        are required.
+        (e.g. "customer_id", "total_amount").
 
         Parameters
         ----------

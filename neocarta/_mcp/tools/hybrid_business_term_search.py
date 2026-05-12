@@ -25,20 +25,28 @@ def register_table_tool(
         max_tables: int = 5,
     ) -> list[TableContext]:
         """
-        Find tables via vector + full-text search, with the full-text branch bridged through BusinessTerm tags.
+        Find tables via vector + full-text search, with the full-text branch routed through business-glossary terms.
 
-        The full-text branch matches BusinessTerm nodes and then surfaces tables that
-        (a) also match the query in the table full-text index AND (b) are TAGGED_WITH
-        one of those BusinessTerm nodes. Combined with the vector branch via per-branch
-        normalization and max-per-table merge. Use this tool when the query is phrased
-        in business-glossary terms (e.g. "average order value") that may not appear
-        verbatim in table metadata but are tagged to relevant tables.
+        Anchors on tables using two parallel signals:
+        (1) embedding similarity on table descriptions, and
+        (2) full-text matches on business-glossary terms — surfacing only those
+        tables that are tagged to a matching glossary term AND whose name or
+        description also matches the query.
+
+        The two signals are normalized and merged per table by taking the stronger
+        of the two. Each surviving anchor is then expanded with its full set of
+        columns (types, example values, foreign-key references) and its schema and
+        database to return the full table context per hit.
+
+        Prefer this tool when the query uses business-glossary language (e.g.
+        "average order value", "gross merchandise value") that may not appear
+        verbatim in table metadata but is captured by glossary tags.
 
         Parameters
         ----------
         text_content: str
-            Natural-language and/or business-term query. The same string is used for
-            the embedding lookup and both full-text branches.
+            Natural-language and/or business-term query. The same string is used
+            for the embedding lookup and both full-text branches.
         max_tables: int
             Maximum number of tables to return.
         """
@@ -72,20 +80,29 @@ def register_column_tool(
         max_tables: int = 5,
     ) -> list[TableContext]:
         """
-        Find tables via vector + full-text search at the Column level, with the full-text branch bridged through BusinessTerm tags.
+        Find tables via vector + full-text search at the column level, with the full-text branch routed through business-glossary terms.
 
-        The full-text branch matches BusinessTerm nodes and then surfaces columns that
-        (a) also match the query in the column full-text index AND (b) are TAGGED_WITH
-        one of those BusinessTerm nodes. Combined with the column-vector branch via
-        per-branch normalization and max-per-column merge, then aggregated to the parent
-        table by average score. Use this tool when business-glossary phrasing maps onto
-        field-level concepts via column tags.
+        Anchors on columns using two parallel signals:
+        (1) embedding similarity on column descriptions, and
+        (2) full-text matches on business-glossary terms — surfacing only those
+        columns that are tagged to a matching glossary term AND whose name or
+        description also matches the query.
+
+        The two signals are normalized and merged per column by taking the stronger
+        of the two. Each anchor is then expanded to its parent table — pulling in
+        every column of that table along with data types, example values, and
+        foreign-key references — and tables are ranked by the average anchor score
+        across their matching columns.
+
+        Prefer this tool when business-glossary language maps onto field-level
+        concepts via column tags (e.g. "customer acquisition cost" tagged to a
+        cost column).
 
         Parameters
         ----------
         text_content: str
-            Natural-language and/or business-term query. The same string is used for
-            the embedding lookup and both full-text branches.
+            Natural-language and/or business-term query. The same string is used
+            for the embedding lookup and both full-text branches.
         max_tables: int
             Maximum number of tables to return.
         """

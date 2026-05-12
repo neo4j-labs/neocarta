@@ -25,18 +25,23 @@ def register_table_tool(
         max_tables: int = 5,
     ) -> list[TableContext]:
         """
-        Find tables via a hybrid vector + full-text search at the Table level.
+        Find tables via a hybrid vector + full-text search at the table level.
 
-        Combines table-embedding similarity with full-text matches on table name and
-        description, normalizes scores per branch, and merges with a max-per-table rule.
-        Prefer this tool when the query mixes conceptual phrasing with literal tokens
-        you expect to see verbatim in table metadata.
+        Anchors on tables using two parallel signals — embedding similarity and
+        full-text matching on table name/description — normalizes each signal and
+        merges them per table by taking the stronger of the two. Each surviving
+        anchor is then expanded with its full set of columns (types, example
+        values, foreign-key references) and its schema and database to return the
+        full table context per hit.
+
+        Prefer this tool when the query mixes conceptual phrasing with literal
+        tokens you expect to see verbatim in table metadata.
 
         Parameters
         ----------
         text_content: str
-            Natural-language and/or keyword query. The same string is used for both
-            the embedding lookup and the full-text search.
+            Natural-language and/or keyword query. The same string is used for
+            both the embedding lookup and the full-text search.
         max_tables: int
             Maximum number of tables to return.
         """
@@ -70,18 +75,24 @@ def register_column_tool(
         max_tables: int = 5,
     ) -> list[TableContext]:
         """
-        Find tables via a hybrid vector + full-text search at the Column level.
+        Find tables via a hybrid vector + full-text search at the column level.
 
-        Combines column-embedding similarity with full-text matches on column name and
-        description, normalizes scores per branch, merges per column, then aggregates
-        up to the parent table by average score. Prefer this tool when the query
-        references specific field-level concepts and literal token names together.
+        Anchors on columns using two parallel signals — embedding similarity and
+        full-text matching on column name/description — normalizes each signal
+        and merges them per column by taking the stronger of the two. Each
+        anchor is then expanded to its parent table — pulling in every column
+        of that table along with data types, example values, and foreign-key
+        references — and tables are ranked by the average anchor score across
+        their matching columns.
+
+        Prefer this tool when the query references specific field-level concepts
+        alongside literal token names.
 
         Parameters
         ----------
         text_content: str
-            Natural-language and/or keyword query. The same string is used for both
-            the embedding lookup and the full-text search.
+            Natural-language and/or keyword query. The same string is used for
+            both the embedding lookup and the full-text search.
         max_tables: int
             Maximum number of tables to return.
         """

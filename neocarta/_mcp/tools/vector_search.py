@@ -28,10 +28,14 @@ def register_column_tool(
         """
         Find tables whose columns are semantically similar to the provided text.
 
+        Anchors on the closest matching columns by embedding similarity, then
+        expands each anchor to its parent table — pulling in every column of that
+        table along with data types, example values, and foreign-key references —
+        and returns the full table context per hit. Tables are ranked by the
+        average anchor score across their matching columns.
+
         Prefer this tool when the query references specific field or column names
-        (e.g. "customer email", "order total"). Matches are ranked by average
-        column embedding similarity and traversed up to the parent table.
-        Note: requires that Column nodes have the embedding property set.
+        (e.g. "customer email", "order total").
 
         Parameters
         ----------
@@ -69,10 +73,13 @@ def register_table_tool(
         """
         Find tables that are semantically similar to the provided text.
 
+        Anchors on the closest matching tables by embedding similarity, then
+        expands each anchor with its full set of columns (types, example values,
+        foreign-key references) and its schema and database to return the full
+        table context per hit. Ranked by table similarity.
+
         Prefer this tool when the query describes a general concept or entity
-        (e.g. "customers", "sales transactions"). Matches are ranked by table
-        embedding similarity.
-        Note: requires that Table nodes have the embedding property set.
+        (e.g. "customers", "sales transactions").
 
         Parameters
         ----------
@@ -110,11 +117,15 @@ def register_schema_tool(
         """
         Find tables by matching both schema and table embeddings to the provided text.
 
-        Prefer this tool when the query is broad and may span multiple schemas and tables
+        Anchors first on the closest matching schemas, then narrows to tables
+        within those schemas whose embeddings score near or better than the
+        schema. Each surviving table is expanded with its full set of columns
+        (types, example values, foreign-key references) and its database to
+        return the full table context per hit. Ranked by schema score then table
+        score.
+
+        Prefer this tool when the query is broad and may span multiple schemas
         (e.g. "everything related to billing").
-        First finds similar schemas, then filters to tables within those schemas whose
-        embeddings are near or better than the schema score.
-        Note: requires that `Schema` and `Table` nodes have the `embedding` property set.
 
         Parameters
         ----------
@@ -122,8 +133,7 @@ def register_schema_tool(
             Natural-language description or query to search for semantically
             similar schemas and tables.
         max_tables: int
-            Maximum number of tables to return, ordered by descending schema
-            then table similarity score.
+            Maximum number of tables to return.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_schema_and_table_vector_search_cypher()

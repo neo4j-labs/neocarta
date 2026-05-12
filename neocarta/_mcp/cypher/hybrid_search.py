@@ -194,8 +194,11 @@ def get_context_by_table_business_term_hybrid_search_cypher() -> str:
 
     The full-text branch finds BusinessTerm nodes matching the query, then finds Table nodes
     that (a) also match the query in `table_full_text_index` AND (b) are TAGGED_WITH one of those
-    BusinessTerm nodes. Combined with a vector search on `table_vector_index` via min-max
-    normalization and max-merge per table.
+    BusinessTerm nodes. For each (table, bt) pair the full-text branch score is
+    ``(tableScore/maxTableScore + btScore/maxBtScore) / 2`` — each component min-max normalized
+    by its own branch maximum and averaged so the result is in [0,1] and directly comparable
+    to the vector branch's normalized score. Combined with a vector search on
+    `table_vector_index` via per-branch normalization and max-merge per table.
 
     Parameters
     ----------
@@ -219,7 +222,11 @@ CALL () {
 
   UNION
 
-  // full-text search business terms, then bridge to tables tagged with those terms
+  // full-text search business terms, then bridge to tables tagged with those terms.
+  // The FT branch score for each (table, bt) pair is the average of the table
+  // full-text score and the business-term full-text score, each min-max normalized
+  // by its own branch maximum so the combined score is in [0,1] and directly
+  // comparable to the vector branch's normalized score.
   CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $maxTables})
   YIELD node as bt, score as btScore
   WITH bt, btScore
@@ -228,12 +235,14 @@ CALL () {
   WHERE EXISTS {(bt:BusinessTerm)<-[:TAGGED_WITH]-(table:Table)}
   WITH collect({
             node:table,
-            score:tableScore,
+            tableScore:tableScore,
             businessTerm:bt,
             btScore:btScore}) AS nodes,
-        max(tableScore) AS ft_index_max_score
+        max(tableScore) AS ft_table_max_score,
+        max(btScore) AS ft_bt_max_score
   UNWIND nodes AS n
-  RETURN n.node AS node, (n.score / ft_index_max_score) AS score
+  RETURN n.node AS node,
+         ((n.tableScore / ft_table_max_score) + (n.btScore / ft_bt_max_score)) / 2.0 AS score
 }
 WITH node as table, max(score) AS score
 ORDER BY score DESC
@@ -299,8 +308,12 @@ def get_context_by_column_business_term_hybrid_search_cypher() -> str:
 
     The full-text branch finds BusinessTerm nodes matching the query, then finds Column nodes
     that (a) also match the query in `column_full_text_index` AND (b) are TAGGED_WITH one of those
-    BusinessTerm nodes. Combined with a vector search on `column_vector_index` via min-max
-    normalization and max-merge per column, then aggregated up to the parent Table.
+    BusinessTerm nodes. For each (col, bt) pair the full-text branch score is
+    ``(colScore/maxColScore + btScore/maxBtScore) / 2`` — each component min-max normalized
+    by its own branch maximum and averaged so the result is in [0,1] and directly comparable
+    to the vector branch's normalized score. Combined with a vector search on
+    `column_vector_index` via per-branch normalization and max-merge per column, then aggregated
+    up to the parent Table by average score.
 
     Parameters
     ----------
@@ -324,7 +337,11 @@ CALL () {
 
   UNION
 
-  // full-text search business terms, then bridge to columns tagged with those terms
+  // full-text search business terms, then bridge to columns tagged with those terms.
+  // The FT branch score for each (col, bt) pair is the average of the column
+  // full-text score and the business-term full-text score, each min-max normalized
+  // by its own branch maximum so the combined score is in [0,1] and directly
+  // comparable to the vector branch's normalized score.
   CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $maxTables})
   YIELD node as bt, score as btScore
   WITH bt, btScore
@@ -333,12 +350,14 @@ CALL () {
   WHERE EXISTS {(bt:BusinessTerm)<-[:TAGGED_WITH]-(col:Column)}
   WITH collect({
             node:col,
-            score:colScore,
+            colScore:colScore,
             businessTerm:bt,
             btScore:btScore}) AS nodes,
-        max(colScore) AS ft_index_max_score
+        max(colScore) AS ft_col_max_score,
+        max(btScore) AS ft_bt_max_score
   UNWIND nodes AS n
-  RETURN n.node AS node, (n.score / ft_index_max_score) AS score
+  RETURN n.node AS node,
+         ((n.colScore / ft_col_max_score) + (n.btScore / ft_bt_max_score)) / 2.0 AS score
 }
 WITH node as col, max(score) AS score
 
