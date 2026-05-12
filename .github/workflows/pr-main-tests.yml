@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Unit, Integration, and Smoke Tests (Python ${{ matrix.python-version }})
