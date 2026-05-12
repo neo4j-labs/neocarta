@@ -115,28 +115,26 @@ def test_per_label_priority_registers_bt_hybrid_tools(neo4j_connection, loaded_g
     lower_tier_for_table = {
         "get_context_by_table_hybrid_search",
         "get_context_by_table_full_text_search",
-        "get_metadata_schema_by_table_semantic_similarity",
+        "get_context_by_table_vector_search",
     }
     lower_tier_for_column = {
         "get_context_by_column_hybrid_search",
         "get_context_by_column_full_text_search",
-        "get_metadata_schema_by_column_semantic_similarity",
+        "get_context_by_column_vector_search",
     }
     assert tools.isdisjoint(lower_tier_for_table)
     assert tools.isdisjoint(lower_tier_for_column)
 
-    assert "get_metadata_schema_by_schema_and_table_semantic_similarity" in tools
+    assert "get_context_by_schema_and_table_vector_search" in tools
     assert {"list_schemas", "list_tables_by_schema", "get_full_metadata_schema"}.issubset(tools)
 
 
-def test_get_metadata_schema_by_schema_and_table_semantic_similarity(
-    neo4j_connection, loaded_graph
-):
-    """Schema/table similarity search returns tables with their columns populated."""
+def test_get_context_by_schema_and_table_vector_search(neo4j_connection, loaded_graph):
+    """Schema/table vector search returns tables with their columns populated."""
     data = asyncio.run(
         _call_tool(
             neo4j_connection,
-            "get_metadata_schema_by_schema_and_table_semantic_similarity",
+            "get_context_by_schema_and_table_vector_search",
             {"text_content": "sales orders customers", "max_tables": 5},
         )
     )
