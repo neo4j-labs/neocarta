@@ -20,9 +20,9 @@ from .hybrid_search import (
     get_context_by_table_hybrid_search_cypher,
 )
 from .vector_search import (
-    get_metadata_schema_by_column_semantic_similarity_cypher,
-    get_metadata_schema_by_schema_and_table_semantic_similarity_cypher,
-    get_metadata_schema_by_table_semantic_similarity_cypher,
+    get_context_by_column_vector_search_cypher,
+    get_context_by_schema_and_table_vector_search_cypher,
+    get_context_by_table_vector_search_cypher,
 )
 
 __all__ = [
@@ -33,9 +33,9 @@ __all__ = [
     "get_context_by_table_full_text_search_cypher",
     "get_context_by_table_hybrid_search_cypher",
     "get_full_metadata_schema_cypher",
-    "get_metadata_schema_by_column_semantic_similarity_cypher",
-    "get_metadata_schema_by_schema_and_table_semantic_similarity_cypher",
-    "get_metadata_schema_by_table_semantic_similarity_cypher",
+    "get_context_by_column_vector_search_cypher",
+    "get_context_by_schema_and_table_vector_search_cypher",
+    "get_context_by_table_vector_search_cypher",
     "list_full_text_indexes_cypher",
     "list_indexes_cypher",
     "list_schemas_cypher",

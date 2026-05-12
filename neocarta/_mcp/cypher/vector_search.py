@@ -1,7 +1,7 @@
 """Vector-search-based cypher queries."""
 
 
-def get_metadata_schema_by_column_semantic_similarity_cypher() -> str:
+def get_context_by_column_vector_search_cypher() -> str:
     """
     Get the cypher query to find metadata by column semantic similarity to the query.
 
@@ -67,7 +67,7 @@ LIMIT $maxTables
 """
 
 
-def get_metadata_schema_by_table_semantic_similarity_cypher() -> str:
+def get_context_by_table_vector_search_cypher() -> str:
     """
     Get the cypher query to find metadata by table semantic similarity to the query.
 
@@ -136,7 +136,7 @@ LIMIT $maxTables
 """
 
 
-def get_metadata_schema_by_schema_and_table_semantic_similarity_cypher() -> str:
+def get_context_by_schema_and_table_vector_search_cypher() -> str:
     """
     Get the cypher query to find metadata by schema and table semantic similarity to the query.
 

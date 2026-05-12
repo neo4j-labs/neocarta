@@ -5,9 +5,9 @@ from neo4j import AsyncDriver, RoutingControl
 
 from ...enrichment.embeddings import OpenAIEmbeddingsConnector
 from ..cypher import (
-    get_metadata_schema_by_column_semantic_similarity_cypher,
-    get_metadata_schema_by_schema_and_table_semantic_similarity_cypher,
-    get_metadata_schema_by_table_semantic_similarity_cypher,
+    get_context_by_column_vector_search_cypher,
+    get_context_by_schema_and_table_vector_search_cypher,
+    get_context_by_table_vector_search_cypher,
 )
 from ..models import TableContext
 
@@ -21,7 +21,7 @@ def register_column_tool(
     """Register the column-level vector similarity tool."""
 
     @server.tool()
-    async def get_metadata_schema_by_column_semantic_similarity(
+    async def get_context_by_column_vector_search(
         text_content: str,
         max_tables: int = 5,
     ) -> list[TableContext]:
@@ -42,7 +42,7 @@ def register_column_tool(
             Maximum number of tables to return.
         """
         embedding = await embedder._create_embedding_async(text_content)
-        cypher = get_metadata_schema_by_column_semantic_similarity_cypher()
+        cypher = get_context_by_column_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
             parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
@@ -62,7 +62,7 @@ def register_table_tool(
     """Register the table-level vector similarity tool."""
 
     @server.tool()
-    async def get_metadata_schema_by_table_semantic_similarity(
+    async def get_context_by_table_vector_search(
         text_content: str,
         max_tables: int = 10,
     ) -> list[TableContext]:
@@ -83,7 +83,7 @@ def register_table_tool(
             Maximum number of tables to return.
         """
         embedding = await embedder._create_embedding_async(text_content)
-        cypher = get_metadata_schema_by_table_semantic_similarity_cypher()
+        cypher = get_context_by_table_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
             parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
@@ -103,7 +103,7 @@ def register_schema_tool(
     """Register the schema+table vector similarity tool."""
 
     @server.tool()
-    async def get_metadata_schema_by_schema_and_table_semantic_similarity(
+    async def get_context_by_schema_and_table_vector_search(
         text_content: str,
         max_tables: int = 5,
     ) -> list[TableContext]:
@@ -126,7 +126,7 @@ def register_schema_tool(
             then table similarity score.
         """
         embedding = await embedder._create_embedding_async(text_content)
-        cypher = get_metadata_schema_by_schema_and_table_semantic_similarity_cypher()
+        cypher = get_context_by_schema_and_table_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
             parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
