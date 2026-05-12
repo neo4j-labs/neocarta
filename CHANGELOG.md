@@ -6,7 +6,7 @@
 * Fix demo data: `business_term_info.csv` had duplicate term identity columns (`term_name` as abbreviation and `name` as full readable name); removed `term_name` abbreviation column and renamed `name` → `term_name`. Updated `column_term_info.csv` and `table_term_info.csv` to reference terms by full readable name to match.
 * Fixed query parser reading CTEs as real tables
 * Fixed query parser reading `.*` projections as a real column named `*`
-* Fixed query parser reading self referential joins as real FKs
+* Fixed query parser reading self referential joins as real FKs 
 
 ### Changed
 * MCP server now probes the target database at startup and registers retrieval tools per label by priority: business-term-bridged hybrid > hybrid (vector + full-text on same label) > vector or full-text alone. Schema-level vector retrieval and catalog tools are registered independently.
