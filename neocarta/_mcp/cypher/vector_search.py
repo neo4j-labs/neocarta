@@ -5,7 +5,7 @@ def get_metadata_schema_by_column_semantic_similarity_cypher() -> str:
     """
     Get the cypher query to find metadata by column semantic similarity to the query.
 
-    Notes
+    Notes:
     -----
     Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
     Index name: ``column_vector_index`` (library convention).
@@ -71,7 +71,7 @@ def get_metadata_schema_by_table_semantic_similarity_cypher() -> str:
     """
     Get the cypher query to find metadata by table semantic similarity to the query.
 
-    Notes
+    Notes:
     -----
     Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
     Index name: ``table_vector_index`` (library convention).
@@ -140,7 +140,7 @@ def get_metadata_schema_by_schema_and_table_semantic_similarity_cypher() -> str:
     """
     Get the cypher query to find metadata by schema and table semantic similarity to the query.
 
-    Notes
+    Notes:
     -----
     Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
     Index name: ``schema_vector_index`` (library convention). Table similarity is computed

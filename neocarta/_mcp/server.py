@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP

@@ -28,6 +28,7 @@ from ...data_model.rdbms import (
     Value,
 )
 from ...enums import NodeLabel, RelationshipType
+from ..indexes import create_full_text_index
 from ..utils import (
     _build_node_ingest_query,
     _build_relationship_ingest_query,
@@ -35,7 +36,6 @@ from ..utils import (
     write_neo4j_constraints,
 )
 from .constraints import KEY_CONSTRAINTS_LOOKUP, UNIQUE_CONSTRAINTS_LOOKUP
-from ..indexes import create_full_text_index
 
 
 class Neo4jRDBMSLoader:

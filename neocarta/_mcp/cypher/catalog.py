@@ -33,7 +33,7 @@ def list_search_indexes_cypher() -> str:
     for VECTOR and FULLTEXT node indexes. Used to gate MCP tool registration on the
     indexes that are actually present in the database.
 
-    Returns
+    Returns:
     -------
     str
         Each row has ``label`` (str) and ``type`` (``'VECTOR' | 'FULLTEXT'``). A full-text
@@ -50,7 +50,7 @@ def list_schemas_cypher() -> str:
     """
     Get the cypher query to list all schemas and their databases.
 
-    Returns
+    Returns:
     -------
     str
         The cypher query to list all schemas and their databases.
@@ -70,7 +70,7 @@ def list_tables_by_schema_cypher() -> str:
     schema_name: str
         The name of the schema to list tables for.
 
-    Returns
+    Returns:
     -------
     str
         The cypher query to list all tables for a given schema.
@@ -85,7 +85,7 @@ def get_full_metadata_schema_cypher() -> str:
     """
     Get the cypher query to get the full metadata schema for the database.
 
-    Returns
+    Returns:
     -------
     str
         The cypher query to get the full metadata schema for the database.

@@ -73,7 +73,7 @@ def create_full_text_index(
     labels_lower_sorted = sorted([label.lower() for label in node_labels])
     query = f"""
 CREATE FULLTEXT INDEX {"_".join(labels_lower_sorted) + "_full_text_index"} IF NOT EXISTS
-    FOR (n:{"|".join(node_labels)}) 
+    FOR (n:{"|".join(node_labels)})
     ON EACH [n.{" , n.".join(property_names)}]
     """
 

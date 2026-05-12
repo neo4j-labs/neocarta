@@ -21,7 +21,7 @@ async def fetch_index_inventory(
     neo4j_database: str
         The target database name.
 
-    Returns
+    Returns:
     -------
     set[tuple[str, str]]
         Pairs like ``("Table", "VECTOR")`` or ``("BusinessTerm", "FULLTEXT")``.

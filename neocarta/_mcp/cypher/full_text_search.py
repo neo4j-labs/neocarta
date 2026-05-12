@@ -12,7 +12,7 @@ def get_context_by_table_full_text_search_cypher() -> str:
     maxTables: int
         The maximum number of tables to return.
 
-    Returns
+    Returns:
     -------
     str
         The cypher query that returns TableContext rows ordered by full-text score.
@@ -87,7 +87,7 @@ def get_context_by_column_full_text_search_cypher() -> str:
     maxTables: int
         The maximum number of tables to return.
 
-    Returns
+    Returns:
     -------
     str
         The cypher query that returns TableContext rows aggregated from matching columns,
