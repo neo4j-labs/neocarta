@@ -37,6 +37,7 @@ from ..utils import (
 from .constraints import KEY_CONSTRAINTS_LOOKUP, UNIQUE_CONSTRAINTS_LOOKUP
 from ..indexes import create_full_text_index
 
+
 class Neo4jRDBMSLoader:
     """
     Loader class for loading RDBMS metadata into Neo4j.

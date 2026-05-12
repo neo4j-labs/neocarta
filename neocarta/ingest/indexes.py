@@ -49,6 +49,7 @@ CREATE VECTOR INDEX {node_label.lower() + "_vector_index"} IF NOT EXISTS
     )
     return summary.counters.__dict__
 
+
 def create_full_text_index(
     neo4j_driver: Driver,
     node_labels: list[str],
@@ -82,4 +83,3 @@ CREATE FULLTEXT INDEX {"_".join(labels_lower_sorted) + "_full_text_index"} IF NO
         database_=database_name,
     )
     return summary.counters.__dict__
-    

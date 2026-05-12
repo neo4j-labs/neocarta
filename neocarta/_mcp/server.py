@@ -6,6 +6,7 @@ from typing import Callable
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.utilities.logging import get_logger
 from neo4j import AsyncDriver, AsyncGraphDatabase
 from openai import AsyncOpenAI
 
@@ -20,6 +21,8 @@ from .tools import (
     hybrid_search,
     vector_search,
 )
+
+logger = get_logger("neocarta")
 
 RegisterFn = Callable[[FastMCP, AsyncDriver, str, OpenAIEmbeddingsConnector], None]
 
@@ -87,17 +90,28 @@ async def create_mcp_server(
 This is an MCP server that facilitates context retrieval from a Neo4j semantic layer.
 The retrieved context may be used for query generation, query routing or data discovery.
 """
-    server = FastMCP(name=name, instructions=instructions)
+    server = FastMCP(name=name, instructions=instructions, log_level="DEBUG")
 
     inventory = await fetch_index_inventory(neo4j_driver, neo4j_database)
-    business_term_search_available = ("BusinessTerm", "FULLTEXT") in inventory and (
-        await has_business_term_nodes(neo4j_driver, neo4j_database)
+    business_term_index_present = ("BusinessTerm", "FULLTEXT") in inventory
+    business_term_nodes_present = await has_business_term_nodes(neo4j_driver, neo4j_database)
+    business_term_search_available = business_term_index_present and business_term_nodes_present
+
+    logger.info(
+        "Detected search indexes: %s",
+        sorted(inventory) if inventory else "(none)",
+    )
+    logger.info(
+        "BusinessTerm full-text index present=%s, BusinessTerm nodes present=%s",
+        business_term_index_present,
+        business_term_nodes_present,
     )
 
     catalog.register(server, neo4j_driver, neo4j_database)
 
     if ("Schema", "VECTOR") in inventory:
         vector_search.register_schema_tool(server, neo4j_driver, neo4j_database, embedder)
+        logger.info("Registered schema vector tool")
 
     per_label_registrars: dict[str, dict[str, RegisterFn]] = {
         "Table": {
@@ -117,10 +131,10 @@ The retrieved context may be used for query generation, query routing or data di
     for label, registrars in per_label_registrars.items():
         strategy = _select_search_strategy(label, inventory, business_term_search_available)
         if strategy is None:
+            logger.info("No search index for %s; no tool registered", label)
             continue
-        _register_for_label(
-            server, neo4j_driver, neo4j_database, embedder, strategy, registrars
-        )
+        _register_for_label(server, neo4j_driver, neo4j_database, embedder, strategy, registrars)
+        logger.info("Registered %s tool for %s", strategy, label)
 
     return server
 
@@ -145,6 +159,7 @@ async def main() -> None:
 def run() -> None:
     """Load environment variables and run the MCP server."""
     load_dotenv()
+    logger.setLevel(logging.INFO)
     asyncio.run(main())
 
 
