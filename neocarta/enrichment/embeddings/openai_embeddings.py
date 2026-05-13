@@ -219,8 +219,6 @@ class OpenAIEmbeddingsConnector:
             else:
                 print(f"No embeddings found for {label} nodes")
 
-        self.neo4j_driver.close()
-
     async def arun(
         self,
         node_labels: list[NodeLabel] = [NodeLabel.TABLE, NodeLabel.COLUMN],
@@ -270,5 +268,3 @@ class OpenAIEmbeddingsConnector:
                 )
             else:
                 print(f"No embeddings found for {label} nodes")
-
-        self.neo4j_driver.close()

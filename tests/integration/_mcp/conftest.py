@@ -99,7 +99,7 @@ def sample_csv_dir(setup):
 def loaded_graph(setup, sample_csv_dir):
     """Load sample graph data and write mock embeddings once for the module.
 
-    MockEmbeddingsConnector.run() closes the Neo4j driver on completion.
+    The fixture owns the Neo4j driver and closes it after setup.
     """
     sync_driver = GraphDatabase.driver(
         setup.get_connection_url(),
@@ -115,11 +115,12 @@ def loaded_graph(setup, sample_csv_dir):
         database_name=DATABASE_NAME,
     ).run()
 
-    # run() closes sync_driver on completion
     MockEmbeddingsConnector(
         neo4j_driver=sync_driver,
         database_name=DATABASE_NAME,
     ).run(node_labels=[NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN])
+
+    sync_driver.close()
 
 
 @pytest.fixture(scope="module")
