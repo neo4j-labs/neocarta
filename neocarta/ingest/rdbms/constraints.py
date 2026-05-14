@@ -61,6 +61,13 @@ FOR (c:CTE) REQUIRE c.id IS UNIQUE;
 
 cte_id_key_constraint = cte_id_unique_constraint.replace("UNIQUE", "NODE KEY")
 
+catalog_asset_id_unique_constraint = """
+CREATE CONSTRAINT catalog_asset_id_constraint IF NOT EXISTS
+FOR (a:CatalogAsset) REQUIRE a.id IS UNIQUE;
+"""
+
+catalog_asset_id_key_constraint = catalog_asset_id_unique_constraint.replace("UNIQUE", "NODE KEY")
+
 UNIQUE_CONSTRAINTS_LOOKUP = {
     NodeLabel.DATABASE: database_id_unique_constraint,
     NodeLabel.SCHEMA: schema_id_unique_constraint,
@@ -72,6 +79,7 @@ UNIQUE_CONSTRAINTS_LOOKUP = {
     NodeLabel.BUSINESS_TERM: business_term_id_unique_constraint,
     NodeLabel.QUERY: query_id_unique_constraint,
     NodeLabel.CTE: cte_id_unique_constraint,
+    NodeLabel.CATALOG_ASSET: catalog_asset_id_unique_constraint,
 }
 
 KEY_CONSTRAINTS_LOOKUP = {
@@ -85,4 +93,5 @@ KEY_CONSTRAINTS_LOOKUP = {
     NodeLabel.BUSINESS_TERM: business_term_id_key_constraint,
     NodeLabel.QUERY: query_id_key_constraint,
     NodeLabel.CTE: cte_id_key_constraint,
+    NodeLabel.CATALOG_ASSET: catalog_asset_id_key_constraint,
 }

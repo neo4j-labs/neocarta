@@ -11,6 +11,9 @@
 ### Changed
 
 ### Added
+* Add Collibra Data Catalog connector (Extract → Transform → Load) mapping Collibra Communities/Domains/Assets to the neocarta graph model; supports Basic-auth and Bearer-token authentication, optional lineage ingestion, and community/domain/asset-type scoping filters
+* Add `CatalogAsset`, `HasAsset`, and `FlowsInto` to the RDBMS data model for generic catalog entities not covered by existing structural or semantic node types
+* Add `status` and `collibra_id` fields to `Table`, `Column`, `BusinessTerm`, `Category`, and `Glossary` nodes
 * Add data model diagram for table views and materialized views
 * Add `claude.md` file
 * Add `CTE` node to capture CTEs from queries 

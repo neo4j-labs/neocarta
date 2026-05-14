@@ -223,6 +223,31 @@ def generate_business_term_id(glossary: str, category: str, term: str) -> str:
     return f"{_normalize(glossary)}.{_normalize(category)}.{_normalize(term)}"
 
 
+def generate_catalog_asset_id(collibra_id: str) -> str:
+    """
+    Generate a catalog asset ID from a Collibra UUID.
+
+    Uses the Collibra UUID directly as the stable neocarta identifier,
+    normalised to lowercase with hyphens replaced by underscores.
+
+    Parameters
+    ----------
+    collibra_id : str
+        The Collibra UUID for the asset.
+
+    Returns:
+    -------
+    str
+        A stable ID derived from the Collibra UUID.
+
+    Examples:
+    --------
+    >>> generate_catalog_asset_id("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    'collibra.a1b2c3d4_e5f6_7890_abcd_ef1234567890'
+    """
+    return f"collibra.{_normalize(collibra_id)}"
+
+
 def create_query_id(query: str) -> str:
     """Create a query ID from a query string."""
     return hashlib.sha256(query.encode()).hexdigest()
