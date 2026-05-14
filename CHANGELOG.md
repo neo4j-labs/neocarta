@@ -11,6 +11,7 @@
 ### Changed
 
 ### Added
+* Add Salesforce connector (`neocarta.connectors.salesforce`): Extract → Transform → Load pipeline from Salesforce sobject describe dicts into Neo4j. Derives namespaces from object name patterns (managed-package prefix, unmanaged custom, standard/core), reuses `CSVTransformer` for standard node/relationship loading, and applies supplementary Cypher for Salesforce-specific properties (`label`, `labelPlural`, `keyPrefix`, `isCustom`, `picklistValues`, capability booleans). REFERENCES edges use MERGE semantics to create stub Column nodes for system objects (RecordType, Profile, Group, …) not in the described set. Optional `output_dir` writes extracted DataFrames to CSV for inspection.
 * Add data model diagram for table views and materialized views
 * Add `claude.md` file
 * Add `CTE` node to capture CTEs from queries 
