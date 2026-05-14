@@ -30,6 +30,20 @@ python bigquery.py
 python bigquery.py --skip-embeddings
 ```
 
+#### `collibra.py` - Collibra Data Catalog Connector
+Extract metadata from Collibra (Communities, Domains, Assets, Attributes, Relations, Lineage) and load into Neo4j.
+
+**Usage:**
+```bash
+# Bearer token auth (production)
+COLLIBRA_URL=https://myorg.collibra.com COLLIBRA_TOKEN=<jwt> uv run examples/collibra.py
+
+# Basic auth (dev/test)
+COLLIBRA_URL=https://myorg.collibra.com COLLIBRA_USERNAME=user COLLIBRA_PASSWORD=pass uv run examples/collibra.py
+```
+
+See [neocarta/connectors/collibra/README.md](../neocarta/connectors/collibra/README.md) for full configuration options.
+
 #### `dataplex.py` - Google Dataplex Connector
 Extract metadata from Google Cloud Dataplex catalog.
 

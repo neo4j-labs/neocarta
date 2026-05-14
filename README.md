@@ -518,6 +518,42 @@ connector.run()
 
 A sample e-commerce dataset is provided in `datasets/csv/` that demonstrates the expected CSV file structure and can be used for testing the CSV connector.
 
+#### **Collibra Data Catalog**
+
+Connector for extracting metadata from [Collibra](https://www.collibra.com/product/data-catalog/) and loading it into Neo4j. Maps Collibra's three-level hierarchy (Communities → Domains → Assets) to the neocarta graph model.
+
+Supports both Bearer-token (production) and Basic-auth (dev/test) authentication, optional technical lineage ingestion, and community/domain/asset-type scoping filters to limit extraction scope.
+
+This connector requires the following variables to be set:
+
+* `COLLIBRA_URL` — root URL, e.g. `https://myorg.collibra.com`
+* One of: `COLLIBRA_TOKEN` (Bearer JWT) **or** `COLLIBRA_USERNAME` + `COLLIBRA_PASSWORD` (Basic auth)
+* `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`
+
+##### Code Example
+
+```python
+import os
+from neo4j import GraphDatabase
+from neocarta.connectors.collibra import CollibraConnector
+
+with GraphDatabase.driver(
+    os.environ["NEO4J_URI"],
+    auth=(os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"]),
+) as driver:
+    connector = CollibraConnector(
+        collibra_url=os.environ["COLLIBRA_URL"],
+        neo4j_driver=driver,
+        token=os.environ.get("COLLIBRA_TOKEN"),
+        username=os.environ.get("COLLIBRA_USERNAME"),
+        password=os.environ.get("COLLIBRA_PASSWORD"),
+        include_lineage=True,
+    )
+    connector.run()
+```
+
+See [`neocarta/connectors/collibra/README.md`](neocarta/connectors/collibra/README.md) for the full data model mapping and configuration options.
+
 
 ### Embeddings 
 
