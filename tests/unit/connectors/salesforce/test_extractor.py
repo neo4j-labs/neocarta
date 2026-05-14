@@ -204,11 +204,13 @@ class TestCsvOutput:
         written = {f.name for f in tmp_path.iterdir()}
         assert expected.issubset(written)
 
-    def test_no_csvs_when_output_dir_none(self, all_objects, tmp_path):
+    def test_no_csvs_when_output_dir_none(self, all_objects):
+        from unittest.mock import patch
+
         e = SalesforceExtractor(all_objects, ORG_NAME, output_dir=None)
-        e.extract_all()
-        # Nothing was written — the caller provided no output dir
-        assert list(tmp_path.iterdir()) == []
+        with patch("pandas.DataFrame.to_csv") as mock_to_csv:
+            e.extract_all()
+        mock_to_csv.assert_not_called()
 
 
 # ─── extract_all integration ─────────────────────────────────────────────────

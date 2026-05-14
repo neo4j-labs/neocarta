@@ -14,8 +14,12 @@ from .models import SalesforceObjectDict
 #
 # These properties are outside neocarta's core schema and must be set after the
 # standard loader has created the nodes.
+#
+# Two variants per query mirror the overwrite_existing flag used by the standard
+# loader: the _OVERWRITE variants always SET; the _MERGE variants use coalesce()
+# so existing values are preserved and only NULL properties are filled in.
 
-_SET_TABLE_SFDC_PROPS = """
+_SET_TABLE_SFDC_PROPS_OVERWRITE = """
 UNWIND $rows AS row
 MATCH (t:Table {id: row.id})
 SET t.label        = row.label,
@@ -30,7 +34,22 @@ SET t.label        = row.label,
 RETURN count(*) AS updated
 """
 
-_SET_COLUMN_SFDC_PROPS = """
+_SET_TABLE_SFDC_PROPS_MERGE = """
+UNWIND $rows AS row
+MATCH (t:Table {id: row.id})
+SET t.label        = coalesce(t.label,        row.label),
+    t.labelPlural  = coalesce(t.labelPlural,  row.labelPlural),
+    t.keyPrefix    = coalesce(t.keyPrefix,    row.keyPrefix),
+    t.namespace    = coalesce(t.namespace,    row.namespace),
+    t.isCustom     = coalesce(t.isCustom,     row.isCustom),
+    t.isQueryable  = coalesce(t.isQueryable,  row.isQueryable),
+    t.isCreateable = coalesce(t.isCreateable, row.isCreateable),
+    t.isUpdateable = coalesce(t.isUpdateable, row.isUpdateable),
+    t.isDeletable  = coalesce(t.isDeletable,  row.isDeletable)
+RETURN count(*) AS updated
+"""
+
+_SET_COLUMN_SFDC_PROPS_OVERWRITE = """
 UNWIND $rows AS row
 MATCH (c:Column {id: row.id})
 SET c.label          = row.label,
@@ -42,10 +61,33 @@ SET c.label          = row.label,
 RETURN count(*) AS updated
 """
 
+_SET_COLUMN_SFDC_PROPS_MERGE = """
+UNWIND $rows AS row
+MATCH (c:Column {id: row.id})
+SET c.label          = coalesce(c.label,          row.label),
+    c.length         = coalesce(c.length,          row.length),
+    c.precision      = coalesce(c.precision,       row.precision),
+    c.scale          = coalesce(c.scale,           row.scale),
+    c.isUnique       = coalesce(c.isUnique,        row.isUnique),
+    c.picklistValues = coalesce(c.picklistValues,  row.picklistValues)
+RETURN count(*) AS updated
+"""
+
 # Uses MERGE on the target Column so that references to system objects not in
 # the described set (RecordType, Profile, Group, …) create stub Column nodes
 # rather than being silently dropped.
-_MERGE_REFERENCES = """
+# overwrite_existing=True  → SET r.criteria (always update)
+# overwrite_existing=False → ON CREATE SET r.criteria (only on new edges)
+_MERGE_REFERENCES_OVERWRITE = """
+UNWIND $rows AS row
+MATCH (src:Column {id: row.source_column_id})
+MERGE (tgt:Column {id: row.target_column_id})
+MERGE (src)-[r:REFERENCES]->(tgt)
+SET r.criteria = row.criteria
+RETURN count(*) AS created
+"""
+
+_MERGE_REFERENCES_MERGE = """
 UNWIND $rows AS row
 MATCH (src:Column {id: row.source_column_id})
 MERGE (tgt:Column {id: row.target_column_id})
@@ -187,13 +229,17 @@ class SalesforceConnector:
                 t.has_column_relationships, overwrite_existing=overwrite_existing
             )
 
+        table_q = _SET_TABLE_SFDC_PROPS_OVERWRITE if overwrite_existing else _SET_TABLE_SFDC_PROPS_MERGE
+        col_q = _SET_COLUMN_SFDC_PROPS_OVERWRITE if overwrite_existing else _SET_COLUMN_SFDC_PROPS_MERGE
+        ref_q = _MERGE_REFERENCES_OVERWRITE if overwrite_existing else _MERGE_REFERENCES_MERGE
+
         # ── Salesforce-specific Table properties ─────────────────────────
         sfdc_tables = self.extractor.table_sfdc_props
         if not sfdc_tables.empty:
             rows = sfdc_tables.where(sfdc_tables.notna(), None).to_dict("records")
             for batch in _chunk(rows, self._batch_size):
                 self._driver.execute_query(
-                    _SET_TABLE_SFDC_PROPS,
+                    table_q,
                     parameters_={"rows": batch},
                     routing_=RoutingControl.WRITE,
                     database_=self._db,
@@ -205,7 +251,7 @@ class SalesforceConnector:
             rows = sfdc_cols.where(sfdc_cols.notna(), None).to_dict("records")
             for batch in _chunk(rows, self._batch_size):
                 self._driver.execute_query(
-                    _SET_COLUMN_SFDC_PROPS,
+                    col_q,
                     parameters_={"rows": batch},
                     routing_=RoutingControl.WRITE,
                     database_=self._db,
@@ -217,7 +263,7 @@ class SalesforceConnector:
             ref_rows = refs[["source_column_id", "target_column_id", "criteria"]].to_dict("records")
             for batch in _chunk(ref_rows, self._batch_size):
                 self._driver.execute_query(
-                    _MERGE_REFERENCES,
+                    ref_q,
                     parameters_={"rows": batch},
                     routing_=RoutingControl.WRITE,
                     database_=self._db,

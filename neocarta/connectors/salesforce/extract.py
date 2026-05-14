@@ -14,9 +14,6 @@ from ...connectors.utils.generate_id import (
 )
 from .models import SalesforceExtractorCache, SalesforceObjectDict
 
-# Suffix patterns that mark Salesforce custom / managed-package objects.
-_CUSTOM_SUFFIXES = re.compile(r"__[ceEbBt]$|__mdt$|__kav$")
-
 # A valid namespace prefix is an alphanumeric token (no underscores) followed
 # by double-underscore. Objects like CPP_CC_Entry__c have an underscore in the
 # "prefix" so they don't match and fall through to "custom".
@@ -32,11 +29,9 @@ def _get_namespace(name: str, is_custom: bool) -> str:
     """
     if not is_custom:
         return "core"
-    parts = name.split("__")
-    if len(parts) >= 3:
-        candidate = parts[0]
-        if re.match(r"^[A-Za-z][A-Za-z0-9]*$", candidate):
-            return candidate.lower()
+    m = _NAMESPACE_PREFIX.match(name)
+    if m and name.count("__") >= 2:
+        return m.group(1).lower()
     return "custom"
 
 
@@ -250,9 +245,7 @@ class SalesforceExtractor:
                 col_name = _normalize(field["name"])
                 column_id = generate_column_id(self.org_name, ns, obj_name, col_name)
 
-                is_pk = field.get("type") == "id" or (
-                    field.get("idLookup", False) and field.get("name") == "Id"
-                )
+                is_pk = field.get("type") == "id"
                 is_fk = field.get("type") == "reference"
                 picklist = [
                     v["value"] for v in field.get("picklistValues", []) if v.get("active", True)
