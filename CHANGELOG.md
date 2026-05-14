@@ -11,6 +11,7 @@
 ### Changed
 
 ### Added
+* Add `performance` optional extra (`pip install neocarta[performance]`) that pulls in `neo4j-rust-ext` for 60–90% faster Neo4j serialisation on bulk loads. Requires Python ≥ 3.11. The extension patches the `neo4j` driver automatically on import — no code changes needed.
 * Add data model diagram for table views and materialized views
 * Add `claude.md` file
 * Add `CTE` node to capture CTEs from queries 
