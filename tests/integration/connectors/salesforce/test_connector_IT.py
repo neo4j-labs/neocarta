@@ -8,7 +8,7 @@ import pytest
 
 from neocarta.connectors.salesforce import SalesforceConnector
 
-from .conftest import ORG_NAME, _TEST_DB
+from .conftest import _TEST_DB, ORG_NAME
 
 pytestmark = pytest.mark.integration
 
@@ -18,10 +18,10 @@ def clean_db(neo4j_driver):
     """Wipe the test database before each individual test."""
     with neo4j_driver.session(database=_TEST_DB) as s:
         s.run("MATCH (n) DETACH DELETE n")
-    yield
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
 
 def _query(driver, cypher: str, **params) -> list[dict]:
     records, _, _ = driver.execute_query(cypher, parameters_=params, database_="neo4j")
@@ -35,6 +35,7 @@ def _count(driver, label: str) -> int:
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
 
+
 class TestSalesforceConnectorIT:
     """Full ETL round-trip against a containerised Neo4j instance."""
 
@@ -42,7 +43,9 @@ class TestSalesforceConnectorIT:
         connector = SalesforceConnector(sample_objects, ORG_NAME, neo4j_driver)
         connector.run()
         assert _count(neo4j_driver, "Database") == 1
-        rows = _query(neo4j_driver, "MATCH (d:Database) RETURN d.name AS name, d.platform AS platform")
+        rows = _query(
+            neo4j_driver, "MATCH (d:Database) RETURN d.name AS name, d.platform AS platform"
+        )
         assert rows[0]["name"] == ORG_NAME
         assert rows[0]["platform"].upper() == "SALESFORCE"
 
@@ -51,10 +54,7 @@ class TestSalesforceConnectorIT:
         connector.run()
         # Account + Contact → core; Acme__Widget__c → acme
         assert _count(neo4j_driver, "Schema") == 2
-        names = {
-            r["name"]
-            for r in _query(neo4j_driver, "MATCH (s:Schema) RETURN s.name AS name")
-        }
+        names = {r["name"] for r in _query(neo4j_driver, "MATCH (s:Schema) RETURN s.name AS name")}
         assert names == {"core", "acme"}
 
     def test_run_creates_table_nodes(self, neo4j_driver, sample_objects):
@@ -175,9 +175,7 @@ class TestSalesforceConnectorIT:
         assert _count(neo4j_driver, "Column") == columns_first
 
     def test_csv_output_written(self, neo4j_driver, sample_objects, tmp_path):
-        connector = SalesforceConnector(
-            sample_objects, ORG_NAME, neo4j_driver, output_dir=tmp_path
-        )
+        connector = SalesforceConnector(sample_objects, ORG_NAME, neo4j_driver, output_dir=tmp_path)
         connector.run()
         assert (tmp_path / "database_info.csv").exists()
         assert (tmp_path / "schema_info.csv").exists()

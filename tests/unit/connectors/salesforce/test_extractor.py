@@ -1,13 +1,11 @@
 """Unit tests for SalesforceExtractor."""
 
-import pytest
-
 from neocarta.connectors.salesforce.extract import SalesforceExtractor, _get_namespace
 
 from .conftest import ORG_NAME
 
-
 # ─── Namespace derivation ────────────────────────────────────────────────────
+
 
 class TestGetNamespace:
     def test_standard_object(self):
@@ -32,6 +30,7 @@ class TestGetNamespace:
 
 # ─── Database extraction ─────────────────────────────────────────────────────
 
+
 class TestExtractDatabaseInfo:
     def test_single_row(self, all_objects):
         e = SalesforceExtractor(all_objects, ORG_NAME)
@@ -48,6 +47,7 @@ class TestExtractDatabaseInfo:
 
 
 # ─── Schema extraction ───────────────────────────────────────────────────────
+
 
 class TestExtractSchemaInfo:
     def test_correct_namespaces(self, all_objects):
@@ -70,6 +70,7 @@ class TestExtractSchemaInfo:
 
 
 # ─── Table extraction ────────────────────────────────────────────────────────
+
 
 class TestExtractTableInfo:
     def test_row_count(self, all_objects):
@@ -109,6 +110,7 @@ class TestExtractTableInfo:
 
 
 # ─── Column extraction ───────────────────────────────────────────────────────
+
 
 class TestExtractColumnInfo:
     def test_row_count(self, account_object):
@@ -151,6 +153,7 @@ class TestExtractColumnInfo:
 
 # ─── References extraction ───────────────────────────────────────────────────
 
+
 class TestExtractColumnReferencesInfo:
     def test_known_target_resolved(self, account_object, contact_object):
         e = SalesforceExtractor([account_object, contact_object], ORG_NAME)
@@ -186,6 +189,7 @@ class TestExtractColumnReferencesInfo:
 
 # ─── CSV output ──────────────────────────────────────────────────────────────
 
+
 class TestCsvOutput:
     def test_writes_csvs_when_output_dir_set(self, all_objects, tmp_path):
         e = SalesforceExtractor(all_objects, ORG_NAME, output_dir=tmp_path)
@@ -208,6 +212,7 @@ class TestCsvOutput:
 
 
 # ─── extract_all integration ─────────────────────────────────────────────────
+
 
 class TestExtractAll:
     def test_all_caches_populated(self, all_objects):

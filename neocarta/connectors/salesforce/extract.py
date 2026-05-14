@@ -68,6 +68,7 @@ class SalesforceExtractor:
         org_name: str,
         output_dir: Path | None = None,
     ) -> None:
+        """Initialise the extractor with a list of sobject describe dicts."""
         self.objects = objects
         self.org_name = org_name
         self.output_dir = output_dir
@@ -85,30 +86,37 @@ class SalesforceExtractor:
 
     @property
     def database_info(self) -> pd.DataFrame:
+        """Extracted database info DataFrame."""
         return self._cache.get("database_info", pd.DataFrame())
 
     @property
     def schema_info(self) -> pd.DataFrame:
+        """Extracted schema info DataFrame."""
         return self._cache.get("schema_info", pd.DataFrame())
 
     @property
     def table_info(self) -> pd.DataFrame:
+        """Extracted table info DataFrame."""
         return self._cache.get("table_info", pd.DataFrame())
 
     @property
     def column_info(self) -> pd.DataFrame:
+        """Extracted column info DataFrame."""
         return self._cache.get("column_info", pd.DataFrame())
 
     @property
     def column_references_info(self) -> pd.DataFrame:
+        """Extracted column references DataFrame."""
         return self._cache.get("column_references_info", pd.DataFrame())
 
     @property
     def table_sfdc_props(self) -> pd.DataFrame:
+        """Salesforce-specific Table extra properties DataFrame."""
         return self._cache.get("table_sfdc_props", pd.DataFrame())
 
     @property
     def column_sfdc_props(self) -> pd.DataFrame:
+        """Salesforce-specific Column extra properties DataFrame."""
         return self._cache.get("column_sfdc_props", pd.DataFrame())
 
     # ------------------------------------------------------------------
@@ -136,21 +144,25 @@ class SalesforceExtractor:
     # ------------------------------------------------------------------
 
     def extract_database_info(self) -> pd.DataFrame:
-        df = pd.DataFrame([
-            {
-                "database_name": self.org_name,
-                "platform": "Salesforce",
-                "service": "Salesforce CRM",
-                "description": f"Salesforce org: {self.org_name}",
-                "database_id": generate_database_id(self.org_name),
-            }
-        ])
+        """Build the single-row database info DataFrame for the org."""
+        df = pd.DataFrame(
+            [
+                {
+                    "database_name": self.org_name,
+                    "platform": "Salesforce",
+                    "service": "Salesforce CRM",
+                    "description": f"Salesforce org: {self.org_name}",
+                    "database_id": generate_database_id(self.org_name),
+                }
+            ]
+        )
         self._cache["database_info"] = df
         self._write_csv(df, "database_info.csv")
         print(f"  Extracted 1 database row ({self.org_name})")
         return df
 
     def extract_schema_info(self) -> pd.DataFrame:
+        """Build the schema info DataFrame (one row per unique namespace)."""
         seen: dict[str, str] = {}
         for obj in self.objects:
             ns = _get_namespace(obj["name"], obj.get("custom", False))
@@ -159,13 +171,15 @@ class SalesforceExtractor:
 
         rows = []
         for ns, desc in seen.items():
-            rows.append({
-                "database_name": self.org_name,
-                "schema_name": ns,
-                "description": desc,
-                "database_id": generate_database_id(self.org_name),
-                "schema_id": generate_schema_id(self.org_name, ns),
-            })
+            rows.append(
+                {
+                    "database_name": self.org_name,
+                    "schema_name": ns,
+                    "description": desc,
+                    "database_id": generate_database_id(self.org_name),
+                    "schema_id": generate_schema_id(self.org_name, ns),
+                }
+            )
 
         df = pd.DataFrame(rows)
         self._cache["schema_info"] = df
@@ -174,6 +188,7 @@ class SalesforceExtractor:
         return df
 
     def extract_table_info(self) -> pd.DataFrame:
+        """Build table info and SFDC-extra DataFrames (one row per object)."""
         table_rows: list[dict[str, Any]] = []
         sfdc_rows: list[dict[str, Any]] = []
 
@@ -186,27 +201,33 @@ class SalesforceExtractor:
             # Label alone is used when no description exists (the common case).
             _t_label = obj.get("label", "")
             _t_desc = obj.get("description", "")
-            table_desc = f"{_t_label} — {_t_desc}" if _t_label and _t_desc else (_t_label or _t_desc or None)
-            table_rows.append({
-                "database_name": self.org_name,
-                "schema_name": ns,
-                "table_name": name,
-                "description": table_desc,
-                "schema_id": generate_schema_id(self.org_name, ns),
-                "table_id": table_id,
-            })
-            sfdc_rows.append({
-                "id": table_id,
-                "label": obj.get("label", obj["name"]),
-                "labelPlural": obj.get("labelPlural", ""),
-                "keyPrefix": obj.get("keyPrefix"),
-                "namespace": ns,
-                "isCustom": obj.get("custom", False),
-                "isQueryable": obj.get("queryable", True),
-                "isCreateable": obj.get("createable", True),
-                "isUpdateable": obj.get("updateable", True),
-                "isDeletable": obj.get("deletable", True),
-            })
+            table_desc = (
+                f"{_t_label} — {_t_desc}" if _t_label and _t_desc else (_t_label or _t_desc or None)
+            )
+            table_rows.append(
+                {
+                    "database_name": self.org_name,
+                    "schema_name": ns,
+                    "table_name": name,
+                    "description": table_desc,
+                    "schema_id": generate_schema_id(self.org_name, ns),
+                    "table_id": table_id,
+                }
+            )
+            sfdc_rows.append(
+                {
+                    "id": table_id,
+                    "label": obj.get("label", obj["name"]),
+                    "labelPlural": obj.get("labelPlural", ""),
+                    "keyPrefix": obj.get("keyPrefix"),
+                    "namespace": ns,
+                    "isCustom": obj.get("custom", False),
+                    "isQueryable": obj.get("queryable", True),
+                    "isCreateable": obj.get("createable", True),
+                    "isUpdateable": obj.get("updateable", True),
+                    "isDeletable": obj.get("deletable", True),
+                }
+            )
 
         df = pd.DataFrame(table_rows)
         sfdc_df = pd.DataFrame(sfdc_rows)
@@ -217,6 +238,7 @@ class SalesforceExtractor:
         return df
 
     def extract_column_info(self) -> pd.DataFrame:
+        """Build column info and SFDC-extra DataFrames (one row per field)."""
         column_rows: list[dict[str, Any]] = []
         sfdc_rows: list[dict[str, Any]] = []
 
@@ -228,36 +250,48 @@ class SalesforceExtractor:
                 col_name = _normalize(field["name"])
                 column_id = generate_column_id(self.org_name, ns, obj_name, col_name)
 
-                is_pk = field.get("type") == "id" or field.get("idLookup", False) and field.get("name") == "Id"
+                is_pk = field.get("type") == "id" or (
+                    field.get("idLookup", False) and field.get("name") == "Id"
+                )
                 is_fk = field.get("type") == "reference"
-                picklist = [v["value"] for v in field.get("picklistValues", []) if v.get("active", True)]
+                picklist = [
+                    v["value"] for v in field.get("picklistValues", []) if v.get("active", True)
+                ]
 
                 # Combine label + admin description for richer embeddings.
                 _c_label = field.get("label", "")
                 _c_desc = field.get("description", "")
-                col_desc = f"{_c_label} — {_c_desc}" if _c_label and _c_desc else (_c_label or _c_desc or None)
-                column_rows.append({
-                    "database_name": self.org_name,
-                    "schema_name": ns,
-                    "table_name": obj_name,
-                    "column_name": col_name,
-                    "data_type": field.get("type"),
-                    "is_nullable": field.get("nillable", True),
-                    "is_primary_key": is_pk,
-                    "is_foreign_key": is_fk,
-                    "description": col_desc,
-                    "table_id": generate_table_id(self.org_name, ns, obj_name),
-                    "column_id": column_id,
-                })
-                sfdc_rows.append({
-                    "id": column_id,
-                    "label": field.get("label", field["name"]),
-                    "length": field.get("length"),
-                    "precision": field.get("precision"),
-                    "scale": field.get("scale"),
-                    "isUnique": field.get("unique", False),
-                    "picklistValues": picklist if picklist else None,
-                })
+                col_desc = (
+                    f"{_c_label} — {_c_desc}"
+                    if _c_label and _c_desc
+                    else (_c_label or _c_desc or None)
+                )
+                column_rows.append(
+                    {
+                        "database_name": self.org_name,
+                        "schema_name": ns,
+                        "table_name": obj_name,
+                        "column_name": col_name,
+                        "data_type": field.get("type"),
+                        "is_nullable": field.get("nillable", True),
+                        "is_primary_key": is_pk,
+                        "is_foreign_key": is_fk,
+                        "description": col_desc,
+                        "table_id": generate_table_id(self.org_name, ns, obj_name),
+                        "column_id": column_id,
+                    }
+                )
+                sfdc_rows.append(
+                    {
+                        "id": column_id,
+                        "label": field.get("label", field["name"]),
+                        "length": field.get("length"),
+                        "precision": field.get("precision"),
+                        "scale": field.get("scale"),
+                        "isUnique": field.get("unique", False),
+                        "picklistValues": picklist or None,
+                    }
+                )
 
         df = pd.DataFrame(column_rows)
         sfdc_df = pd.DataFrame(sfdc_rows)
@@ -268,6 +302,7 @@ class SalesforceExtractor:
         return df
 
     def extract_column_references_info(self) -> pd.DataFrame:
+        """Build the column references DataFrame from all reference-type fields."""
         rows: list[dict[str, Any]] = []
 
         for obj in self.objects:
@@ -285,30 +320,43 @@ class SalesforceExtractor:
                 for target_obj in ref_targets:
                     tgt_db, tgt_ns, tgt_table = self._resolve_target(target_obj)
 
-                    rows.append({
-                        "source_database_name": self.org_name,
-                        "source_schema_name": src_ns,
-                        "source_table_name": obj_name,
-                        "source_column_name": src_col,
-                        "target_database_name": tgt_db,
-                        "target_schema_name": tgt_ns,
-                        "target_table_name": tgt_table,
-                        "target_column_name": "id",
-                        "criteria": f"{obj_name}.{src_col} → {target_obj}.Id",
-                        "source_column_id": generate_column_id(
-                            self.org_name, src_ns, obj_name, src_col
-                        ),
-                        "target_column_id": generate_column_id(
-                            tgt_db, tgt_ns, tgt_table, "id"
-                        ),
-                    })
+                    rows.append(
+                        {
+                            "source_database_name": self.org_name,
+                            "source_schema_name": src_ns,
+                            "source_table_name": obj_name,
+                            "source_column_name": src_col,
+                            "target_database_name": tgt_db,
+                            "target_schema_name": tgt_ns,
+                            "target_table_name": tgt_table,
+                            "target_column_name": "id",
+                            "criteria": f"{obj_name}.{src_col} → {target_obj}.Id",
+                            "source_column_id": generate_column_id(
+                                self.org_name, src_ns, obj_name, src_col
+                            ),
+                            "target_column_id": generate_column_id(tgt_db, tgt_ns, tgt_table, "id"),
+                        }
+                    )
 
-        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=[
-            "source_database_name", "source_schema_name", "source_table_name",
-            "source_column_name", "target_database_name", "target_schema_name",
-            "target_table_name", "target_column_name", "criteria",
-            "source_column_id", "target_column_id",
-        ])
+        df = (
+            pd.DataFrame(rows)
+            if rows
+            else pd.DataFrame(
+                columns=[
+                    "source_database_name",
+                    "source_schema_name",
+                    "source_table_name",
+                    "source_column_name",
+                    "target_database_name",
+                    "target_schema_name",
+                    "target_table_name",
+                    "target_column_name",
+                    "criteria",
+                    "source_column_id",
+                    "target_column_id",
+                ]
+            )
+        )
         self._cache["column_references_info"] = df
         self._write_csv(df, "column_references_info.csv")
         print(f"  Extracted {len(df)} reference rows")
@@ -320,7 +368,9 @@ class SalesforceExtractor:
 
     def extract_all(self) -> None:
         """Run all extraction steps and populate the cache."""
-        print(f"Extracting Salesforce schema for org: {self.org_name} ({len(self.objects)} objects)...")
+        print(
+            f"Extracting Salesforce schema for org: {self.org_name} ({len(self.objects)} objects)..."
+        )
         self.extract_database_info()
         self.extract_schema_info()
         self.extract_table_info()

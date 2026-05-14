@@ -6,8 +6,8 @@ field/object definitions are used.
 
 import pytest
 
-
 # ── Synthetic sobject describe fixtures ──────────────────────────────────────
+
 
 @pytest.fixture
 def account_object():

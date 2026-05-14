@@ -1,7 +1,7 @@
 """Salesforce Connector: ETL from Salesforce schema into Neo4j."""
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 from neo4j import Driver, RoutingControl
 
@@ -55,7 +55,7 @@ RETURN count(*) AS created
 """
 
 
-def _chunk(lst: list, size: int):
+def _chunk(lst: list, size: int) -> Generator[list, None, None]:
     for i in range(0, len(lst), size):
         yield lst[i : i + size]
 
@@ -103,6 +103,7 @@ class SalesforceConnector:
         output_dir: Path | None = None,
         batch_size: int = 500,
     ) -> None:
+        """Initialise extractor, transformer, and loader for the given org."""
         self.extractor = SalesforceExtractor(objects, org_name, output_dir)
         self.transformer = CSVTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
@@ -222,9 +223,12 @@ class SalesforceConnector:
                     database_=self._db,
                 )
             n_system = (
-                refs["target_database_name"].notna()
-                & (refs["target_schema_name"] == "system")
-            ).sum() if "target_schema_name" in refs.columns else 0
+                (
+                    refs["target_database_name"].notna() & (refs["target_schema_name"] == "system")
+                ).sum()
+                if "target_schema_name" in refs.columns
+                else 0
+            )
             if n_system:
                 print(f"  ⚠ {n_system} references to system objects (stub Column nodes created)")
 
