@@ -40,6 +40,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Rust-accelerated Neo4j driver — 60-90% faster serialisation for bulk loads.
+# Requires Python >=3.11 (compiled extension); install with: pip install neocarta[performance]
+performance = [
+    "neo4j-rust-ext>=6.2.0.0",
+]
 mcp = [
     "fastmcp>=2.14.4,<3",
     "mcp>=1.26.0",
