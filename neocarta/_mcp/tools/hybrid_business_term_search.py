@@ -22,7 +22,7 @@ def register_table_tool(
 
     @server.tool()
     async def get_context_by_table_business_term_hybrid_search(
-        text_content: str,  
+        text_content: str,
         max_tables: int = 5,
         search_top_k: int = 10,
     ) -> list[TableContext]:

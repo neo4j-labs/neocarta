@@ -1,5 +1,6 @@
 """Utilities for the MCP server."""
 
+
 def remove_lucene_chars(text: str | None) -> str | None:
     """Remove Lucene special characters."""
     if not text:

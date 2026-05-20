@@ -174,4 +174,6 @@ class BigQueryLogsConnector:
         self.transform_metadata()
         print("Loading metadata into Neo4j...")
         self.load_metadata()
+        print("Recording neocarta graph metadata...")
+        print(self.loader.upsert_neocarta_graph_node().model_dump())
         print("BigQuery logs connector completed successfully!")

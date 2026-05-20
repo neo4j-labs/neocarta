@@ -10,9 +10,14 @@ from fastmcp.utilities.logging import get_logger
 from neo4j import AsyncDriver, AsyncGraphDatabase
 from openai import AsyncOpenAI
 
+from .. import __version__
 from ..enrichment.embeddings import OpenAIEmbeddingsConnector
 from .embeddings import create_openai_embedder
-from .inventory import fetch_index_inventory, has_business_term_nodes
+from .inventory import (
+    fetch_index_inventory,
+    fetch_neocarta_graph_metadata,
+    has_business_term_nodes,
+)
 from .settings import mcp_server_settings
 from .tools import (
     catalog,
@@ -69,6 +74,40 @@ def _register_for_label(
     registrar(server, neo4j_driver, neo4j_database, embedder)
 
 
+async def _validate_graph_version(neo4j_driver: AsyncDriver, neo4j_database: str) -> None:
+    """
+    Warn if the graph's recorded neocarta version differs from this server's.
+
+    The ``__neocarta_graph__`` node is written by connectors on each run and
+    records the neocarta version responsible. A mismatch usually means the
+    MCP server and the connector that loaded the graph were installed from
+    different package versions and may disagree on schema details.
+    """
+    metadata = await fetch_neocarta_graph_metadata(neo4j_driver, neo4j_database)
+    if metadata is None:
+        logger.warning(
+            "No `__neocarta_graph__` metadata node found in database %r. "
+            "The graph may have been loaded by a neocarta version that pre-dates "
+            "graph metadata, or by a non-neocarta process.",
+            neo4j_database,
+        )
+        return
+    if metadata.latest_version != __version__:
+        logger.warning(
+            "Neocarta version mismatch: MCP server is running %s but the graph "
+            "was last written by %s (initial version %s). Behavior may be "
+            "unexpected — align the connector and MCP server versions.",
+            __version__,
+            metadata.latest_version,
+            metadata.initial_version,
+        )
+    else:
+        logger.info(
+            "Neocarta graph metadata version %s matches MCP server version.",
+            metadata.latest_version,
+        )
+
+
 async def create_mcp_server(
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
@@ -91,6 +130,8 @@ This is an MCP server that facilitates context retrieval from a Neo4j semantic l
 The retrieved context may be used for query generation, query routing or data discovery.
 """
     server = FastMCP(name=name, instructions=instructions, log_level="DEBUG")
+
+    await _validate_graph_version(neo4j_driver, neo4j_database)
 
     inventory = await fetch_index_inventory(neo4j_driver, neo4j_database)
     business_term_index_present = ("BusinessTerm", "FULLTEXT") in inventory
