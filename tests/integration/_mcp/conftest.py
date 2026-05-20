@@ -90,6 +90,30 @@ def sample_csv_dir(setup):
         "my-project,sales,customers,name,Jane Smith\n"
         "my-project,sales,customers,name,Bob Johnson\n"
     )
+    (temp_dir / "glossary_info.csv").write_text(
+        "glossary_name,name,description\n"
+        "test_glossary,Test Glossary,Glossary for MCP integration tests\n"
+    )
+    (temp_dir / "category_info.csv").write_text(
+        "glossary_name,category_name,name,description\n"
+        "test_glossary,sales_metrics,Sales Metrics,Metrics for sales\n"
+        "test_glossary,customer_metrics,Customer Metrics,Metrics for customers\n"
+    )
+    (temp_dir / "business_term_info.csv").write_text(
+        "glossary_name,category_name,term_name,description\n"
+        "test_glossary,sales_metrics,Order Total,Total monetary amount of an order\n"
+        "test_glossary,customer_metrics,Customer Name,Full name of a customer\n"
+    )
+    (temp_dir / "table_term_info.csv").write_text(
+        "database_name,schema_name,table_name,glossary_name,category_name,term_name\n"
+        "my-project,sales,orders,test_glossary,sales_metrics,Order Total\n"
+        "my-project,sales,customers,test_glossary,customer_metrics,Customer Name\n"
+    )
+    (temp_dir / "column_term_info.csv").write_text(
+        "database_name,schema_name,table_name,column_name,glossary_name,category_name,term_name\n"
+        "my-project,sales,orders,total,test_glossary,sales_metrics,Order Total\n"
+        "my-project,sales,customers,name,test_glossary,customer_metrics,Customer Name\n"
+    )
 
     yield temp_dir
     shutil.rmtree(temp_dir)

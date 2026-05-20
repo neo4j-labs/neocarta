@@ -68,13 +68,14 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
 	
 test-unit:
-	uv run pytest tests/unit -v
+	uv run pytest tests/unit -v --ignore=tests/unit/_mcp
 
 test-it:
-	uv run pytest tests/integration -v
+	uv run pytest tests/integration -v --ignore=tests/integration/_mcp
 
 test-mcp:
 	uv run pytest tests/integration/_mcp -v
+	uv run pytest tests/unit/_mcp -v
 
 test-smoke:
 	uv run pytest tests/smoke -v

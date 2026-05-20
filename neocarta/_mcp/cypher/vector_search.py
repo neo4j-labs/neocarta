@@ -1,64 +1,25 @@
-"""Cypher queries for the Neocarta MCP server."""
+"""Vector-search-based cypher queries."""
 
 
-def list_schemas_cypher() -> str:
-    """
-    Get the cypher query to list all schemas and their databases.
+def get_context_by_column_vector_search_cypher() -> str:
+    """Get the cypher query to find metadata by column semantic similarity to the query.
 
-    Parameters
-    ----------
-    None
+    Notes:
+    -----
+    Expected Cypher parameters:
 
-    Returns:
-    -------
-    str
-        The cypher query to list all schemas and their databases.
-    """
-    return """
-    MATCH (d:Database)-[:HAS_SCHEMA]->(schema:Schema)
-    RETURN d.name as database_name, schema.name as schema_name
-    """
+    queryEmbedding : list[float]
+        Embedding to compare against ``column_vector_index``.
+    searchTopK : int
+        Number of column candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
 
-
-def list_tables_by_schema_cypher() -> str:
-    """
-    Get the cypher query to list all tables for a given schema.
-
-    Parameters
-    ----------
-    schema_name: str
-        The name of the schema to list tables for.
-
-    Returns:
-    -------
-    str
-        The cypher query to list all tables for a given schema.
-    """
-    return """
-    MATCH (s:Schema {name: $schemaName})-[:HAS_TABLE]->(t:Table)
-    RETURN s.name as schema_name, collect(t.name) as table_names
-    """
-
-
-def get_metadata_schema_by_column_semantic_similarity_cypher() -> str:
-    """
-    Get the cypher query to get the metadata schema by column semantic similarity to the query.
-
-    Parameters
-    ----------
-    queryEmbedding: str
-        The embedding to use for the semantic similarity search.
-    maxTables: int
-        The maximum number of tables to return.
-
-    Returns:
-    -------
-    str
-        The cypher query to get the metadata schema by column semantic similarity to the query.
+    Uses the ``column_vector_index`` index (library convention).
     """
     return """
 // Find similar columns by embedding
-CALL db.index.vector.queryNodes('column_vector_index', 10, $queryEmbedding)
+CALL db.index.vector.queryNodes('column_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as col, score
 WHERE score > 0.5
 
@@ -113,20 +74,25 @@ LIMIT $maxTables
 """
 
 
-def get_metadata_schema_by_table_semantic_similarity_cypher() -> str:
-    """
-    Get the cypher query to find metadata by table semantic similarity to the query.
+def get_context_by_table_vector_search_cypher() -> str:
+    """Get the cypher query to find metadata by table semantic similarity to the query.
 
-    Parameters
-    ----------
-    queryEmbedding: str
-        The embedding to use for the semantic similarity search.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding to compare against ``table_vector_index``.
+    searchTopK : int
+        Number of table candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``table_vector_index`` index (library convention).
     """
     return """
 // Find similar tables by embedding
-CALL db.index.vector.queryNodes('table_vector_index', 10, $queryEmbedding)
+CALL db.index.vector.queryNodes('table_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as table, score as tableScore
 WHERE tableScore > 0.5
 
@@ -184,20 +150,26 @@ LIMIT $maxTables
 """
 
 
-def get_metadata_schema_by_schema_and_table_semantic_similarity_cypher() -> str:
-    """
-    Get the cypher query to find metadata by schema and table semantic similarity to the query.
+def get_context_by_schema_and_table_vector_search_cypher() -> str:
+    """Get the cypher query to find metadata by schema and table semantic similarity to the query.
 
-    Parameters
-    ----------
-    queryEmbedding: str
-        The embedding to use for the semantic similarity search.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding to compare against ``schema_vector_index`` and to score tables in-line.
+    searchTopK : int
+        Number of schema candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``schema_vector_index`` index (library convention). Table similarity is
+    computed in-line via ``vector.similarity.cosine``
     """
     return """
 // Find similar schemas by embedding
-CALL db.index.vector.queryNodes('schema_vector_index', 5, $queryEmbedding)
+CALL db.index.vector.queryNodes('schema_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as schema, score as schemaScore
 WHERE schemaScore > 0.5
 
@@ -263,70 +235,4 @@ RETURN {
 } AS result
 ORDER BY schemaScore DESC, tableScore DESC
 LIMIT $maxTables
-"""
-
-
-def get_full_metadata_schema_cypher() -> str:
-    """
-    Get the cypher query to get the full metadata schema for the database.
-
-    Parameters
-    ----------
-    None
-
-    Returns:
-    -------
-    str
-        The cypher query to get the full metadata schema for the database.
-    """
-    return """
-// Get the columns for each table
-MATCH (col:Column)<-[:HAS_COLUMN]-(table:Table)
-
-// Find all references for this column (both directions)
-OPTIONAL MATCH (col)-[:REFERENCES]-(refCol:Column)<-[:HAS_COLUMN]-(refTable:Table)
-
-// Get example values
-OPTIONAL MATCH (col)-[:HAS_VALUE]->(v:Value)
-
-WITH
-    table,
-    col,
-    collect(DISTINCT refTable.name + "." + refCol.name) AS refs,
-    collect(DISTINCT v.value)[0..5] AS exampleValues
-
-// Group columns by table and build column objects
-WITH
-    table,
-    collect({
-        column_name: col.name,
-        column_description: col.description,
-        data_type: col.type,
-        examples: exampleValues,
-        key_type: CASE
-            WHEN col.is_primary_key THEN "primary"
-            WHEN col.is_foreign_key THEN "foreign"
-            ELSE null
-        END,
-        nullable: col.nullable,
-        references: refs
-    }) AS columns
-
-// Get Schema and Database names for Tables
-MATCH (table)<-[:HAS_TABLE]-(schema:Schema)<-[:HAS_SCHEMA]-(db:Database)
-
-WITH
-    table,
-    columns,
-    schema.name as schema_name,
-    db.name as database_name
-
-RETURN {
-    table_name: table.name,
-    table_description: table.description,
-    database_name: database_name,
-    schema_name: schema_name,
-    columns: columns
-} AS result
-ORDER BY table.name
 """

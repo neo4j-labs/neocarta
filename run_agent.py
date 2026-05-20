@@ -66,21 +66,16 @@ CONFIG = {"configurable": {"thread_id": "1"}}
 # run the agent with MCP server using stdio transport
 async def main() -> None:
     """Connect to MCP servers, build the agent, and run an interactive chat loop."""
-    # Get tools
-    mcp_tools = await client.get_tools()
-
-    tool_names = {
-        # From SQL Metadata Graph MCP Server
-        "list_schemas",
-        "list_tables_by_schema",
-        "get_metadata_schema_by_column_semantic_similarity",
-        "get_metadata_schema_by_schema_and_table_semantic_similarity",
-        "get_full_metadata_schema",
-        # From BigQuery MCP Server
-        "execute_sql",
-    }
-
-    allowed_tools = [tool for tool in mcp_tools if tool.name in tool_names]
+    # Get tools per server. The neocarta server self-filters its tool set based on
+    # the target database's index inventory, so we trust everything it exposes.
+    # The BigQuery MCP server exposes more than we want, so we explicitly allowlist
+    # only the SQL execution tool.
+    neocarta_tools = await client.get_tools(server_name="sql_metadata_graph")
+    bigquery_tools = await client.get_tools(server_name="bigquery")
+    bigquery_allowed = {"execute_sql"}
+    allowed_tools = list(neocarta_tools) + [
+        tool for tool in bigquery_tools if tool.name in bigquery_allowed
+    ]
 
     agent = create_text2sql_agent(allowed_tools)
 
