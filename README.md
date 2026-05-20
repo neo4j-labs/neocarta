@@ -26,6 +26,7 @@ Requires Python 3.10 or higher and a running Neo4j instance. Options:
 
 Neocarta has an optional performance enhancement extra. neo4j-rust-ext replaces the pure-Python serialisation layer of the Neo4j Python Driver with a compiled Rust extension, delivering 60–90% faster throughput for bulk loads — relevant for any connector loading large schemas or datasets.
 
+*Note: This requires Python >=3.11*
 ```bash
 pip install neocarta[performance]
 ```
