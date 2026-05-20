@@ -24,6 +24,7 @@ def register_column_tool(
     async def get_context_by_column_vector_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables whose columns are semantically similar to the provided text.
@@ -44,13 +45,20 @@ def register_column_tool(
             Natural-language description or query to search for semantically
             similar columns.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of column candidates the vector index returns before being
+            grouped to parent tables. Increase to widen recall; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_column_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
-            parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
+            parameters_={
+                "queryEmbedding": embedding,
+                "searchTopK": search_top_k,
+                "maxTables": max_tables,
+            },
             database_=neo4j_database,
             routing_=RoutingControl.READ,
             result_transformer_=lambda x: x.data(),
@@ -70,6 +78,7 @@ def register_table_tool(
     async def get_context_by_table_vector_search(
         text_content: str,
         max_tables: int = 10,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables that are semantically similar to the provided text.
@@ -88,13 +97,20 @@ def register_table_tool(
             Natural-language description or query to search for semantically
             similar tables.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of table candidates the vector index returns before ranking.
+            Increase to widen recall; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_table_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
-            parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
+            parameters_={
+                "queryEmbedding": embedding,
+                "searchTopK": search_top_k,
+                "maxTables": max_tables,
+            },
             database_=neo4j_database,
             routing_=RoutingControl.READ,
             result_transformer_=lambda x: x.data(),
@@ -114,6 +130,7 @@ def register_schema_tool(
     async def get_context_by_schema_and_table_vector_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 5,
     ) -> list[TableContext]:
         """
         Find tables by matching both schema and table embeddings to the provided text.
@@ -134,13 +151,21 @@ def register_schema_tool(
             Natural-language description or query to search for semantically
             similar schemas and tables.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of schema candidates the vector index returns before tables
+            within those schemas are scored in-line. Increase to consider more
+            schemas; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_schema_and_table_vector_search_cypher()
         results = await neo4j_driver.execute_query(
             query_=cypher,
-            parameters_={"queryEmbedding": embedding, "maxTables": max_tables},
+            parameters_={
+                "queryEmbedding": embedding,
+                "searchTopK": search_top_k,
+                "maxTables": max_tables,
+            },
             database_=neo4j_database,
             routing_=RoutingControl.READ,
             result_transformer_=lambda x: x.data(),

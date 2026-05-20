@@ -2,24 +2,24 @@
 
 
 def get_context_by_table_full_text_search_cypher() -> str:
-    """
-    Get the cypher query to find tables whose name or description match a full-text query.
+    """Get the cypher query to find tables whose name or description match a full-text query.
 
-    Parameters
-    ----------
-    queryText: str
-        The text to use for the full-text search.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
 
-    Returns:
-    -------
-    str
-        The cypher query that returns TableContext rows ordered by full-text score.
+    queryText : str
+        Lucene query for ``table_full_text_index``.
+    searchTopK : int
+        Number of table candidates to fetch from the full-text index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``table_full_text_index`` index (library convention).
     """
     return """
 // Full-text search tables
-CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $maxTables})
+CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $searchTopK})
 YIELD node as table, score as tableScore
 
 // Get the schema for each table
@@ -77,25 +77,24 @@ LIMIT $maxTables
 
 
 def get_context_by_column_full_text_search_cypher() -> str:
-    """
-    Get the cypher query to find tables whose columns match a full-text query.
+    """Get the cypher query to find tables whose columns match a full-text query.
 
-    Parameters
-    ----------
-    queryText: str
-        The text to use for the full-text search.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
 
-    Returns:
-    -------
-    str
-        The cypher query that returns TableContext rows aggregated from matching columns,
-        ordered by average column full-text score.
+    queryText : str
+        Lucene query for ``column_full_text_index``.
+    searchTopK : int
+        Number of column candidates to fetch from the full-text index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``column_full_text_index`` index (library convention).
     """
     return """
 // Full-text search columns
-CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $maxTables})
+CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $searchTopK})
 YIELD node as col, score
 
 // Get the table for each matching column

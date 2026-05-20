@@ -2,17 +2,24 @@
 
 
 def get_context_by_column_vector_search_cypher() -> str:
-    """
-    Get the cypher query to find metadata by column semantic similarity to the query.
+    """Get the cypher query to find metadata by column semantic similarity to the query.
 
     Notes:
     -----
-    Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
-    Index name: ``column_vector_index`` (library convention).
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding to compare against ``column_vector_index``.
+    searchTopK : int
+        Number of column candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``column_vector_index`` index (library convention).
     """
     return """
 // Find similar columns by embedding
-CALL db.index.vector.queryNodes('column_vector_index', 10, $queryEmbedding)
+CALL db.index.vector.queryNodes('column_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as col, score
 WHERE score > 0.5
 
@@ -68,17 +75,24 @@ LIMIT $maxTables
 
 
 def get_context_by_table_vector_search_cypher() -> str:
-    """
-    Get the cypher query to find metadata by table semantic similarity to the query.
+    """Get the cypher query to find metadata by table semantic similarity to the query.
 
     Notes:
     -----
-    Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
-    Index name: ``table_vector_index`` (library convention).
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding to compare against ``table_vector_index``.
+    searchTopK : int
+        Number of table candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``table_vector_index`` index (library convention).
     """
     return """
 // Find similar tables by embedding
-CALL db.index.vector.queryNodes('table_vector_index', 10, $queryEmbedding)
+CALL db.index.vector.queryNodes('table_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as table, score as tableScore
 WHERE tableScore > 0.5
 
@@ -137,18 +151,25 @@ LIMIT $maxTables
 
 
 def get_context_by_schema_and_table_vector_search_cypher() -> str:
-    """
-    Get the cypher query to find metadata by schema and table semantic similarity to the query.
+    """Get the cypher query to find metadata by schema and table semantic similarity to the query.
 
     Notes:
     -----
-    Query parameters expected: ``$queryEmbedding`` (list[float]), ``$maxTables`` (int).
-    Index name: ``schema_vector_index`` (library convention). Table similarity is computed
-    in-line via ``vector.similarity.cosine`` against ``table.embedding`` and requires no index.
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding to compare against ``schema_vector_index`` and to score tables in-line.
+    searchTopK : int
+        Number of schema candidates to fetch from the vector index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
+
+    Uses the ``schema_vector_index`` index (library convention). Table similarity is
+    computed in-line via ``vector.similarity.cosine``
     """
     return """
 // Find similar schemas by embedding
-CALL db.index.vector.queryNodes('schema_vector_index', 5, $queryEmbedding)
+CALL db.index.vector.queryNodes('schema_vector_index', $searchTopK, $queryEmbedding)
 YIELD node as schema, score as schemaScore
 WHERE schemaScore > 0.5
 

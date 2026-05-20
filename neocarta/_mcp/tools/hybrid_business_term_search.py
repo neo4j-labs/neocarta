@@ -23,6 +23,7 @@ def register_table_tool(
     async def get_context_by_table_business_term_hybrid_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables via vector + full-text search, with the full-text branch routed through business-glossary terms.
@@ -48,7 +49,12 @@ def register_table_tool(
             Natural-language and/or business-term query. The same string is used
             for the embedding lookup and both full-text branches.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of candidates each search call returns — applies to the table
+            vector lookup, the table full-text lookup, and the business-term
+            full-text lookup. Increase to widen recall; decrease to tighten
+            precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_table_business_term_hybrid_search_cypher()
@@ -57,6 +63,7 @@ def register_table_tool(
             parameters_={
                 "queryEmbedding": embedding,
                 "queryText": text_content,
+                "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
             database_=neo4j_database,
@@ -78,6 +85,7 @@ def register_column_tool(
     async def get_context_by_column_business_term_hybrid_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables via vector + full-text search at the column level, with the full-text branch routed through business-glossary terms.
@@ -105,7 +113,11 @@ def register_column_tool(
             Natural-language and/or business-term query. The same string is used
             for the embedding lookup and both full-text branches.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of candidates each search call returns — applies to the column
+            vector lookup, the column full-text lookup, and the business-term
+            full-text lookup. Increase to widen recall; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_column_business_term_hybrid_search_cypher()
@@ -114,6 +126,7 @@ def register_column_tool(
             parameters_={
                 "queryEmbedding": embedding,
                 "queryText": text_content,
+                "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
             database_=neo4j_database,

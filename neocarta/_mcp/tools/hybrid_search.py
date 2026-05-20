@@ -23,6 +23,7 @@ def register_table_tool(
     async def get_context_by_table_hybrid_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables via a hybrid vector + full-text search at the table level.
@@ -43,7 +44,10 @@ def register_table_tool(
             Natural-language and/or keyword query. The same string is used for
             both the embedding lookup and the full-text search.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of table candidates each search branch returns before
+            ranking. Increase to widen recall; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_table_hybrid_search_cypher()
@@ -52,6 +56,7 @@ def register_table_tool(
             parameters_={
                 "queryEmbedding": embedding,
                 "queryText": text_content,
+                "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
             database_=neo4j_database,
@@ -73,6 +78,7 @@ def register_column_tool(
     async def get_context_by_column_hybrid_search(
         text_content: str,
         max_tables: int = 5,
+        search_top_k: int = 10,
     ) -> list[TableContext]:
         """
         Find tables via a hybrid vector + full-text search at the column level.
@@ -95,7 +101,10 @@ def register_column_tool(
             Natural-language and/or keyword query. The same string is used for
             both the embedding lookup and the full-text search.
         max_tables: int
-            Maximum number of tables to return.
+            Maximum number of tables in the returned context.
+        search_top_k: int
+            Number of column candidates each search branch returns before being
+            grouped to parent tables. Increase to widen recall; decrease to tighten precision.
         """
         embedding = await embedder._create_embedding_async(text_content)
         cypher = get_context_by_column_hybrid_search_cypher()
@@ -104,6 +113,7 @@ def register_column_tool(
             parameters_={
                 "queryEmbedding": embedding,
                 "queryText": text_content,
+                "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
             database_=neo4j_database,

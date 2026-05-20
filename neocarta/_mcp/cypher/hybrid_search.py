@@ -2,26 +2,29 @@
 
 
 def get_context_by_table_hybrid_search_cypher() -> str:
-    """
-    Get the cypher query to find tables via hybrid vector + full-text search on the Table node.
+    """Get the cypher query to find tables via hybrid vector + full-text search on the Table node.
 
     Combines a vector search over `table_vector_index` with a full-text search over
     `table_full_text_index`. Scores from each branch are min-max normalized by the branch's
     own maximum score and merged by taking the maximum across branches per table.
 
-    Parameters
-    ----------
-    queryEmbedding: list[float]
-        The embedding to use for the vector branch.
-    queryText: str
-        The text to use for the full-text branch.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding for the vector branch.
+    queryText : str
+        Lucene query for the full-text branch.
+    searchTopK : int
+        Number of table candidates to fetch from each branch's index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
     """
     return """
 CALL () {
   // vector search tables
-  CALL db.index.vector.queryNodes('table_vector_index', $maxTables, $queryEmbedding)
+  CALL db.index.vector.queryNodes('table_vector_index', $searchTopK, $queryEmbedding)
   YIELD node as table, score as tableScore
   WHERE tableScore > 0.5
 
@@ -32,7 +35,7 @@ CALL () {
   UNION
 
   // full-text search tables
-  CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as table, score as tableScore
 
   WITH collect({node:table, score:tableScore}) AS nodes, max(tableScore) AS ft_index_max_score
@@ -98,26 +101,29 @@ LIMIT $maxTables
 
 
 def get_context_by_column_hybrid_search_cypher() -> str:
-    """
-    Get the cypher query to find tables via hybrid vector + full-text search on the Column node.
+    """Get the cypher query to find tables via hybrid vector + full-text search on the Column node.
 
     Combines a vector search over `column_vector_index` with a full-text search over
     `column_full_text_index`. Column-level scores are normalized per-branch and merged by max,
     then aggregated up to the parent Table as the per-table average.
 
-    Parameters
-    ----------
-    queryEmbedding: list[float]
-        The embedding to use for the vector branch.
-    queryText: str
-        The text to use for the full-text branch.
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding for the vector branch.
+    queryText : str
+        Lucene query for the full-text branch.
+    searchTopK : int
+        Number of column candidates to fetch from each branch's index.
+    maxTables : int
+        Maximum number of tables to return in the final result.
     """
     return """
 CALL () {
   // vector search columns
-  CALL db.index.vector.queryNodes('column_vector_index', $maxTables, $queryEmbedding)
+  CALL db.index.vector.queryNodes('column_vector_index', $searchTopK, $queryEmbedding)
   YIELD node as col, score as colScore
   WHERE colScore > 0.5
 
@@ -128,7 +134,7 @@ CALL () {
   UNION
 
   // full-text search columns
-  CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as col, score as colScore
 
   WITH collect({node:col, score:colScore}) AS nodes, max(colScore) AS ft_index_max_score
@@ -189,8 +195,7 @@ LIMIT $maxTables
 
 
 def get_context_by_table_business_term_hybrid_search_cypher() -> str:
-    """
-    Get the cypher query to find tables via hybrid vector + business-term-bridged full-text search.
+    """Get the cypher query to find tables via hybrid vector + business-term-bridged full-text search.
 
     The full-text branch finds BusinessTerm nodes matching the query, then finds Table nodes
     that (a) also match the query in `table_full_text_index` AND (b) are TAGGED_WITH one of those
@@ -200,19 +205,23 @@ def get_context_by_table_business_term_hybrid_search_cypher() -> str:
     to the vector branch's normalized score. Combined with a vector search on
     `table_vector_index` via per-branch normalization and max-merge per table.
 
-    Parameters
-    ----------
-    queryEmbedding: list[float]
-        The embedding to use for the vector branch.
-    queryText: str
-        The text to use for the full-text branches (business term + table).
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding for the vector branch.
+    queryText : str
+        Lucene query for both full-text branches (business term + table).
+    searchTopK : int
+        Number of candidates to fetch from each index call (vector + both full-text).
+    maxTables : int
+        Maximum number of tables to return in the final result.
     """
     return """
 CALL () {
   // vector search tables
-  CALL db.index.vector.queryNodes('table_vector_index', $maxTables, $queryEmbedding)
+  CALL db.index.vector.queryNodes('table_vector_index', $searchTopK, $queryEmbedding)
   YIELD node as table, score as tableScore
   WHERE tableScore > 0.5
 
@@ -227,10 +236,10 @@ CALL () {
   // full-text score and the business-term full-text score, each min-max normalized
   // by its own branch maximum so the combined score is in [0,1] and directly
   // comparable to the vector branch's normalized score.
-  CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as bt, score as btScore
   WITH bt, btScore
-  CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('table_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as table, score as tableScore
   WHERE EXISTS {(bt:BusinessTerm)<-[:TAGGED_WITH]-(table:Table)}
   WITH collect({
@@ -303,8 +312,7 @@ LIMIT $maxTables
 
 
 def get_context_by_column_business_term_hybrid_search_cypher() -> str:
-    """
-    Get the cypher query to find tables via hybrid vector + business-term-bridged full-text search on Column.
+    """Get the cypher query to find tables via hybrid vector + business-term-bridged full-text search on Column.
 
     The full-text branch finds BusinessTerm nodes matching the query, then finds Column nodes
     that (a) also match the query in `column_full_text_index` AND (b) are TAGGED_WITH one of those
@@ -315,19 +323,23 @@ def get_context_by_column_business_term_hybrid_search_cypher() -> str:
     `column_vector_index` via per-branch normalization and max-merge per column, then aggregated
     up to the parent Table by average score.
 
-    Parameters
-    ----------
-    queryEmbedding: list[float]
-        The embedding to use for the vector branch.
-    queryText: str
-        The text to use for the full-text branches (business term + column).
-    maxTables: int
-        The maximum number of tables to return.
+    Notes:
+    -----
+    Expected Cypher parameters:
+
+    queryEmbedding : list[float]
+        Embedding for the vector branch.
+    queryText : str
+        Lucene query for both full-text branches (business term + column).
+    searchTopK : int
+        Number of candidates to fetch from each index call (vector + both full-text).
+    maxTables : int
+        Maximum number of tables to return in the final result.
     """
     return """
 CALL () {
   // vector search columns
-  CALL db.index.vector.queryNodes('column_vector_index', $maxTables, $queryEmbedding)
+  CALL db.index.vector.queryNodes('column_vector_index', $searchTopK, $queryEmbedding)
   YIELD node as col, score as colScore
   WHERE colScore > 0.5
 
@@ -342,10 +354,10 @@ CALL () {
   // full-text score and the business-term full-text score, each min-max normalized
   // by its own branch maximum so the combined score is in [0,1] and directly
   // comparable to the vector branch's normalized score.
-  CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('businessterm_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as bt, score as btScore
   WITH bt, btScore
-  CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $maxTables})
+  CALL db.index.fulltext.queryNodes('column_full_text_index', $queryText, {limit: $searchTopK})
   YIELD node as col, score as colScore
   WHERE EXISTS {(bt:BusinessTerm)<-[:TAGGED_WITH]-(col:Column)}
   WITH collect({
