@@ -685,10 +685,15 @@ This is a metadata retrieval MCP server that provides tools to query the Neo4j s
 **Tools**
 * `list_schemas` - List all schemas and their associated databases.
 * `list_tables_by_schema` - List all tables for a given schema name.
-* `get_metadata_schema_by_column_semantic_similarity` - Find tables by semantic similarity on column embeddings.
-* `get_metadata_schema_by_table_semantic_similarity` - Find tables by semantic similarity on table embeddings.
-* `get_metadata_schema_by_schema_and_table_semantic_similarity` - Find tables by semantic similarity across both schema and table embeddings.
+* `get_context_by_column_vector_search` - Find tables by semantic similarity on column embeddings.
+* `get_context_by_table_vector_search` - Find tables by semantic similarity on table embeddings.
+* `get_context_by_schema_and_table_vector_search` - Find tables by semantic similarity across both schema and table embeddings.
+* `get_context_by_column_full_text_search` / `get_context_by_table_full_text_search` - Full-text search on column or table name/description.
+* `get_context_by_column_hybrid_search` / `get_context_by_table_hybrid_search` - Hybrid vector + full-text search at the column or table level.
+* `get_context_by_column_business_term_hybrid_search` / `get_context_by_table_business_term_hybrid_search` - Hybrid search with the full-text branch bridged through `:BusinessTerm` tags.
 * `get_full_metadata_schema` - Return complete metadata for all tables. **Warning:** expensive — use only for debugging.
+
+The MCP server probes the target database at startup and registers, per label (Table, Column), the highest-priority retrieval tool whose indexes are present: business-term-bridged hybrid > hybrid > vector or full-text alone. Schema-level vector retrieval and catalog tools are registered independently.
 
 See the [MCP server README](neocarta/_mcp/README.md) for full server documentation.
 
@@ -703,7 +708,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.3.0",
+        "neocarta[mcp]@0.4.0",
         "neocarta-mcp"
       ],
       "env": {
@@ -941,7 +946,7 @@ Required environment variables (add to `.env` file):
 ```
 > What are the total sales by product category?
 
-Agent: [Calls get_metadata_schema_by_column_semantic_similarity with query about sales and categories]
+Agent: [Calls get_context_by_column_vector_search with query about sales and categories]
 Agent: [Generates SQL query using retrieved schema]
 Agent: [Calls execute_sql with generated query]
 Agent: Here are the total sales by product category:
