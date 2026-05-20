@@ -22,6 +22,14 @@ Requires Python 3.10 or higher and a running Neo4j instance. Options:
 - [Neo4j Desktop](https://neo4j.com/download/) — local GUI-based instance
 - [Docker image](https://hub.docker.com/_/neo4j) — lightweight local instance
 
+### Performance Accelerator 
+
+Neocarta has an optional performance enhancement extra. neo4j-rust-ext replaces the pure-Python serialisation layer of the Neo4j Python Driver with a compiled Rust extension, delivering 60–90% faster throughput for bulk loads — relevant for any connector loading large schemas or datasets.
+
+```bash
+pip install neocarta[performance]
+```
+
 ## Metadata Graph
 
 The metadata graph has the following schema. All connectors must convert their schema information to this graph schema to be compatible with the provided MCP server and ingestion tooling.
