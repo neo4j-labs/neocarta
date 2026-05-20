@@ -9,6 +9,7 @@ from ..cypher import (
     get_context_by_table_hybrid_search_cypher,
 )
 from ..models import TableContext
+from ..utils import remove_lucene_chars
 
 
 def register_table_tool(
@@ -55,7 +56,7 @@ def register_table_tool(
             query_=cypher,
             parameters_={
                 "queryEmbedding": embedding,
-                "queryText": text_content,
+                "queryText": remove_lucene_chars(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
@@ -112,7 +113,7 @@ def register_column_tool(
             query_=cypher,
             parameters_={
                 "queryEmbedding": embedding,
-                "queryText": text_content,
+                "queryText": remove_lucene_chars(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },

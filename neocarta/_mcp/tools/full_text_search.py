@@ -9,6 +9,7 @@ from ..cypher import (
     get_context_by_table_full_text_search_cypher,
 )
 from ..models import TableContext
+from ..utils import remove_lucene_chars
 
 
 def register_table_tool(
@@ -56,7 +57,7 @@ def register_table_tool(
         results = await neo4j_driver.execute_query(
             query_=cypher,
             parameters_={
-                "queryText": text_content,
+                "queryText": remove_lucene_chars(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
@@ -112,7 +113,7 @@ def register_column_tool(
         results = await neo4j_driver.execute_query(
             query_=cypher,
             parameters_={
-                "queryText": text_content,
+                "queryText": remove_lucene_chars(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
