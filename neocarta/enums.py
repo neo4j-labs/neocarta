@@ -16,6 +16,7 @@ class NodeLabel(str, Enum):
     BUSINESS_TERM = "BusinessTerm"
     QUERY = "Query"
     CTE = "CTE"
+    NEOCARTA_GRAPH = "__neocarta_graph__"
 
     def __str__(self) -> str:
         """Return the enum value as a plain string."""

@@ -4,6 +4,7 @@ from functools import partial
 
 from neo4j import Driver, RoutingControl
 
+from ...data_model.metadata import NeocartaGraph
 from ...data_model.rdbms import (
     CTE,
     BusinessTerm,
@@ -29,6 +30,7 @@ from ...data_model.rdbms import (
 )
 from ...enums import NodeLabel, RelationshipType
 from ..indexes import create_full_text_index
+from ..metadata import upsert_neocarta_graph_node
 from ..utils import (
     _build_node_ingest_query,
     _build_relationship_ingest_query,
@@ -591,6 +593,31 @@ class Neo4jRDBMSLoader:
             database_=self.database_name,
         )
         return summary.counters.__dict__
+
+    def upsert_neocarta_graph_node(self, version: str | None = None) -> NeocartaGraph:
+        """
+        Create or update the singleton ``__neocarta_graph__`` metadata node.
+
+        Connectors should invoke this once per run so that the graph carries an
+        up-to-date record of which neocarta version last wrote to it.
+
+        Parameters
+        ----------
+        version: str, optional
+            Override the recorded neocarta version. Defaults to the installed
+            ``neocarta`` package version; explicit overrides should be reserved
+            for tests.
+
+        Returns:
+        -------
+        NeocartaGraph
+            The current state of the metadata node after the upsert.
+        """
+        return upsert_neocarta_graph_node(
+            neo4j_driver=self.neo4j_driver,
+            database_name=self.database_name,
+            version=version,
+        )
 
     def load_uses_column_relationships(
         self,
