@@ -29,10 +29,11 @@ def register_column_tool(
         Find tables whose columns are semantically similar to the provided text.
 
         Anchors on the closest matching columns by embedding similarity, then
-        expands each anchor to its parent table — pulling in every column of that
-        table along with data types, example values, and foreign-key references —
-        and returns the full table context per hit. Tables are ranked by the
-        average anchor score across their matching columns.
+        groups those anchors by parent table and returns each table along with
+        the matched columns only (their data types, example values, and
+        foreign-key references). Unmatched columns of the same table are not
+        included. Tables are ranked by the average anchor score across their
+        matching columns.
 
         Prefer this tool when the query references specific field or column names
         (e.g. "customer email", "order total").

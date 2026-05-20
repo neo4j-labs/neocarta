@@ -88,11 +88,12 @@ def register_column_tool(
         columns that are tagged to a matching glossary term AND whose name or
         description also matches the query.
 
-        The two signals are normalized and merged per column by taking the stronger
-        of the two. Each anchor is then expanded to its parent table — pulling in
-        every column of that table along with data types, example values, and
-        foreign-key references — and tables are ranked by the average anchor score
-        across their matching columns.
+        The two signals are normalized and merged per column by taking the
+        stronger of the two. Anchors are then grouped by parent table, and each
+        table is returned along with the matched columns only (their data types,
+        example values, and foreign-key references). Unmatched columns of the
+        same table are not included. Tables are ranked by the average anchor
+        score across their matching columns.
 
         Prefer this tool when business-glossary language maps onto field-level
         concepts via column tags (e.g. "customer acquisition cost" tagged to a

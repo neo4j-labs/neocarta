@@ -80,11 +80,11 @@ def register_column_tool(
         Find tables by full-text matching on column name and description.
 
         Anchors on the closest matching columns via a full-text search over
-        column names and descriptions, then expands each anchor to its parent
-        table — pulling in every column of that table along with data types,
-        example values, and foreign-key references — and returns the full table
-        context per hit. Tables are ranked by the average anchor score across
-        their matching columns. No embeddings required.
+        column names and descriptions, then groups those anchors by parent table
+        and returns each table along with the matched columns only (their data
+        types, example values, and foreign-key references). Unmatched columns
+        of the same table are not included. Tables are ranked by the average
+        anchor score across their matching columns. No embeddings required.
 
         Prefer this tool when the query references specific column-name tokens
         (e.g. "customer_id", "total_amount").
