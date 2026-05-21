@@ -50,8 +50,14 @@ mcp = [
     "mcp>=1.26.0",
     "pydantic-settings>=2.12.0",
 ]
+cli = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "pydantic-settings>=2.12.0",
+]
 
 [project.scripts]
+neocarta = "neocarta._cli:main"
 neocarta-mcp = "neocarta._mcp.server:run"
 
 [dependency-groups]
