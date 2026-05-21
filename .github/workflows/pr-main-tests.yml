@@ -32,7 +32,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --extra cli
       
       - name: Run format
         run: make fmt
@@ -40,8 +40,11 @@ jobs:
       - name: Run lint
         run: make lint
 
-      - name: Run unit tests
+      - name: Run core unit tests
         run: make test-unit
+
+      - name: Run CLI unit tests
+        run: make test-cli
 
       - name: Run integration tests
         run: make test-it
