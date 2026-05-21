@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import click
 
 from ...enums import NodeLabel
-from ..config import load_settings, require, resolve
+from ..config import load_settings, require, require_secret, resolve
 from ..errors import CLIError
 from ..output import emit_json
 
@@ -41,50 +41,78 @@ def bigquery() -> None:
     """Run BigQuery connectors against your warehouse."""
 
 
+def _require_neo4j_settings(settings: CLISettings) -> None:
+    """Validate that Neo4j credentials are configured.
+
+    Returns nothing on purpose: callers must read non-secret fields off the
+    settings object directly, and the secret password is only unwrapped inside
+    :func:`_neo4j_driver` at the point of use. This keeps the raw password
+    out of named local variables and out of CodeQL's reach as a logging-sink
+    source.
+    """
+    require("NEO4J_URI", settings.neo4j_uri, env_var="NEO4J_URI")
+    require("NEO4J_USERNAME", settings.neo4j_username, env_var="NEO4J_USERNAME")
+    require_secret(
+        "NEO4J_PASSWORD",
+        settings.neo4j_password,
+        env_var="NEO4J_PASSWORD",
+    )
+
+
 @contextlib.contextmanager
-def _neo4j_driver(uri: str, username: str, password: str) -> Iterator[Driver]:
-    """Yield a Neo4j driver and close it on exit."""
+def _neo4j_driver(settings: CLISettings) -> Iterator[Driver]:
+    """Yield a Neo4j driver for ``settings`` and close it on exit.
+
+    The password is unwrapped inline via ``settings.neo4j_password
+    .get_secret_value()`` so the raw secret string is never bound to a named
+    local variable in the caller's scope.
+    """
     # Lazy import: keeps `neocarta --help` and `agent-context` fast and lets
     # tests run without a Neo4j driver installed.
     from neo4j import GraphDatabase  # noqa: PLC0415
 
-    driver = GraphDatabase.driver(uri=uri, auth=(username, password))
+    # _require_neo4j_settings has already raised CLIError if any of these are
+    # missing; the asserts narrow the type for the GraphDatabase.driver call.
+    assert settings.neo4j_uri is not None  # noqa: S101
+    assert settings.neo4j_password is not None  # noqa: S101
+    driver = GraphDatabase.driver(
+        uri=settings.neo4j_uri,
+        auth=(settings.neo4j_username, settings.neo4j_password.get_secret_value()),
+    )
     try:
         yield driver
     finally:
         driver.close()
 
 
-def _require_neo4j_settings(settings: CLISettings) -> tuple[str, str, str, str]:
-    """Validate that Neo4j credentials are configured; return (uri, user, password, database)."""
-    uri = require("NEO4J_URI", settings.neo4j_uri, env_var="NEO4J_URI")
-    username = require("NEO4J_USERNAME", settings.neo4j_username, env_var="NEO4J_USERNAME")
-    password = require("NEO4J_PASSWORD", settings.neo4j_password, env_var="NEO4J_PASSWORD")
-    return uri, username, password, settings.neo4j_database
-
-
 def _build_embedder(
     settings: CLISettings,
     neo4j_driver: Driver,
-    database: str,
 ) -> OpenAIEmbeddingsConnector:
-    """Construct an OpenAIEmbeddingsConnector for post-load embedding runs."""
+    """Construct an OpenAIEmbeddingsConnector for post-load embedding runs.
+
+    The OpenAI API key is unwrapped from :class:`SecretStr` inline in the
+    ``OpenAI(...)`` constructor call, so the raw key is never assigned to a
+    named local variable.
+    """
     # Lazy import: heavy dependencies are only loaded when embeddings run.
     from openai import OpenAI  # noqa: PLC0415
 
     from ...enrichment.embeddings import OpenAIEmbeddingsConnector  # noqa: PLC0415
 
-    api_key = require(
+    require_secret(
         "OPENAI_API_KEY",
         settings.openai_api_key,
         env_var="OPENAI_API_KEY",
     )
+    # require_secret raised on missing/empty; the assert narrows the type.
+    assert settings.openai_api_key is not None  # noqa: S101
     return OpenAIEmbeddingsConnector(
         neo4j_driver=neo4j_driver,
-        client=OpenAI(api_key=api_key),
+        client=OpenAI(api_key=settings.openai_api_key.get_secret_value()),
         embedding_model=settings.embedding_model,
         dimensions=settings.embedding_dimensions,
-        database_name=database,
+        database_name=settings.neo4j_database,
     )
 
 
@@ -185,7 +213,7 @@ def bigquery_schema(
             stdout.print(payload)
         return
 
-    uri, username, password, database = _require_neo4j_settings(settings)
+    _require_neo4j_settings(settings)
 
     # Lazy imports: heavy GCP / connector deps are only loaded when the
     # command actually runs, not on --help or --dry-run.
@@ -195,14 +223,14 @@ def bigquery_schema(
 
     stderr.print("[dim]Starting BigQuery schema connector...[/dim]")
 
-    with _neo4j_driver(uri, username, password) as driver:
+    with _neo4j_driver(settings) as driver:
         try:
             connector = BigQuerySchemaConnector(
                 client=bq_client.Client(project=project_id),
                 project_id=project_id,
                 dataset_id=dataset_id,
                 neo4j_driver=driver,
-                database_name=database,
+                database_name=settings.neo4j_database,
             )
             connector.run()
         except ValueError as exc:
@@ -210,14 +238,14 @@ def bigquery_schema(
 
         if embeddings:
             stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver, database)
+            embedder = _build_embedder(settings, driver)
             embedder.run(node_labels=node_labels)
 
     payload = {
         "bigquery_schema": {
             "project_id": project_id,
             "dataset_id": dataset_id,
-            "database": database,
+            "database": settings.neo4j_database,
             "embeddings": embeddings,
             "node_labels": [label.value for label in node_labels],
             "status": "succeeded",
@@ -228,7 +256,7 @@ def bigquery_schema(
     else:
         stdout.print(
             f"Loaded BigQuery schema for [bold]{project_id}.{dataset_id}[/bold] into "
-            f"[bold]{database}[/bold] "
+            f"[bold]{settings.neo4j_database}[/bold] "
             f"({'with' if embeddings else 'without'} embeddings)."
         )
 
@@ -343,7 +371,7 @@ def bigquery_logs(
             stdout.print(payload)
         return
 
-    uri, username, password, database = _require_neo4j_settings(settings)
+    _require_neo4j_settings(settings)
 
     # Lazy imports: heavy GCP / connector deps are only loaded when the
     # command actually runs, not on --help or --dry-run.
@@ -353,13 +381,13 @@ def bigquery_logs(
 
     stderr.print("[dim]Starting BigQuery logs connector...[/dim]")
 
-    with _neo4j_driver(uri, username, password) as driver:
+    with _neo4j_driver(settings) as driver:
         try:
             connector = BigQueryLogsConnector(
                 client=bq_client.Client(project=project_id),
                 project_id=project_id,
                 neo4j_driver=driver,
-                database_name=database,
+                database_name=settings.neo4j_database,
             )
             connector.run(
                 dataset_id=dataset_id,
@@ -374,7 +402,7 @@ def bigquery_logs(
 
         if embeddings:
             stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver, database)
+            embedder = _build_embedder(settings, driver)
             embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
 
         extractor = connector.extractor
@@ -382,7 +410,7 @@ def bigquery_logs(
             "project_id": project_id,
             "dataset_id": dataset_id,
             "region": region,
-            "database": database,
+            "database": settings.neo4j_database,
             "queries": len(extractor.query_info),
             "tables_referenced": len(extractor.table_info),
             "columns_referenced": len(extractor.column_info),
@@ -398,5 +426,5 @@ def bigquery_logs(
         stdout.print(
             f"Loaded {result['queries']} queries referencing "
             f"{result['tables_referenced']} tables / {result['columns_referenced']} columns "
-            f"into [bold]{database}[/bold]."
+            f"into [bold]{settings.neo4j_database}[/bold]."
         )

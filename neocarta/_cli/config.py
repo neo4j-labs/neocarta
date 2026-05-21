@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .errors import CLIError
@@ -42,11 +42,14 @@ class CLISettings(BaseSettings):
     # Neo4j
     neo4j_uri: str | None = Field(default=None, validation_alias="NEO4J_URI")
     neo4j_username: str | None = Field(default=None, validation_alias="NEO4J_USERNAME")
-    neo4j_password: str | None = Field(default=None, validation_alias="NEO4J_PASSWORD")
+    # Secrets are wrapped in pydantic.SecretStr so accidental serialization
+    # (json.dumps, repr, log statements) emits "**********" instead of the
+    # real value. Unwrap inline at the point of use with .get_secret_value().
+    neo4j_password: SecretStr | None = Field(default=None, validation_alias="NEO4J_PASSWORD")
     neo4j_database: str = Field(default="neo4j", validation_alias="NEO4J_DATABASE")
 
     # Embeddings / OpenAI
-    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 768
     embedding_batch_size: int = 100
@@ -110,5 +113,29 @@ def require(name: str, value: Any, *, env_var: str | None = None) -> Any:
         suggestion = (
             f"Pass {name} on the command line or set {env_var}." if env_var else f"Pass {name}."
         )
+        raise CLIError("usage_error", f"Missing required setting: {name}.", suggestion=suggestion)
+    return value
+
+
+def require_secret(name: str, value: SecretStr | None, *, env_var: str | None = None) -> SecretStr:
+    """
+    Raise :class:`CLIError` if a :class:`SecretStr` is unset or empty.
+
+    Returns the :class:`SecretStr` itself, never the unwrapped string — callers
+    should call ``.get_secret_value()`` inline at the point of use so the raw
+    secret never lives as a named local variable.
+
+    Parameters
+    ----------
+    name : str
+        Setting name for the error message (e.g. ``"NEO4J_PASSWORD"``).
+    value : SecretStr or None
+        The resolved secret to validate.
+    env_var : str, optional
+        Name of the env var that could supply this setting; included in the
+        suggestion so the agent learns the fix.
+    """
+    if value is None or value.get_secret_value() == "":
+        suggestion = f"Set {env_var}." if env_var else f"Provide {name}."
         raise CLIError("usage_error", f"Missing required setting: {name}.", suggestion=suggestion)
     return value
