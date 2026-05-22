@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
+
+if TYPE_CHECKING:
+    from neocarta.errors import NeocartaError
 
 # Closed exit-code map. Renaming a code's meaning is a breaking change.
 EXIT_SUCCESS = 0
@@ -117,6 +120,23 @@ class CLIError(click.ClickException):
         click.echo(f"Error: {self.message}", err=True)
         if self.suggestion:
             click.echo(f"  Suggestion: {self.suggestion}", err=True)
+
+
+def cli_error_from(err: NeocartaError) -> CLIError:
+    """Convert a library-level :class:`NeocartaError` into a :class:`CLIError`.
+
+    Each :class:`NeocartaError` subclass declares a ``code`` that matches an
+    entry in :data:`EXIT_CODES`, so the conversion just forwards the
+    structured fields onto the CLI envelope. Use this at every CLI command
+    boundary that calls into the library.
+    """
+    return CLIError(
+        err.code,
+        err.message,
+        suggestion=err.suggestion,
+        retryable=err.retryable,
+        details=err.details,
+    )
 
 
 def error_envelope(err: CLIError) -> dict[str, Any]:
