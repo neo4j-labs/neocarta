@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
+
+if TYPE_CHECKING:
+    from neocarta.errors import NeocartaError
 
 # Closed exit-code map. Renaming a code's meaning is a breaking change.
 EXIT_SUCCESS = 0
@@ -89,6 +92,7 @@ class CLIError(click.ClickException):
         suggestion: str | None = None,
         retryable: bool = False,
         details: dict[str, Any] | None = None,
+        debug: bool | None = None,
     ) -> None:
         if code not in EXIT_CODES:
             raise ValueError(f"Unknown error code: {code!r}")
@@ -100,6 +104,9 @@ class CLIError(click.ClickException):
         self.details = details or {}
         # click.ClickException uses .exit_code as the process exit code.
         self.exit_code = EXIT_CODES[code]["code"]
+        # Capture debug now — by the time .show() runs, Click has unwound
+        # contexts and click.get_current_context() returns None.
+        self._debug = _debug_enabled() if debug is None else debug
 
     def show(self, file: Any = None) -> None:  # noqa: ARG002
         """Render the error to stdout/stderr.
@@ -108,6 +115,10 @@ class CLIError(click.ClickException):
         ``{"error": ...}`` so agents see it; a one-line human summary always
         goes to stderr. ``--json`` is detected from ``stdout.isatty()`` since
         the surrounding Click context may not be available at this point.
+
+        When the top-level ``--debug`` flag is set, also prints the full
+        chained traceback to stderr so the original vendor exception (and
+        any other ``__cause__`` links) are visible without re-running.
         """
         as_json = not sys.stdout.isatty()
         if as_json:
@@ -117,6 +128,45 @@ class CLIError(click.ClickException):
         click.echo(f"Error: {self.message}", err=True)
         if self.suggestion:
             click.echo(f"  Suggestion: {self.suggestion}", err=True)
+        if self._debug and self.__cause__ is not None:
+            import traceback  # noqa: PLC0415 — only loaded when debug is on
+
+            click.echo("\n--- Debug: original exception chain ---", err=True)
+            traceback.print_exception(
+                type(self.__cause__),
+                self.__cause__,
+                self.__cause__.__traceback__,
+                file=sys.stderr,
+            )
+
+
+def _debug_enabled() -> bool:
+    """Return True if the active Click context has ``--debug`` set.
+
+    Reads from ``ctx.obj["debug"]`` populated by the top-level CLI group.
+    Returns False when no context is active (e.g. tests, library use).
+    """
+    ctx = click.get_current_context(silent=True)
+    if ctx is None or ctx.obj is None:
+        return False
+    return bool(ctx.obj.get("debug"))
+
+
+def cli_error_from(err: NeocartaError) -> CLIError:
+    """Convert a library-level :class:`NeocartaError` into a :class:`CLIError`.
+
+    Each :class:`NeocartaError` subclass declares a ``code`` that matches an
+    entry in :data:`EXIT_CODES`, so the conversion just forwards the
+    structured fields onto the CLI envelope. Use this at every CLI command
+    boundary that calls into the library.
+    """
+    return CLIError(
+        err.code,
+        err.message,
+        suggestion=err.suggestion,
+        retryable=err.retryable,
+        details=err.details,
+    )
 
 
 def error_envelope(err: CLIError) -> dict[str, Any]:

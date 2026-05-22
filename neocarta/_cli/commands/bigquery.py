@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING
 import click
 
 from ...enums import NodeLabel
+from ...errors import NeocartaError
 from ..config import load_settings, require, require_secret, resolve
-from ..errors import CLIError
+from ..errors import cli_error_from
 from ..output import emit_json
 
 if TYPE_CHECKING:
@@ -233,13 +234,13 @@ def bigquery_schema(
                 database_name=settings.neo4j_database,
             )
             connector.run()
-        except ValueError as exc:
-            raise CLIError("validation_error", str(exc)) from exc
 
-        if embeddings:
-            stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver)
-            embedder.run(node_labels=node_labels)
+            if embeddings:
+                stderr.print("[dim]Generating embeddings...[/dim]")
+                embedder = _build_embedder(settings, driver)
+                embedder.run(node_labels=node_labels)
+        except NeocartaError as exc:
+            raise cli_error_from(exc) from exc
 
     payload = {
         "bigquery_schema": {
@@ -397,13 +398,13 @@ def bigquery_logs(
                 limit=limit,
                 drop_failed_queries=drop_failed,
             )
-        except ValueError as exc:
-            raise CLIError("validation_error", str(exc)) from exc
 
-        if embeddings:
-            stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver)
-            embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
+            if embeddings:
+                stderr.print("[dim]Generating embeddings...[/dim]")
+                embedder = _build_embedder(settings, driver)
+                embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
+        except NeocartaError as exc:
+            raise cli_error_from(exc) from exc
 
         extractor = connector.extractor
         result = {
