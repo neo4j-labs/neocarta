@@ -21,6 +21,7 @@ from neocarta._cli.errors import EXIT_CODES, CLIError, cli_error_from
 from neocarta.errors import (
     AuthError,
     ConfigError,
+    EnrichmentError,
     Neo4jConnectionError,
     NeocartaError,
     RateLimitError,
@@ -114,6 +115,40 @@ def test_bigquery_schema_routes_library_errors_to_exit_codes(
 
     assert result.exit_code == expected_exit_code, (
         f"{type(error).__name__} should exit {expected_exit_code}, got {result.exit_code}. "
+        f"Output: {result.output!r}"
+    )
+
+
+@pytest.mark.usefixtures("_cli_env")
+def test_bigquery_schema_routes_embedder_errors_through_adapter(monkeypatch):
+    """The try/except must cover the embedder block, not just connector.run().
+
+    Regression guard for an earlier bug where ``embedder.run()`` sat outside
+    the ``try`` and any :class:`NeocartaError` from it bypassed the adapter.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+    runner = CliRunner()
+    mock_embedder = MagicMock()
+    mock_embedder.run.side_effect = EnrichmentError("OpenAI embedding call failed.")
+    with (
+        patch("neocarta._cli.commands.bigquery._neo4j_driver") as mock_driver_ctx,
+        patch("google.cloud.bigquery.Client", return_value=MagicMock()),
+        patch(
+            "neocarta.connectors.bigquery.BigQuerySchemaConnector",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "neocarta._cli.commands.bigquery._build_embedder",
+            return_value=mock_embedder,
+        ),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(cli, ["bigquery", "schema", "--embeddings"])
+
+    assert result.exit_code == EXIT_CODES["upstream_error"]["code"], (
+        f"EnrichmentError should exit upstream_error, got {result.exit_code}. "
         f"Output: {result.output!r}"
     )
 

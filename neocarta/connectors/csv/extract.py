@@ -261,7 +261,7 @@ class CSVExtractor:
 
     def _validate_columns(self, df: pd.DataFrame, entity_key: str, filename: str) -> None:
         """
-        Raise ValueError if any required columns are missing from df.
+        Raise ConfigError if any required columns are missing from df.
 
         Parameters
         ----------

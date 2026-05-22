@@ -234,13 +234,13 @@ def bigquery_schema(
                 database_name=settings.neo4j_database,
             )
             connector.run()
+
+            if embeddings:
+                stderr.print("[dim]Generating embeddings...[/dim]")
+                embedder = _build_embedder(settings, driver)
+                embedder.run(node_labels=node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
-
-        if embeddings:
-            stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver)
-            embedder.run(node_labels=node_labels)
 
     payload = {
         "bigquery_schema": {
@@ -398,13 +398,13 @@ def bigquery_logs(
                 limit=limit,
                 drop_failed_queries=drop_failed,
             )
+
+            if embeddings:
+                stderr.print("[dim]Generating embeddings...[/dim]")
+                embedder = _build_embedder(settings, driver)
+                embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
-
-        if embeddings:
-            stderr.print("[dim]Generating embeddings...[/dim]")
-            embedder = _build_embedder(settings, driver)
-            embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
 
         extractor = connector.extractor
         result = {
