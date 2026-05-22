@@ -7,6 +7,7 @@ from google.cloud import bigquery
 
 from ....errors import ConfigError, StateError
 from ...utils.generate_id import generate_column_id
+from .._errors import wrap_bigquery_errors
 from .models import SchemaExtractorCache
 
 
@@ -118,6 +119,7 @@ class BigQuerySchemaExtractor:
 
         return df
 
+    @wrap_bigquery_errors
     def extract_schema_info(
         self, dataset_id: str | None = None, cache: bool = True
     ) -> pd.DataFrame:
@@ -157,6 +159,7 @@ WHERE schema_name = '{dataset_id}'
 
         return df
 
+    @wrap_bigquery_errors
     def extract_table_info(self, dataset_id: str | None = None, cache: bool = True) -> pd.DataFrame:
         """
         Extract BigQuery table information from the specified dataset.
@@ -199,6 +202,7 @@ ORDER BY table_name
 
         return df
 
+    @wrap_bigquery_errors
     def extract_column_info(
         self, dataset_id: str | None = None, cache: bool = True
     ) -> pd.DataFrame:
@@ -259,6 +263,7 @@ FROM `{self.project_id}`.`{dataset_id}`.INFORMATION_SCHEMA.COLUMNS as columns
 
         return df
 
+    @wrap_bigquery_errors
     def extract_column_references_info(
         self, dataset_id: str | None = None, cache: bool = True
     ) -> pd.DataFrame:
@@ -303,6 +308,7 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
 
         return df
 
+    @wrap_bigquery_errors
     def extract_column_unique_values_for_table(
         self,
         table_name: str,
@@ -405,6 +411,7 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
 
         return result
 
+    @wrap_bigquery_errors
     def extract_column_unique_values_for_all_tables(
         self,
         dataset_id: str | None = None,

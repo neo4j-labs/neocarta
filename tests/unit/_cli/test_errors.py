@@ -120,6 +120,45 @@ def test_bigquery_schema_routes_library_errors_to_exit_codes(
 
 
 @pytest.mark.usefixtures("_cli_env")
+def test_debug_flag_prints_cause_chain():
+    """``--debug`` (a top-level flag) should surface the original vendor
+    exception via ``__cause__`` instead of hiding it.
+
+    Regression guard: previously the flag was wired up but never read by
+    any code, so passing it had no effect on error output.
+    """
+
+    class FakeVendorError(RuntimeError):
+        pass
+
+    def raise_with_cause(*_args, **_kwargs):
+        try:
+            raise FakeVendorError("underlying vendor failure")
+        except FakeVendorError as cause:
+            raise ConfigError("wrapping error") from cause
+
+    runner = CliRunner()
+    with (
+        patch("neocarta._cli.commands.bigquery._neo4j_driver") as mock_driver_ctx,
+        patch("google.cloud.bigquery.Client", return_value=MagicMock()),
+        patch(
+            "neocarta.connectors.bigquery.BigQuerySchemaConnector",
+            side_effect=raise_with_cause,
+        ),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(cli, ["--debug", "bigquery", "schema", "--no-embeddings"])
+
+    assert result.exit_code == EXIT_CODES["validation_error"]["code"]
+    # The original exception's class and message must appear in stderr
+    # when --debug is on. Click's CliRunner mixes stdout/stderr by default.
+    assert "FakeVendorError" in result.output
+    assert "underlying vendor failure" in result.output
+
+
+@pytest.mark.usefixtures("_cli_env")
 def test_bigquery_schema_routes_embedder_errors_through_adapter(monkeypatch):
     """The try/except must cover the embedder block, not just connector.run().
 

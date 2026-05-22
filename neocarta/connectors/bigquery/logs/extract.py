@@ -5,6 +5,7 @@ from google.cloud import bigquery
 
 from ....errors import ConfigError
 from ...query_log.utils import create_query_id, parse_sql_query
+from .._errors import wrap_bigquery_errors
 from .models import LogsExtractorCache
 
 
@@ -115,6 +116,7 @@ class BigQueryLogsExtractor:
             return pd.DataFrame()
         return column_info[["query_id", "column_id"]].drop_duplicates()
 
+    @wrap_bigquery_errors
     def extract_query_logs(
         self,
         dataset_id: str,
