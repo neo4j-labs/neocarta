@@ -3,6 +3,7 @@
 import pandas as pd
 from google.cloud import bigquery
 
+from ....errors import ConfigError
 from ...query_log.utils import create_query_id, parse_sql_query
 from .models import LogsExtractorCache
 
@@ -28,7 +29,7 @@ class BigQueryLogsExtractor:
         self.project_id = client.project or project_id
 
         if self.project_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Project ID is required as argument in constructor or as attribute in BigQuery client."
             )
 

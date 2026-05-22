@@ -5,6 +5,7 @@ from neo4j import Driver
 from openai import AsyncOpenAI, OpenAI
 
 from ...enums import NodeLabel
+from ...errors import ConfigError
 from ...ingest.indexes import create_vector_index
 from .utils import (
     create_embeddings_in_batches_async,
@@ -189,11 +190,11 @@ class OpenAIEmbeddingsConnector:
 
         Raises:
         ------
-        ValueError
+        ConfigError
             If a sync client is not provided.
         """
         if self.client is None:
-            raise ValueError("Sync client is not provided")
+            raise ConfigError("Sync client is not provided")
 
         for label in node_labels:
             print(f"Processing {label} nodes...")
@@ -239,11 +240,11 @@ class OpenAIEmbeddingsConnector:
 
         Raises:
         ------
-        ValueError
+        ConfigError
             If an async client is not provided.
         """
         if self.async_client is None:
-            raise ValueError("Async client is not provided")
+            raise ConfigError("Async client is not provided")
 
         for label in node_labels:
             print(f"Processing {label} nodes...")

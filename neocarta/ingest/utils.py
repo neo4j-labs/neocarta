@@ -4,6 +4,7 @@ from neo4j import Driver, RoutingControl
 from pydantic import BaseModel
 
 from ..enums import NodeLabel, RelationshipType
+from ..errors import ConfigError
 
 
 def is_enterprise_edition(neo4j_driver: Driver, database_name: str = "neo4j") -> bool:
@@ -79,7 +80,7 @@ def write_neo4j_constraints(
             try:
                 c = key_constraints[node_label]
             except KeyError as e:
-                raise ValueError(
+                raise ConfigError(
                     f"Node key constraint not found for node label {node_label}."
                 ) from e
             _, summary, _ = neo4j_driver.execute_query(
@@ -92,7 +93,7 @@ def write_neo4j_constraints(
             try:
                 c = unique_constraints[node_label]
             except KeyError as e:
-                raise ValueError(
+                raise ConfigError(
                     f"Node unique constraint not found for node label {node_label}."
                 ) from e
             _, summary, _ = neo4j_driver.execute_query(
@@ -116,12 +117,12 @@ def _validate_properties_list(model: BaseModel, properties_list: list[str]) -> N
 
     Raises:
     ------
-    ValueError
+    ConfigError
         If any properties are not found in the model fields.
     """
     invalid_props = set(properties_list) - set(model.model_fields)
     if invalid_props:
-        raise ValueError(
+        raise ConfigError(
             f"Properties list contains invalid properties for model {model.__class__.__name__}: {invalid_props}"
         )
 

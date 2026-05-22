@@ -6,6 +6,7 @@ from typing import ClassVar
 import pandas as pd
 
 from ...enums import NodeLabel, RelationshipType
+from ...errors import ConfigError
 from ..utils.generate_id import (
     generate_business_term_id,
     generate_category_id,
@@ -159,9 +160,9 @@ class CSVExtractor:
         """
         self.csv_directory = Path(csv_directory)
         if not self.csv_directory.exists():
-            raise ValueError(f"csv_directory does not exist: {self.csv_directory}")
+            raise ConfigError(f"csv_directory does not exist: {self.csv_directory}")
         if not self.csv_directory.is_dir():
-            raise ValueError(f"csv_directory is not a directory: {self.csv_directory}")
+            raise ConfigError(f"csv_directory is not a directory: {self.csv_directory}")
 
         self.csv_file_map = self.DEFAULT_FILE_MAP.copy()
         if csv_file_map:
@@ -274,7 +275,7 @@ class CSVExtractor:
         required = REQUIRED_COLUMNS.get(entity_key, [])
         missing = [col for col in required if col not in df.columns]
         if missing:
-            raise ValueError(
+            raise ConfigError(
                 f"{filename} is missing required columns: {missing}. "
                 f"Required columns for '{entity_key}': {required}"
             )
@@ -562,7 +563,7 @@ class CSVExtractor:
             unknown = sorted(set(include_nodes) - NODE_ENTITIES.keys(), key=str)
             if unknown:
                 valid = sorted(label.value for label in NODE_ENTITIES)
-                raise ValueError(
+                raise ConfigError(
                     f"Unknown node types: {[str(x) for x in unknown]}. Valid values: {valid}"
                 )
 
@@ -570,7 +571,7 @@ class CSVExtractor:
             unknown = sorted(set(include_relationships) - REL_ENTITIES.keys(), key=str)
             if unknown:
                 valid = sorted(rel.value for rel in REL_ENTITIES)
-                raise ValueError(
+                raise ConfigError(
                     f"Unknown relationship types: {[str(x) for x in unknown]}. "
                     f"Valid values: {valid}"
                 )

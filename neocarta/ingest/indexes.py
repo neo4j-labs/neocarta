@@ -2,6 +2,8 @@
 
 from neo4j import Driver, RoutingControl
 
+from ..errors import ConfigError
+
 
 def create_vector_index(
     neo4j_driver: Driver,
@@ -29,7 +31,7 @@ def create_vector_index(
         The summary of the vector index created.
     """
     if dimensions <= 0:
-        raise ValueError("Dimensions must be an integer greater than 0")
+        raise ConfigError("Dimensions must be an integer greater than 0")
 
     vector_index_query = f"""
 CREATE VECTOR INDEX {node_label.lower() + "_vector_index"} IF NOT EXISTS

@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from ...errors import ConfigError
 from .models import QueryLogExtractorCache
 from .utils import parse_bigquery_query_log_json, parse_sql_query
 
@@ -110,7 +111,7 @@ class QueryLogExtractor:
         if source == "bigquery":
             parsed = parse_bigquery_query_log_json(query_log_file)
         else:
-            raise ValueError(f"Unsupported source: {source}")
+            raise ConfigError(f"Unsupported source: {source}")
 
         query_info_df = parsed["query_info"]
 

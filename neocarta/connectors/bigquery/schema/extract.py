@@ -5,6 +5,7 @@ import hashlib
 import pandas as pd
 from google.cloud import bigquery
 
+from ....errors import ConfigError, StateError
 from ...utils.generate_id import generate_column_id
 from .models import SchemaExtractorCache
 
@@ -37,7 +38,7 @@ class BigQuerySchemaExtractor:
         self.project_id = client.project or project_id
 
         if self.project_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Project ID is required as argument in constructor or as attribute in BigQueryclient."
             )
 
@@ -91,7 +92,7 @@ class BigQuerySchemaExtractor:
         dataset_id = dataset_id or self.dataset_id
 
         if dataset_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Dataset ID is required in either constructor as `dataset_id` or as an argument to `extract_schema_info` method."
             )
 
@@ -433,13 +434,13 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
         """
         column_info = column_info or self._cache.get("column_info", None)
         if column_info is None:
-            raise ValueError(
+            raise StateError(
                 "Column information is required to extract column unique values for all tables. Please use `extract_column_info` method to extract column information. You may cache results by setting method argument `cache` to True."
             )
 
         table_info = table_info or self._cache.get("table_info", None)
         if table_info is None:
-            raise ValueError(
+            raise StateError(
                 "Table information is required to extract column unique values for all tables. Please use `extract_table_info` method to extract table information. You may cache results by setting method argument `cache` to True."
             )
 
