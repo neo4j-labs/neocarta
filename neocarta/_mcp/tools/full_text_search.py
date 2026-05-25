@@ -3,7 +3,7 @@
 from fastmcp import FastMCP
 from neo4j import AsyncDriver, RoutingControl
 
-from ...enrichment.embeddings import OpenAIEmbeddingsConnector
+from ...enrichment.embeddings import LiteLLMEmbeddingsConnector
 from ..cypher import (
     get_context_by_column_full_text_search_cypher,
     get_context_by_table_full_text_search_cypher,
@@ -16,7 +16,7 @@ def register_table_tool(
     server: FastMCP,
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
-    embedder: OpenAIEmbeddingsConnector,
+    embedder: LiteLLMEmbeddingsConnector,
 ) -> None:
     """Register the table-level full-text search tool.
 
@@ -72,7 +72,7 @@ def register_column_tool(
     server: FastMCP,
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
-    embedder: OpenAIEmbeddingsConnector,
+    embedder: LiteLLMEmbeddingsConnector,
 ) -> None:
     """Register the column-level full-text search tool.
 

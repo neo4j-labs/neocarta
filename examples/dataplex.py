@@ -6,11 +6,10 @@ import os
 from dotenv import load_dotenv
 from google.cloud import dataplex_v1
 from neo4j import GraphDatabase
-from openai import OpenAI
 
 from neocarta import NodeLabel
 from neocarta.connectors.dataplex import DataplexConnector
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 
 def main(
@@ -56,13 +55,11 @@ def main(
     connector.run()
 
     if with_embeddings and node_labels:
-        embedding_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         print("Generating embeddings for nodes...")
-        embeddings = OpenAIEmbeddingsConnector(
+        # Configure provider via env vars (e.g. OPENAI_API_KEY, GEMINI_API_KEY).
+        embeddings = LiteLLMEmbeddingsConnector(
             neo4j_driver=neo4j_driver,
-            client=embedding_client,
-            embedding_model="text-embedding-3-small",
-            dimensions=768,
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             database_name=neo4j_database,
         )
         embeddings.run(node_labels=node_labels)

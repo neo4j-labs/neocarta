@@ -1,5 +1,5 @@
 """Embedding generation functions."""
 
-from .openai_embeddings import OpenAIEmbeddingsConnector
+from .litellm_embeddings import LiteLLMEmbeddingsConnector
 
-__all__ = ["OpenAIEmbeddingsConnector"]
+__all__ = ["LiteLLMEmbeddingsConnector"]

@@ -582,23 +582,20 @@ graph LR
 import asyncio
 import os
 from neo4j import GraphDatabase
-from openai import AsyncOpenAI
 from neocarta import NodeLabel as nl
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
-# Initialize clients
+# Initialize Neo4j driver. The embedding provider is configured via env vars
+# (e.g. OPENAI_API_KEY, GEMINI_API_KEY) consumed by LiteLLM at call time.
 neo4j_driver = GraphDatabase.driver(
     uri=os.getenv("NEO4J_URI"),
     auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
 )
 neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-embedding_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Create connector instance
-connector = OpenAIEmbeddingsConnector(
-    async_embedding_client=embedding_client,
+# Create connector instance. Vector dimension is auto-detected from the model.
+connector = LiteLLMEmbeddingsConnector(
     embedding_model="text-embedding-3-small",
-    dimensions=768,
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
@@ -726,8 +723,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
         "NEO4J_PASSWORD": "your-password",
         "NEO4J_DATABASE": "neo4j",
         "OPENAI_API_KEY": "sk-...",
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768"
+        "EMBEDDING_MODEL": "text-embedding-3-small"
       }
     }
   }
