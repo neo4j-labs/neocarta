@@ -14,13 +14,14 @@ The server is configured via environment variables (or a `.env` file):
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key for embedding generation |
+| Provider credentials (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `COHERE_API_KEY`, `AZURE_*`, `AWS_*`, …) | Yes | — | Auth for the embedding provider your `EMBEDDING_MODEL` targets. Read by LiteLLM at call time. |
 | `NEO4J_URI` | Yes | — | Neo4j connection URI (e.g. `bolt://localhost:7687`) |
 | `NEO4J_USERNAME` | Yes | — | Neo4j username |
 | `NEO4J_PASSWORD` | Yes | — | Neo4j password |
 | `NEO4J_DATABASE` | No | `neo4j` | Neo4j database name |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | OpenAI embedding model |
-| `EMBEDDING_DIMENSIONS` | No | `768` | Embedding vector dimensions |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | LiteLLM embedding model id (provider prefix optional for OpenAI) |
+
+The embedding vector dimension is auto-detected from the model — no manual configuration is needed.
 
 ## Running the server
 
@@ -160,8 +161,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
         "NEO4J_PASSWORD": "your-password",
         "NEO4J_DATABASE": "neo4j",
         "OPENAI_API_KEY": "sk-...",
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768"
+        "EMBEDDING_MODEL": "text-embedding-3-small"
       }
     }
   }

@@ -91,8 +91,9 @@ def test_rdbms_data_model_imports():
 
 
 def test_enrichment_imports():
-    from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+    from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector, OpenAIEmbeddingsConnector
 
+    assert LiteLLMEmbeddingsConnector
     assert OpenAIEmbeddingsConnector
 
 

@@ -8,11 +8,10 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger
 from neo4j import AsyncDriver, AsyncGraphDatabase
-from openai import AsyncOpenAI
 
 from .. import __version__
-from ..enrichment.embeddings import OpenAIEmbeddingsConnector
-from .embeddings import create_openai_embedder
+from ..enrichment.embeddings import LiteLLMEmbeddingsConnector
+from .embeddings import create_embedder
 from .inventory import (
     fetch_index_inventory,
     fetch_neocarta_graph_metadata,
@@ -29,7 +28,7 @@ from .tools import (
 
 logger = get_logger("neocarta")
 
-RegisterFn = Callable[[FastMCP, AsyncDriver, str, OpenAIEmbeddingsConnector], None]
+RegisterFn = Callable[[FastMCP, AsyncDriver, str, LiteLLMEmbeddingsConnector], None]
 
 
 def _select_search_strategy(
@@ -63,7 +62,7 @@ def _register_for_label(
     server: FastMCP,
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
-    embedder: OpenAIEmbeddingsConnector,
+    embedder: LiteLLMEmbeddingsConnector,
     strategy: str,
     registrars: dict[str, RegisterFn],
 ) -> None:
@@ -111,7 +110,7 @@ async def _validate_graph_version(neo4j_driver: AsyncDriver, neo4j_database: str
 async def create_mcp_server(
     neo4j_driver: AsyncDriver,
     neo4j_database: str,
-    embedder: OpenAIEmbeddingsConnector,
+    embedder: LiteLLMEmbeddingsConnector,
 ) -> FastMCP:
     """
     Create and configure the FastMCP server with all semantic-layer tools.
@@ -187,8 +186,7 @@ async def main() -> None:
         auth=(mcp_server_settings.neo4j_username, mcp_server_settings.neo4j_password),
     )
     neo4j_database = mcp_server_settings.neo4j_database
-    embedder = create_openai_embedder(
-        async_client=AsyncOpenAI(api_key=mcp_server_settings.openai_api_key),
+    embedder = create_embedder(
         neo4j_driver=neo4j_driver,
         database_name=neo4j_database,
     )

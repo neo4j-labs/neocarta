@@ -4,13 +4,12 @@ import random
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 from neo4j import GraphDatabase
 
 from neocarta.connectors.csv import CSVConnector
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 from neocarta.enums import NodeLabel
 
 DATABASE_NAME = "neo4j"
@@ -21,8 +20,8 @@ _rng = random.Random(42)  # noqa: S311
 _MOCK_EMBEDDING: list[float] = [_rng.random() for _ in range(768)]
 
 
-class MockEmbeddingsConnector(OpenAIEmbeddingsConnector):
-    """Embedder that returns a fixed random vector without calling OpenAI.
+class MockEmbeddingsConnector(LiteLLMEmbeddingsConnector):
+    """Embedder that returns a fixed random vector without calling any provider.
 
     Using the same vector for both stored embeddings and query embeddings
     gives a cosine similarity of 1.0, ensuring results pass the > 0.5
@@ -32,7 +31,6 @@ class MockEmbeddingsConnector(OpenAIEmbeddingsConnector):
     def __init__(self, neo4j_driver, database_name: str = DATABASE_NAME) -> None:
         super().__init__(
             neo4j_driver=neo4j_driver,
-            client=MagicMock(),
             database_name=database_name,
         )
 

@@ -29,6 +29,7 @@ classifiers = [
 
 dependencies = [
     "google-cloud-bigquery[pandas]>=3.40.0",
+    "litellm>=1.55.0",
     "openai>=2.15.0",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
@@ -73,6 +74,7 @@ dev = [
 agent = [
     "google-cloud-bigquery>=3.40.0",
     "langchain>=1.2.7",
+    "langchain-litellm>=0.2.4",
     "langchain-mcp-adapters>=0.2.1",
     "langchain-openai>=1.1.7",
     "langgraph>=1.0.7",

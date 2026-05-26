@@ -29,19 +29,32 @@ class GoogleAuth(httpx.Auth):
         yield request
 
 
+# Env vars forwarded to the MCP subprocess. `StdioServerParameters` rejects
+# None values, so any var not set in the parent environment is dropped below.
+# Provider auth vars (OPENAI_API_KEY, GEMINI_API_KEY, COHERE_API_KEY, ...) are
+# passed through if present so LiteLLM in the MCP server can pick them up.
+_mcp_env_candidates = {
+    "NEO4J_URI": os.getenv("NEO4J_URI"),
+    "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME"),
+    "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),
+    "NEO4J_DATABASE": os.getenv("NEO4J_DATABASE"),
+    "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+    # Provider credentials — set the ones your EMBEDDING_MODEL needs.
+    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+    # "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),  # noqa: ERA001
+    # "COHERE_API_KEY": os.getenv("COHERE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_KEY": os.getenv("AZURE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_BASE": os.getenv("AZURE_API_BASE"),  # noqa: ERA001
+    # "AZURE_API_VERSION": os.getenv("AZURE_API_VERSION"),  # noqa: ERA001
+    # "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),  # noqa: ERA001
+    # "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),  # noqa: ERA001
+    # "AWS_REGION_NAME": os.getenv("AWS_REGION_NAME"),  # noqa: ERA001
+}
 sql_metadata_graph_mcp_params = {
     "transport": "stdio",
     "command": "uv",
     "args": ["run", "neocarta-mcp"],
-    "env": {
-        "NEO4J_URI": os.getenv("NEO4J_URI"),
-        "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME"),
-        "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),
-        "NEO4J_DATABASE": os.getenv("NEO4J_DATABASE"),
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768",
-    },
+    "env": {k: v for k, v in _mcp_env_candidates.items() if v is not None},
 }
 
 bigquery_mcp_params = {
