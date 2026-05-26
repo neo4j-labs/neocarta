@@ -537,11 +537,15 @@ Embeddings may be generated for the `description` fields of the following nodes:
 * `Column`
 * `BusinessTerm`
 
-This project currently supports the following embeddings Providers:
-* OpenAI
+Two embedding connectors are available:
 
-This connector requires the following variables to be set in the `.env` file:
-* OPENAI_API_KEY=sk-...
+* **`LiteLLMEmbeddingsConnector`** — multi-provider via [LiteLLM](https://docs.litellm.ai/). Routes to OpenAI, Azure OpenAI, Gemini, Cohere, Bedrock, Vertex AI, Ollama, HuggingFace, and others based on the `embedding_model` string. Vector dimension is auto-detected from the model on first use. Use this when you want provider flexibility or are not on OpenAI.
+* **`OpenAIEmbeddingsConnector`** — direct OpenAI SDK. Takes a pre-built `OpenAI` / `AsyncOpenAI` client and an explicit `dimensions` value. Use this when you want full control over the OpenAI client (custom base URL, retry policy, proxies) or already have one wired up elsewhere in your app.
+
+Authentication is read from provider-specific environment variables (`.env` file). For OpenAI:
+* `OPENAI_API_KEY=sk-...`
+
+For other providers via LiteLLM, set the matching env var (e.g. `GEMINI_API_KEY`, `COHERE_API_KEY`, `AZURE_API_KEY` + `AZURE_API_BASE`, `AWS_*`). For LiteLLM Proxy or custom endpoints, pass `api_key` / `api_base` in `litellm_kwargs`.
 
 #### Connector Architecture
 
@@ -556,8 +560,8 @@ graph LR
         VI(Create Vector Index)
     end
 
-    subgraph ES["Embedding Service"]
-        E(OpenAI Embeddings)
+    subgraph ES["Embedding Provider"]
+        E(OpenAI / LiteLLM)
     end
 
     subgraph Graph["Database"]
@@ -576,7 +580,7 @@ graph LR
     C-->|Embeddings|NEO
 ```
 
-#### Code Example
+#### Code Example — LiteLLM (multi-provider)
 
 ```python
 import asyncio
@@ -606,6 +610,35 @@ node_labels = [nl.DATABASE, nl.TABLE, nl.COLUMN]
 
 # Run the connector to create embeddings for the nodes
 await connector.arun(node_labels=node_labels)
+```
+
+#### Code Example — OpenAI (direct SDK)
+
+```python
+import os
+from neo4j import GraphDatabase
+from openai import AsyncOpenAI
+from neocarta import NodeLabel as nl
+from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+
+neo4j_driver = GraphDatabase.driver(
+    uri=os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
+)
+
+# Bring your own OpenAI client — useful when you need a custom base URL,
+# retry policy, or proxy configuration.
+async_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+connector = OpenAIEmbeddingsConnector(
+    neo4j_driver=neo4j_driver,
+    async_client=async_client,
+    embedding_model="text-embedding-3-small",
+    dimensions=768,
+    database_name=os.getenv("NEO4J_DATABASE", "neo4j"),
+)
+
+await connector.arun(node_labels=[nl.DATABASE, nl.TABLE, nl.COLUMN])
 ```
 
 ### Full Pipeline
@@ -648,8 +681,8 @@ flowchart LR
         VI(Create Vector Index)
     end
 
-    subgraph ES["Embedding Service"]
-        E(OpenAI Embeddings)
+    subgraph ES["Embedding Provider"]
+        E(OpenAI / LiteLLM)
     end
 
     subgraph EP["Embedding Workflow"]
