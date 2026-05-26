@@ -8,10 +8,17 @@
 ### Changed
 * BigQuery error envelopes now include `vendor_exception`, `vendor_message`, and `vendor_http_status` in `details`, preserving the original `google.api_core.exceptions.*` class name, server-side message, and HTTP status code in the JSON output. The original exception is still reachable via `__cause__` (and rendered by `--debug`).
 * MCP server uses LiteLLM embeddings now instead of OpenAI embeddings. OpenAI embeddings still available via LiteLLM.
+* **Breaking:** Replaced `OpenAIEmbeddingsConnector` with `LiteLLMEmbeddingsConnector`. Embedding generation now goes through [LiteLLM](https://docs.litellm.ai/), enabling OpenAI, Azure OpenAI, Cohere, Bedrock, Vertex AI, Ollama, HuggingFace, and other providers via a single connector. The constructor no longer takes `client` / `async_client`; provider routing is driven by the `embedding_model` string (e.g. `"text-embedding-3-small"`, `"cohere/embed-english-v3.0"`) and auth comes from provider-specific environment variables or the new `api_key` / `api_base` / `litellm_kwargs` parameters.
+* **Breaking:** The `dimensions` constructor parameter is removed. The connector now auto-detects the vector dimension from the model on first embed call (one probe) and creates the Neo4j vector index at that size, so no manual dimension config is required. For non-default sizes (truncation), pass `litellm_kwargs={"dimensions": ...}` and the probe will use it.
+* **Breaking:** MCP server settings: `openai_api_key` and `embedding_dimensions` removed. `embedding_model` is the only embedding-related setting. Provider auth (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `AZURE_*`, `AWS_*`, ...) is read directly by LiteLLM from standard env vars. Advanced overrides (LiteLLM Proxy, custom endpoints) move into the connector's `litellm_kwargs` argument.
+* `create_openai_embedder` in `neocarta/_mcp/embeddings.py` renamed to `create_embedder`.
+* Text2SQL agent chat LLM is now provider-agnostic via `langchain-litellm`. Model is configurable through the `AGENT_MODEL` env var (default `openai/gpt-4o-mini`); any LiteLLM model id is accepted (e.g. `gemini/gemini-2.0-flash`, `anthropic/claude-sonnet-4-5`).
 
 ### Added
 * Add `neocarta.errors` module with a unified `NeocartaError` hierarchy: `ConfigError`, `AuthError`, `StateError`, `RateLimitError`, `OperationTimeoutError`, `ConnectorError`, `ExtractionError`, `TransformError`, `EnrichmentError`, and a `Neo4jError` subtree covering `Neo4jConnectionError`, `LoadError`, `ConstraintCreationError`, and `IndexCreationError`. Each class declares a `code` mapping to an existing CLI exit-code envelope; `RateLimitError` and `OperationTimeoutError` default to `retryable=True`. `StateError` is used for call-order/sequencing failures (e.g. calling `extract_entry_links()` before `extract_glossary_info()`), distinct from `ConfigError` for bad arguments.
 * Add `LiteLLMEmbeddingsConnector`. OpenAI embeddings can be generated via this or the original `OpenAIEmbeddingsConnector`. Both now subclass a shared `BaseEmbeddingsConnector` in `neocarta.enrichment.embeddings.base` that owns the batch loop, dimension probing, vector-index creation, and Neo4j read/write; subclasses only override `__init__`, `_create_embedding_sync`, and `_create_embedding_async`.
+* Add `litellm` dependency for multi-provider embedding support.
+* Add `langchain-litellm` to the `agent` dep group for provider-agnostic agent chat LLM.
 
 ## v0.5.0
 
@@ -34,11 +41,7 @@
 * **Breaking:** Renamed vector retrieval MCP tools for consistency with the new full-text / hybrid / business-term-hybrid tool naming. `get_metadata_schema_by_column_semantic_similarity` → `get_context_by_column_vector_search`; `get_metadata_schema_by_table_semantic_similarity` → `get_context_by_table_vector_search`; `get_metadata_schema_by_schema_and_table_semantic_similarity` → `get_context_by_schema_and_table_vector_search`. Cypher helper functions renamed correspondingly.
 * `run_agent.py` no longer hardcodes a neocarta tool allowlist; it trusts whatever the neocarta MCP server exposes (since the server self-filters by index inventory) and only allowlists `execute_sql` from the BigQuery MCP server.
 * Reorganised `neocarta/_mcp/` cypher into a `cypher/` subpackage (`catalog`, `vector_search`, `full_text_search`, `hybrid_search`) and split MCP tool registrations into a `tools/` subpackage with one module per retrieval strategy.
-* **Breaking:** Replaced `OpenAIEmbeddingsConnector` with `LiteLLMEmbeddingsConnector`. Embedding generation now goes through [LiteLLM](https://docs.litellm.ai/), enabling OpenAI, Azure OpenAI, Cohere, Bedrock, Vertex AI, Ollama, HuggingFace, and other providers via a single connector. The constructor no longer takes `client` / `async_client`; provider routing is driven by the `embedding_model` string (e.g. `"text-embedding-3-small"`, `"cohere/embed-english-v3.0"`) and auth comes from provider-specific environment variables or the new `api_key` / `api_base` / `litellm_kwargs` parameters.
-* **Breaking:** The `dimensions` constructor parameter is removed. The connector now auto-detects the vector dimension from the model on first embed call (one probe) and creates the Neo4j vector index at that size, so no manual dimension config is required. For non-default sizes (truncation), pass `litellm_kwargs={"dimensions": ...}` and the probe will use it.
-* **Breaking:** MCP server settings: `openai_api_key` and `embedding_dimensions` removed. `embedding_model` is the only embedding-related setting. Provider auth (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `AZURE_*`, `AWS_*`, ...) is read directly by LiteLLM from standard env vars. Advanced overrides (LiteLLM Proxy, custom endpoints) move into the connector's `litellm_kwargs` argument.
-* `create_openai_embedder` in `neocarta/_mcp/embeddings.py` renamed to `create_embedder`.
-* Text2SQL agent chat LLM is now provider-agnostic via `langchain-litellm`. Model is configurable through the `AGENT_MODEL` env var (default `openai/gpt-4o-mini`); any LiteLLM model id is accepted (e.g. `gemini/gemini-2.0-flash`, `anthropic/claude-sonnet-4-5`).
+
 
 ### Added
 * Add data model diagram for table views and materialized views
@@ -49,8 +52,6 @@
 * Add hybrid (vector + full-text on same node) MCP tools: `get_context_by_table_hybrid_search`, `get_context_by_column_hybrid_search`.
 * Add business-term-bridged hybrid MCP tools: `get_context_by_table_business_term_hybrid_search`, `get_context_by_column_business_term_hybrid_search`. The full-text branch matches `:BusinessTerm` nodes and bridges to `:Table`/`:Column` nodes via `TAGGED_WITH`.
 * Add `__neocarta_graph__` singleton metadata node (`initial_version`, `latest_version`, `create_date`, `last_updated`). Connectors upsert it at the end of every `run()` so the graph carries a record of which neocarta version last wrote to it. The MCP server reads the node at startup and logs a warning when `latest_version` does not match the running server's neocarta version (or when the node is missing).
-* Add `litellm` dependency for multi-provider embedding support.
-* Add `langchain-litellm` to the `agent` dep group for provider-agnostic agent chat LLM.
 
 ## v0.3.0
 
