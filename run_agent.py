@@ -41,14 +41,14 @@ _mcp_env_candidates = {
     "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
     # Provider credentials — set the ones your EMBEDDING_MODEL needs.
     "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-    # "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
-    # "COHERE_API_KEY": os.getenv("COHERE_API_KEY"),
-    # "AZURE_API_KEY": os.getenv("AZURE_API_KEY"),
-    # "AZURE_API_BASE": os.getenv("AZURE_API_BASE"),
-    # "AZURE_API_VERSION": os.getenv("AZURE_API_VERSION"),
-    # "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
-    # "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
-    # "AWS_REGION_NAME": os.getenv("AWS_REGION_NAME"),
+    # "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),  # noqa: ERA001
+    # "COHERE_API_KEY": os.getenv("COHERE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_KEY": os.getenv("AZURE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_BASE": os.getenv("AZURE_API_BASE"),  # noqa: ERA001
+    # "AZURE_API_VERSION": os.getenv("AZURE_API_VERSION"),  # noqa: ERA001
+    # "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),  # noqa: ERA001
+    # "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),  # noqa: ERA001
+    # "AWS_REGION_NAME": os.getenv("AWS_REGION_NAME"),  # noqa: ERA001
 }
 sql_metadata_graph_mcp_params = {
     "transport": "stdio",

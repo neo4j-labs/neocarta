@@ -3,22 +3,12 @@
 from typing import Any
 
 import litellm
-import pandas as pd
 from neo4j import Driver
 
-from ...enums import NodeLabel
-from ...ingest.indexes import create_vector_index
-from .utils import (
-    create_embeddings_in_batches_async,
-    create_embeddings_in_batches_sync,
-    get_nodes_to_embed,
-    write_embeddings_to_graph,
-)
-
-_DIMENSION_PROBE_INPUT = "dimension probe"
+from .base import BaseEmbeddingsConnector
 
 
-class LiteLLMEmbeddingsConnector:
+class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
     """Connector for creating embeddings through LiteLLM.
 
     LiteLLM exposes a single, OpenAI-compatible interface over many providers
@@ -65,16 +55,13 @@ class LiteLLMEmbeddingsConnector:
             ``dimensions`` for models that support truncation, or
             ``api_key`` / ``api_base`` for LiteLLM Proxy / custom endpoints.
         """
-        self.neo4j_driver = neo4j_driver
-        self.embedding_model = embedding_model
-        self.database_name = database_name
-        self._dimensions: int | None = None
+        super().__init__(
+            neo4j_driver=neo4j_driver,
+            embedding_model=embedding_model,
+            database_name=database_name,
+            dimensions=None,
+        )
         self._call_kwargs: dict[str, Any] = dict(litellm_kwargs) if litellm_kwargs else {}
-
-    @property
-    def dimensions(self) -> int | None:
-        """The detected embedding dimension (set after the first embed call)."""
-        return self._dimensions
 
     def _create_embedding_sync(self, description: str) -> list[float] | None:
         """
@@ -96,10 +83,7 @@ class LiteLLMEmbeddingsConnector:
                 input=[description],
                 **self._call_kwargs,
             )
-            vector = response.data[0]["embedding"]
-            if self._dimensions is None:
-                self._dimensions = len(vector)
-            return vector
+            return response.data[0]["embedding"]
         except Exception as e:
             print(e)
             return None
@@ -124,162 +108,7 @@ class LiteLLMEmbeddingsConnector:
                 input=[description],
                 **self._call_kwargs,
             )
-            vector = response.data[0]["embedding"]
-            if self._dimensions is None:
-                self._dimensions = len(vector)
-            return vector
+            return response.data[0]["embedding"]
         except Exception as e:
             print(e)
             return None
-
-    def _probe_dimensions_sync(self) -> int:
-        """Run a tiny embed call to discover the model's native vector size."""
-        vector = self._create_embedding_sync(_DIMENSION_PROBE_INPUT)
-        if vector is None:
-            raise RuntimeError(
-                f"Failed to probe embedding dimension for model '{self.embedding_model}'. "
-                "Check provider credentials and model id."
-            )
-        return len(vector)
-
-    async def _probe_dimensions_async(self) -> int:
-        """Async variant of ``_probe_dimensions_sync``."""
-        vector = await self._create_embedding_async(_DIMENSION_PROBE_INPUT)
-        if vector is None:
-            raise RuntimeError(
-                f"Failed to probe embedding dimension for model '{self.embedding_model}'. "
-                "Check provider credentials and model id."
-            )
-        return len(vector)
-
-    def create_embeddings_sync(
-        self,
-        nodes_to_embed_dataframe: pd.DataFrame,
-        batch_size: int = 100,
-    ) -> pd.DataFrame:
-        """
-        Create embeddings for a DataFrame of nodes (sync).
-
-        Parameters
-        ----------
-        nodes_to_embed_dataframe : pd.DataFrame
-            Has columns ``id``, ``node_label``, and ``description``.
-        batch_size : int
-            The number of nodes to process in each batch.
-
-        Returns:
-        -------
-        pd.DataFrame
-            Has columns ``id`` and ``embedding``.
-        """
-        results = create_embeddings_in_batches_sync(
-            self._create_embedding_sync, nodes_to_embed_dataframe, batch_size
-        )
-        print(f"Successful Embeddings : {len(results)}")
-        return pd.DataFrame(results, columns=["id", "embedding"])
-
-    async def create_embeddings_async(
-        self,
-        nodes_to_embed_dataframe: pd.DataFrame,
-        batch_size: int = 100,
-    ) -> pd.DataFrame:
-        """
-        Create embeddings for a DataFrame of nodes (async).
-
-        Parameters
-        ----------
-        nodes_to_embed_dataframe : pd.DataFrame
-            Has columns ``id``, ``node_label``, and ``description``.
-        batch_size : int
-            The number of nodes to process in each batch.
-
-        Returns:
-        -------
-        pd.DataFrame
-            Has columns ``id`` and ``embedding``.
-        """
-        results = await create_embeddings_in_batches_async(
-            self._create_embedding_async, nodes_to_embed_dataframe, batch_size
-        )
-        print(f"Successful Embeddings : {len(results)}")
-        return pd.DataFrame(results, columns=["id", "embedding"])
-
-    def run(
-        self,
-        node_labels: list[NodeLabel] = [NodeLabel.TABLE, NodeLabel.COLUMN],
-        batch_size: int = 100,
-    ) -> None:
-        """
-        Sync workflow: fetch nodes missing embeddings, embed them, write back.
-
-        Parameters
-        ----------
-        node_labels: list[NodeLabel]
-            The labels of the nodes to embed.
-        batch_size: int
-            The number of nodes to process in each batch.
-        """
-        dimensions = self._probe_dimensions_sync()
-        print(f"Detected embedding dimension: {dimensions}")
-
-        for label in node_labels:
-            print(f"Processing {label} nodes...")
-            print("--------------------------------")
-            create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
-            nodes_to_embed_dataframe = get_nodes_to_embed(
-                self.neo4j_driver, label, 20, self.database_name
-            )
-            embeddings = self.create_embeddings_sync(
-                nodes_to_embed_dataframe=nodes_to_embed_dataframe,
-                batch_size=batch_size,
-            )
-            if len(embeddings) > 0:
-                print(
-                    write_embeddings_to_graph(
-                        embeddings, label, self.neo4j_driver, self.database_name
-                    )
-                )
-            else:
-                print(f"No embeddings found for {label} nodes")
-
-        self.neo4j_driver.close()
-
-    async def arun(
-        self,
-        node_labels: list[NodeLabel] = [NodeLabel.TABLE, NodeLabel.COLUMN],
-        batch_size: int = 100,
-    ) -> None:
-        """
-        Async workflow: fetch nodes missing embeddings, embed them, write back.
-
-        Parameters
-        ----------
-        node_labels: list[NodeLabel]
-            The labels of the nodes to embed.
-        batch_size: int
-            The number of nodes to process in each batch.
-        """
-        dimensions = await self._probe_dimensions_async()
-        print(f"Detected embedding dimension: {dimensions}")
-
-        for label in node_labels:
-            print(f"Processing {label} nodes...")
-            print("--------------------------------")
-            create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
-            nodes_to_embed_dataframe = get_nodes_to_embed(
-                self.neo4j_driver, label, 20, self.database_name
-            )
-            embeddings = await self.create_embeddings_async(
-                nodes_to_embed_dataframe=nodes_to_embed_dataframe,
-                batch_size=batch_size,
-            )
-            if len(embeddings) > 0:
-                print(
-                    write_embeddings_to_graph(
-                        embeddings, label, self.neo4j_driver, self.database_name
-                    )
-                )
-            else:
-                print(f"No embeddings found for {label} nodes")
-
-        self.neo4j_driver.close()

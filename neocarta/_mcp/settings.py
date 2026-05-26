@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     Embedding provider configuration is handled by LiteLLM. ``embedding_model``
     follows LiteLLM's naming (e.g. ``"text-embedding-3-small"``,
-    ``"gemini-embedding-001"``, ...). 
+    ``"gemini-embedding-001"``, ...).
     Auth is read from the provider's environment
     variables (``OPENAI_API_KEY``, ``GEMINI_API_KEY``, ...).
     """

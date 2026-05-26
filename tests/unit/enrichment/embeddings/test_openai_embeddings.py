@@ -15,12 +15,12 @@ def test_run_keeps_neo4j_driver_open():
     )
 
     with (
-        patch("neocarta.enrichment.embeddings.openai_embeddings.create_vector_index"),
+        patch("neocarta.enrichment.embeddings.base.create_vector_index"),
         patch(
-            "neocarta.enrichment.embeddings.openai_embeddings.get_nodes_to_embed",
+            "neocarta.enrichment.embeddings.base.get_nodes_to_embed",
             return_value=pd.DataFrame(columns=["id", "node_label", "description"]),
         ),
-        patch("neocarta.enrichment.embeddings.openai_embeddings.write_embeddings_to_graph"),
+        patch("neocarta.enrichment.embeddings.base.write_embeddings_to_graph"),
         patch.object(
             connector,
             "create_embeddings_sync",
@@ -40,12 +40,12 @@ def test_arun_keeps_neo4j_driver_open():
     )
 
     with (
-        patch("neocarta.enrichment.embeddings.openai_embeddings.create_vector_index"),
+        patch("neocarta.enrichment.embeddings.base.create_vector_index"),
         patch(
-            "neocarta.enrichment.embeddings.openai_embeddings.get_nodes_to_embed",
+            "neocarta.enrichment.embeddings.base.get_nodes_to_embed",
             return_value=pd.DataFrame(columns=["id", "node_label", "description"]),
         ),
-        patch("neocarta.enrichment.embeddings.openai_embeddings.write_embeddings_to_graph"),
+        patch("neocarta.enrichment.embeddings.base.write_embeddings_to_graph"),
         patch.object(
             connector,
             "create_embeddings_async",
