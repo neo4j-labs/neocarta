@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 from google.cloud import dataplex_v1
 
+from ...errors import ConfigError, StateError
 from ..utils.generate_id import generate_business_term_id, generate_column_id, generate_table_id
 from .models import (
     BigQueryMetadataInfoResponse,
@@ -191,7 +192,7 @@ class DataplexExtractor:
         dataset_id = dataset_id or self.dataset_id
 
         if dataset_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Dataset ID is required in either constructor as `dataset_id` or as an argument to `extract_schema_info` method."
             )
 
@@ -521,9 +522,7 @@ class DataplexExtractor:
         """
         glossary_info = self._cache.get("glossary_info", pd.DataFrame())
         if glossary_info.empty:
-            raise RuntimeError(
-                "extract_glossary_info() must be called before extract_entry_links()."
-            )
+            raise StateError("extract_glossary_info() must be called before extract_entry_links().")
 
         creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         session = google.auth.transport.requests.AuthorizedSession(creds)

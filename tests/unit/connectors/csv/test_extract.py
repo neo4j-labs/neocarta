@@ -12,6 +12,7 @@ from neocarta.connectors.utils.generate_id import (
     generate_value_id,
 )
 from neocarta.enums import NodeLabel, RelationshipType
+from neocarta.errors import ConfigError
 
 # ---------------------------------------------------------------------------
 # Fix #1 — csv_directory validation
@@ -21,13 +22,13 @@ from neocarta.enums import NodeLabel, RelationshipType
 class TestCsvDirectoryValidation:
     def test_nonexistent_directory_raises(self, tmp_path):
         missing = tmp_path / "does_not_exist"
-        with pytest.raises(ValueError, match="does not exist"):
+        with pytest.raises(ConfigError, match="does not exist"):
             CSVExtractor(str(missing))
 
     def test_file_path_raises(self, tmp_path):
         f = tmp_path / "not_a_dir.csv"
         f.write_text("a,b\n1,2\n")
-        with pytest.raises(ValueError, match="not a directory"):
+        with pytest.raises(ConfigError, match="not a directory"):
             CSVExtractor(str(f))
 
     def test_valid_directory_does_not_raise(self, csv_dir):
@@ -47,32 +48,32 @@ class TestCsvDirectoryValidation:
 class TestIncludeValidation:
     def test_invalid_include_nodes_raises(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown node types"):
+        with pytest.raises(ConfigError, match="Unknown node types"):
             extractor.extract_all(include_nodes=["databse"])  # typo
 
     def test_invalid_include_relationships_raises(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown relationship types"):
+        with pytest.raises(ConfigError, match="Unknown relationship types"):
             extractor.extract_all(include_relationships=["has_schema_rel"])  # wrong name
 
     def test_multiple_invalid_include_nodes_raises(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown node types"):
+        with pytest.raises(ConfigError, match="Unknown node types"):
             extractor.extract_all(include_nodes=["foo", "bar", "database"])
 
     def test_multiple_invalid_include_relationships_raises(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown relationship types"):
+        with pytest.raises(ConfigError, match="Unknown relationship types"):
             extractor.extract_all(include_relationships=["foo", "has_schema"])
 
     def test_error_message_lists_invalid_values(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="typo_node"):
+        with pytest.raises(ConfigError, match="typo_node"):
             extractor.extract_all(include_nodes=["typo_node"])
 
     def test_error_message_lists_valid_values(self, csv_dir):
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Database"):
+        with pytest.raises(ConfigError, match="Database"):
             extractor.extract_all(include_nodes=["bad"])
 
     def test_all_valid_node_types_accepted(self, csv_dir):
@@ -136,15 +137,15 @@ class TestRawStringCompatibility:
         assert not extractor.schema_info.empty
 
     def test_lowercase_node_label_rejected(self, csv_dir):
-        """Lowercase strings do not match and raise ValueError."""
+        """Lowercase strings do not match and raise ConfigError."""
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown node types"):
+        with pytest.raises(ConfigError, match="Unknown node types"):
             extractor.extract_all(include_nodes=["database"])
 
     def test_lowercase_relationship_type_rejected(self, csv_dir):
-        """Lowercase strings do not match and raise ValueError."""
+        """Lowercase strings do not match and raise ConfigError."""
         extractor = CSVExtractor(str(csv_dir))
-        with pytest.raises(ValueError, match="Unknown relationship types"):
+        with pytest.raises(ConfigError, match="Unknown relationship types"):
             extractor.extract_all(include_relationships=["has_schema"])
 
 
@@ -175,12 +176,12 @@ class TestExtraction:
         assert extractor.database_info.empty
 
     def test_extract_missing_required_column_raises(self, tmp_path):
-        """A file present but missing required columns raises ValueError."""
+        """A file present but missing required columns raises ConfigError."""
         (tmp_path / "schema_info.csv").write_text(
             "schema_name,description\nsales,Sales\n"  # missing database_name
         )
         extractor = CSVExtractor(str(tmp_path))
-        with pytest.raises(ValueError, match="missing required columns"):
+        with pytest.raises(ConfigError, match="missing required columns"):
             extractor.extract_schema_info()
 
     def test_null_string_values_normalised(self, tmp_path):

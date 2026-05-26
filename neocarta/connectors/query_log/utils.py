@@ -14,6 +14,7 @@ from neocarta.connectors.utils.generate_id import (
     generate_schema_id,
     generate_table_id,
 )
+from neocarta.errors import ConfigError
 
 
 def parse_bigquery_query_log_json(query_log_file: str) -> pd.DataFrame:
@@ -105,7 +106,7 @@ def parse_sql_query(
             platform = "GCP"
             service = "BIGQUERY"
         case _:
-            raise ValueError(f"Unsupported read argument: {read}")
+            raise ConfigError(f"Unsupported read argument: {read}")
 
     try:
         parsed = sqlglot.parse_one(query, read=read)
@@ -159,11 +160,11 @@ def parse_sql_query(
 
             # Validate required identifiers
             if not project_id or project_id == "":
-                raise ValueError(
+                raise ConfigError(
                     f"Cannot generate table ID for '{table_name}': missing project_id. Provide `default_project_id` or use fully qualified table names in query."
                 )
             if not dataset_name or dataset_name == "":
-                raise ValueError(
+                raise ConfigError(
                     f"Cannot generate table ID for '{table_name}': missing schema/dataset. Provide `default_schema_id` or use fully qualified table names in query."
                 )
 

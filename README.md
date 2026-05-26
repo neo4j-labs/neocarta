@@ -680,6 +680,40 @@ make create-graph
 
 ---
 
+## Neocarta CLI
+
+The Neocarta CLI is available via the optional `[cli]` add-on. It wraps the same connector classes covered above behind a noun-verb command grammar so you can drive ingestion without writing Python.
+
+```bash
+pip install "neocarta[cli]"
+```
+
+Today the CLI ships two verbs under one connector noun:
+
+| Command | Wraps |
+|---|---|
+| `neocarta bigquery schema` | `BigQuerySchemaConnector` — load `Database`, `Schema`, `Table`, `Column` nodes |
+| `neocarta bigquery logs` | `BigQueryLogsConnector` — load `Query`, `CTE`, and reference relationships from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` |
+
+Plus one introspection verb:
+
+| Command | Purpose |
+|---|---|
+| `neocarta agent-context` | Emits the full CLI shape (commands, flags, exit codes, env vars) as JSON for AI agents to read |
+
+### Example
+
+```bash
+# Set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY in your shell or .env
+neocarta bigquery schema --project-id my-proj --dataset-id sales
+neocarta bigquery schema --no-embeddings
+neocarta bigquery logs --dataset-id sales --limit 500 --json
+```
+
+See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
+
+---
+
 ## Neocarta MCP
 
 The Neocarta MCP server is available via the optional `[mcp]` add-on.
@@ -714,7 +748,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.4.0",
+        "neocarta[mcp]@0.5.0",
         "neocarta-mcp"
       ],
       "env": {

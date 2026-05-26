@@ -4,6 +4,7 @@ import pytest
 
 from neocarta import __version__
 from neocarta.data_model.rdbms import Database
+from neocarta.errors import ConfigError
 from neocarta.ingest.metadata import (
     FETCH_NEOCARTA_GRAPH_CYPHER,
     UPSERT_NEOCARTA_GRAPH_CYPHER,
@@ -22,7 +23,7 @@ def test_validate_properties_list_valid():
 
 
 def test_validate_properties_list_invalid():
-    with pytest.raises(ValueError, match="invalid"):
+    with pytest.raises(ConfigError, match="invalid"):
         _validate_properties_list(Database, ["name", "description", "platform", "invalid"])
 
 

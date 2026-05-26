@@ -3,6 +3,7 @@
 from google.cloud import bigquery
 from neo4j import Driver
 
+from ....errors import ConfigError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from ...query_log.transform import QueryLogTransformer
 from .extract import BigQueryLogsExtractor
@@ -38,7 +39,7 @@ class BigQueryLogsConnector:
         self.database_name = database_name
 
         if self.project_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Project ID is required as argument in constructor or as attribute in BigQuery client."
             )
 
