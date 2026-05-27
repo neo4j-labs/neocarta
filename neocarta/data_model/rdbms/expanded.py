@@ -1,9 +1,11 @@
-"""Expanded RDBMS data model nodes and relationships (glossary, queries, values)."""
+"""Expanded RDBMS data model nodes and relationships (glossary, queries, values, OSI)."""
 
 from typing import Any
 
 from pandas import isna
 from pydantic import BaseModel, Field, field_validator
+
+from .core import Column, Table
 
 
 class Value(BaseModel):
@@ -74,12 +76,16 @@ class BusinessTerm(BaseModel):
 
 class TaggedWith(BaseModel):
     """
-    A relationship between a Column or Table and a Business Term.
+    A relationship between an entity and a Business Term.
     (:Column)-[:TAGGED_WITH]->(:BusinessTerm)
     (:Table)-[:TAGGED_WITH]->(:BusinessTerm)
+    (:Schema)-[:TAGGED_WITH]->(:BusinessTerm)
+    (:Metric)-[:TAGGED_WITH]->(:BusinessTerm)
     """  # noqa: D415
 
-    entity_id: str = Field(..., description="The unique identifier for the column or table")
+    entity_id: str = Field(
+        ..., description="The unique identifier for the source entity (Column, Table, Schema, or Metric)"
+    )
     business_term_id: str = Field(..., description="The unique identifier for the business term")
 
 
@@ -157,3 +163,206 @@ class Defines(BaseModel):
 
     query_id: str = Field(..., description="The unique identifier for the query")
     cte_id: str = Field(..., description="The unique identifier for the CTE")
+
+class Domain(BaseModel):
+    """A Domain node representing a semantic grouping of data assets."""
+
+    id: str = Field(..., description="The unique identifier for the domain")
+    name: str = Field(..., description="The name of the domain")
+    description: str | None = Field(default=None, description="The description of the domain")
+    embedding: list[float] | None = Field(
+        default=None, description="The embedding of the domain description"
+    )
+
+
+class OsiSemanticModel(Domain):
+    """
+    An OSI Semantic Model node — a Domain subtype representing a full OSI spec instance.
+
+    Stored as a (:Domain&OsiSemanticModel) node in Neo4j.
+    """
+
+    osi_version: str = Field(
+        ..., description="The version of the OSI spec this semantic model conforms to"
+    )
+
+
+class OsiTable(Table):
+    """
+    An OSI Table node — a Table with OSI-specific key metadata.
+
+    Stored as a (:Table&OsiTable) node in Neo4j.
+    """
+
+    primary_key: list[str] | None = Field(
+        default=None,
+        description="Ordered list of column names that form the primary key",
+    )
+    unique_keys: list[list[str]] | None = Field(
+        default=None,
+        description=(
+            "List of unique key constraints; each entry is an ordered list of column names"
+        ),
+    )
+
+
+class OsiColumn(Column):
+    """
+    An OSI Column node — a Column with an OSI-defined display label.
+
+    Stored as a (:Column:OsiColumn) node in Neo4j.
+    """
+
+    label: str | None = Field(default=None, description="The OSI display label for the column")
+
+
+class Metric(BaseModel):
+    """A Metric node representing a measurable quantity in an OSI semantic model."""
+
+    id: str = Field(..., description="The unique identifier for the metric")
+    name: str = Field(..., description="The name of the metric")
+    description: str | None = Field(default=None, description="The description of the metric")
+    embedding: list[float] | None = Field(
+        default=None, description="The embedding of the metric description"
+    )
+
+
+class Aspect(BaseModel):
+    """
+    An Aspect node providing additional context to graph components. 
+    This may be comments, annotations, or other metadata.
+    """
+
+    id: str = Field(..., description="The unique identifier for the aspect")
+
+
+class OsiAiContext(Aspect):
+    """
+    An OSI AI Context aspect carrying agent-facing context as a JSON-encoded string.
+    Recommended data attributes are:
+    - instructions: instructions for AI on how to use this entity
+    - synonyms: Alternative names and terms
+    - examples: Sample questions or use cases
+    """
+    data: str = Field(..., description="The aspect payload as a JSON-encoded string")
+
+
+class OsiCustomExtensions(Aspect):
+    """Custom extensions allow vendors to add platform-specific metadata without breaking core compatibility. 
+    Each extension includes a vendor name and arbitrary JSON data."""
+
+    data: str = Field(..., description="The aspect payload as a JSON-encoded string")
+    vendor_name: str = Field(..., description="The name of the vendor")
+
+
+class Expression(BaseModel):
+    """An Expression node — a dialect-specific computation expression."""
+
+    id: str = Field(..., description="The unique identifier for the expression")
+    dialect: str = Field(
+        ..., description="The dialect of the expression (e.g. 'bigquery', 'snowflake')"
+    )
+    expression: str = Field(..., description="The expression text")
+
+
+class Join(BaseModel):
+    """A Join node representing a join definition between two tables in an OSI model."""
+
+    id: str = Field(..., description="The unique identifier for the join")
+    name: str = Field(..., description="The name of the join")
+
+
+class Dimension(BaseModel):
+    """A Dimension node — denotes that a column is treated as a dimension; flags time dimensions."""
+
+    id: str = Field(..., description="The unique identifier for the dimension")
+    is_time: bool = Field(default=False, description="Whether this dimension represents time")
+
+
+class HasAspect(BaseModel):
+    """
+    A relationship between an OSI entity and an Aspect.
+    (:Schema)-[:HAS_ASPECT]->(:Aspect)
+    (:Table)-[:HAS_ASPECT]->(:Aspect)
+    (:Metric)-[:HAS_ASPECT]->(:Aspect)
+    (:Join)-[:HAS_ASPECT]->(:Aspect)
+    """  # noqa: D415
+
+    entity_id: str = Field(
+        ...,
+        description="The unique identifier for the source entity (Schema, Table, Metric, or Join)",
+    )
+    aspect_id: str = Field(..., description="The unique identifier for the aspect")
+
+
+class UsedInJoin(BaseModel):
+    """
+    A relationship between a Column and a Join indicating the column participates in the join.
+    (Column)-[:USED_IN_JOIN]->(Join).
+    """
+
+    column_id: str = Field(..., description="The unique identifier for the column")
+    join_id: str = Field(..., description="The unique identifier for the join")
+
+
+class HasDimension(BaseModel):
+    """
+    A relationship between a Column and a Dimension.
+    (Column)-[:HAS_DIMENSION]->(Dimension).
+    """
+
+    column_id: str = Field(..., description="The unique identifier for the column")
+    dimension_id: str = Field(..., description="The unique identifier for the dimension")
+
+
+class HasExpression(BaseModel):
+    """
+    A relationship between a Column or Metric and an Expression.
+    (:Column)-[:HAS_EXPRESSION]->(:Expression)
+    (:Metric)-[:HAS_EXPRESSION]->(:Expression)
+    """  # noqa: D415
+
+    entity_id: str = Field(
+        ..., description="The unique identifier for the source entity (Column or Metric)"
+    )
+    expression_id: str = Field(..., description="The unique identifier for the expression")
+
+
+class HasMetric(BaseModel):
+    """
+    A relationship between a Domain and a Metric.
+    (Domain)-[:HAS_METRIC]->(Metric).
+    """
+
+    domain_id: str = Field(..., description="The unique identifier for the domain")
+    metric_id: str = Field(..., description="The unique identifier for the metric")
+
+
+class IncludesSchema(BaseModel):
+    """
+    A relationship between a Domain and a Schema.
+    (Domain)-[:INCLUDES_SCHEMA]->(Schema).
+    """
+
+    domain_id: str = Field(..., description="The unique identifier for the domain")
+    schema_id: str = Field(..., description="The unique identifier for the schema")
+
+
+class HasSourceTable(BaseModel):
+    """
+    A relationship between a Join and its source Table.
+    (Join)-[:HAS_SOURCE_TABLE]->(Table).
+    """
+
+    join_id: str = Field(..., description="The unique identifier for the join")
+    table_id: str = Field(..., description="The unique identifier for the source table")
+
+
+class HasTargetTable(BaseModel):
+    """
+    A relationship between a Join and its target Table.
+    (Join)-[:HAS_TARGET_TABLE]->(Table).
+    """
+
+    join_id: str = Field(..., description="The unique identifier for the join")
+    table_id: str = Field(..., description="The unique identifier for the target table")
