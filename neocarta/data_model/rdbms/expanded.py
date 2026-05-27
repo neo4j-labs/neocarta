@@ -1,6 +1,6 @@
 """Expanded RDBMS data model nodes and relationships (glossary, queries, values, OSI)."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pandas import isna
 from pydantic import BaseModel, Field, field_validator
@@ -83,8 +83,9 @@ class TaggedWith(BaseModel):
     (:Metric)-[:TAGGED_WITH]->(:BusinessTerm)
     """  # noqa: D415
 
-    entity_id: str = Field(
-        ..., description="The unique identifier for the source entity (Column, Table, Schema, or Metric)"
+    source_label: Literal["Column", "Table", "Schema", "Metric"] = Field(..., description="The label of the source entity")
+    source_id: str = Field(
+        ..., description="The unique identifier for the source entity"
     )
     business_term_id: str = Field(..., description="The unique identifier for the business term")
 
@@ -287,11 +288,8 @@ class HasAspect(BaseModel):
     (:Metric)-[:HAS_ASPECT]->(:Aspect)
     (:Join)-[:HAS_ASPECT]->(:Aspect)
     """  # noqa: D415
-
-    entity_id: str = Field(
-        ...,
-        description="The unique identifier for the source entity (Schema, Table, Metric, or Join)",
-    )
+    source_label: Literal["Schema", "Table", "Metric", "Join"] = Field(..., description="The label of the source entity")
+    source_id: str = Field(..., description="The unique identifier for the source entity")
     aspect_id: str = Field(..., description="The unique identifier for the aspect")
 
 
@@ -322,11 +320,9 @@ class HasExpression(BaseModel):
     (:Metric)-[:HAS_EXPRESSION]->(:Expression)
     """  # noqa: D415
 
-    entity_id: str = Field(
-        ..., description="The unique identifier for the source entity (Column or Metric)"
-    )
+    source_label: Literal["Column", "Metric"] = Field(..., description="The label of the source entity")
+    source_id: str = Field(..., description="The unique identifier for the source entity")
     expression_id: str = Field(..., description="The unique identifier for the expression")
-
 
 class HasMetric(BaseModel):
     """
