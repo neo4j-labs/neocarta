@@ -209,12 +209,16 @@ class OsiTable(Table):
 
 class OsiColumn(Column):
     """
-    An OSI Column node — a Column with an OSI-defined display label.
+    An OSI Column node — a Column with OSI-specific display metadata.
 
     Stored as a (:Column:OsiColumn) node in Neo4j.
     """
 
     label: str | None = Field(default=None, description="The OSI display label for the column")
+    is_time_dimension: bool = Field(
+        default=False,
+        description="Whether this column is a time-based dimension",
+    )
 
 
 class Metric(BaseModel):
@@ -273,22 +277,20 @@ class Join(BaseModel):
     name: str = Field(..., description="The name of the join")
 
 
-class Dimension(BaseModel):
-    """A Dimension node — denotes that a column is treated as a dimension; flags time dimensions."""
-
-    id: str = Field(..., description="The unique identifier for the dimension")
-    is_time: bool = Field(default=False, description="Whether this dimension represents time")
-
-
 class HasAspect(BaseModel):
     """
     A relationship between an OSI entity and an Aspect.
+    (:Domain)-[:HAS_ASPECT]->(:Aspect)
     (:Schema)-[:HAS_ASPECT]->(:Aspect)
     (:Table)-[:HAS_ASPECT]->(:Aspect)
+    (:Column)-[:HAS_ASPECT]->(:Aspect)
+    (:Query)-[:HAS_ASPECT]->(:Aspect)
     (:Metric)-[:HAS_ASPECT]->(:Aspect)
     (:Join)-[:HAS_ASPECT]->(:Aspect)
     """  # noqa: D415
-    source_label: Literal["Schema", "Table", "Metric", "Join"] = Field(..., description="The label of the source entity")
+    source_label: Literal[
+        "Schema", "Table", "Column", "Query", "Metric", "Join", "Domain"
+    ] = Field(..., description="The label of the source entity")
     source_id: str = Field(..., description="The unique identifier for the source entity")
     aspect_id: str = Field(..., description="The unique identifier for the aspect")
 
@@ -301,16 +303,6 @@ class UsedInJoin(BaseModel):
 
     column_id: str = Field(..., description="The unique identifier for the column")
     join_id: str = Field(..., description="The unique identifier for the join")
-
-
-class HasDimension(BaseModel):
-    """
-    A relationship between a Column and a Dimension.
-    (Column)-[:HAS_DIMENSION]->(Dimension).
-    """
-
-    column_id: str = Field(..., description="The unique identifier for the column")
-    dimension_id: str = Field(..., description="The unique identifier for the dimension")
 
 
 class HasExpression(BaseModel):
@@ -334,14 +326,48 @@ class HasMetric(BaseModel):
     metric_id: str = Field(..., description="The unique identifier for the metric")
 
 
-class IncludesSchema(BaseModel):
+class DomainHasTable(BaseModel):
     """
-    A relationship between a Domain and a Schema.
-    (Domain)-[:INCLUDES_SCHEMA]->(Schema).
+    A relationship between a Domain (semantic model) and a Table it owns.
+    (Domain)-[:HAS_TABLE]->(Table).
+
+    Shares the ``:HAS_TABLE`` Cypher relationship type with the existing
+    :class:`HasTable` (Schema → Table). An OSI semantic model owns datasets
+    (tables) directly; databases and schemas are parsed from each dataset's
+    ``source`` for hierarchical context but are not themselves children of
+    the semantic model.
     """
 
     domain_id: str = Field(..., description="The unique identifier for the domain")
-    schema_id: str = Field(..., description="The unique identifier for the schema")
+    table_id: str = Field(..., description="The unique identifier for the table")
+
+
+class HasQuery(BaseModel):
+    """
+    A relationship between a Domain (semantic model) and a Query it owns.
+    (Domain)-[:HAS_QUERY]->(Query).
+
+    OSI datasets whose ``source`` is a SQL query (rather than a fully-qualified
+    table reference) are stored as :class:`Query` nodes attached to the
+    semantic model via this relationship.
+    """
+
+    domain_id: str = Field(..., description="The unique identifier for the domain")
+    query_id: str = Field(..., description="The unique identifier for the query")
+
+
+class QueryHasColumn(BaseModel):
+    """
+    A relationship between a Query and a Column it projects.
+    (Query)-[:HAS_COLUMN]->(Column).
+
+    Shares the ``:HAS_COLUMN`` Cypher relationship type with the existing
+    :class:`HasColumn` (Table → Column). When an OSI dataset's source is a
+    query, the dataset's fields become columns owned by the Query node.
+    """
+
+    query_id: str = Field(..., description="The unique identifier for the query")
+    column_id: str = Field(..., description="The unique identifier for the column")
 
 
 class HasSourceTable(BaseModel):
