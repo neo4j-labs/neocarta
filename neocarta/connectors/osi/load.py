@@ -314,7 +314,7 @@ ON CREATE SET n.id = row.id{', ' + set_extras if set_extras else ''}
         """
         cypher = f"""
 UNWIND $rows AS row
-MATCH (s {{id: row.source_id}})
+MATCH (s:{NodeLabel.DOMAIN}|{NodeLabel.SCHEMA}|{NodeLabel.TABLE}|{NodeLabel.COLUMN}|{NodeLabel.QUERY}|{NodeLabel.METRIC}|{NodeLabel.JOIN} {{id: row.source_id}})
 MATCH (a:{NodeLabel.ASPECT} {{id: row.aspect_id}})
 MERGE (s)-[:{RelationshipType.HAS_ASPECT}]->(a)
 """.strip()
@@ -329,7 +329,7 @@ MERGE (s)-[:{RelationshipType.HAS_ASPECT}]->(a)
         """
         cypher = f"""
 UNWIND $rows AS row
-MATCH (s {{id: row.source_id}})
+MATCH (s:{NodeLabel.COLUMN}|{NodeLabel.METRIC} {{id: row.source_id}})
 MATCH (e:{NodeLabel.EXPRESSION} {{id: row.expression_id}})
 MERGE (s)-[:{RelationshipType.HAS_EXPRESSION}]->(e)
 """.strip()
@@ -401,10 +401,10 @@ MERGE (j)-[:{RelationshipType.HAS_TARGET_TABLE}]->(t)
             name = bt_id_to_name.get(rel.business_term_id)
             if name is None:
                 continue
-            rows.append({"entity_id": rel.entity_id, "business_term_name": name})
+            rows.append({"source_id": rel.source_id, "business_term_name": name})
         cypher = f"""
 UNWIND $rows AS row
-MATCH (s {{id: row.entity_id}})
+MATCH (s:{NodeLabel.COLUMN}|{NodeLabel.TABLE}|{NodeLabel.SCHEMA}|{NodeLabel.METRIC} {{id: row.source_id}})
 MATCH (b:{NodeLabel.BUSINESS_TERM} {{name: row.business_term_name}})
 MERGE (s)-[:{RelationshipType.TAGGED_WITH}]->(b)
 """.strip()

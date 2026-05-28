@@ -64,6 +64,11 @@ PLACEHOLDER_SCHEMA = "_unknown_schema"
 _OSI_BT_GLOSSARY = "osi"
 _OSI_BT_CATEGORY = "synonyms"
 
+#: Source labels the :class:`TaggedWith` model permits. OSI entities outside this
+#: set (Domain, Query, Join) can still carry an :class:`OsiAiContext` aspect, but
+#: their synonyms are not turned into BusinessTerm TAGGED_WITH edges.
+_BT_TAGGABLE_LABELS = frozenset({"Column", "Table", "Schema", "Metric"})
+
 
 class ParsedSource(TypedDict):
     """
@@ -547,6 +552,11 @@ class OsiIngestTransformer:
         synonyms = parsed.get("synonyms")
         if not isinstance(synonyms, list):
             return
+        # Only Schema / Table / Column / Metric can carry TaggedWith per the data
+        # model; Domain / Query / Join still get the OsiAiContext aspect above but
+        # do not propagate synonyms into BusinessTerm tags.
+        if source_label not in _BT_TAGGABLE_LABELS:
+            return
         for synonym in synonyms:
             if not isinstance(synonym, str) or not synonym.strip():
                 continue
@@ -557,7 +567,11 @@ class OsiIngestTransformer:
                 self.business_term_nodes.append(BusinessTerm(id=term_id, name=synonym))
                 self._seen_business_term_ids.add(term_id)
             self.tagged_with_rels.append(
-                TaggedWith(entity_id=entity_id, business_term_id=term_id)
+                TaggedWith(
+                    source_label=source_label,
+                    source_id=entity_id,
+                    business_term_id=term_id,
+                )
             )
 
     def _add_custom_extensions(
