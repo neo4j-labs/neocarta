@@ -1,5 +1,6 @@
 """Extract an OSI semantic model subgraph from Neo4j."""
 
+import json
 from typing import Any
 
 from neo4j import Driver
@@ -172,6 +173,17 @@ class OsiGraphExtractor:
         tables: list[dict[str, Any]] = []
         for record in session.run(cypher, sm_id=sm_id):
             ai, customs = self._partition_aspects(aspects_by_parent.get(record["id"], []))
+            # ``unique_keys`` is JSON-encoded at load time because Neo4j can't
+            # store nested lists as property values; decode back to a list of lists.
+            unique_keys_raw = record["unique_keys"]
+            unique_keys: list[list[str]] | None
+            if unique_keys_raw is None:
+                unique_keys = None
+            else:
+                try:
+                    unique_keys = json.loads(unique_keys_raw)
+                except (ValueError, json.JSONDecodeError):
+                    unique_keys = None
             tables.append(
                 {
                     "kind": "table",
@@ -180,9 +192,7 @@ class OsiGraphExtractor:
                     "source": record["source"],
                     "description": record["description"],
                     "primary_key": list(record["primary_key"] or []) or None,
-                    "unique_keys": [
-                        list(uk) for uk in (record["unique_keys"] or [])
-                    ] or None,
+                    "unique_keys": unique_keys,
                     "ai_context": ai,
                     "custom_extensions": customs,
                 }

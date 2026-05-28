@@ -128,7 +128,10 @@ def _validate_properties_list(model: BaseModel, properties_list: list[str]) -> N
 
 
 def _build_node_ingest_query(
-    node_label: NodeLabel, overwrite_existing: bool, properties_list: list[str]
+    node_label: NodeLabel,
+    overwrite_existing: bool,
+    properties_list: list[str],
+    secondary_labels: list[NodeLabel] | None = None,
 ) -> str:
     """
     Build a node ingest query for a given node label, overwrite existing flag, and properties list.
@@ -142,6 +145,10 @@ def _build_node_ingest_query(
         Whether to overwrite existing nodes on MATCH.
     properties_list: list[str]
         The list of properties to set on the node.
+    secondary_labels: list[NodeLabel] | None
+        Optional additional labels to tag onto the node alongside ``node_label``.
+        Used for subtype labels such as ``:Table:OsiTable``. Each label is added
+        in the same SET clause as the property assignments.
 
     Returns:
     -------
@@ -153,8 +160,9 @@ UNWIND $rows as row
 MERGE (n:{node_label} {{id: row.id}})
 """
 
-    # Only add ON CREATE and SET if there are properties to set
-    if len(properties_list) == 0:
+    secondary_labels = secondary_labels or []
+    # Only add ON CREATE and SET if there are secondary labels or properties to set
+    if len(properties_list) == 0 and not secondary_labels:
         return query.rstrip()
 
     # Determine indentation based on overwrite setting
@@ -165,10 +173,10 @@ MERGE (n:{node_label} {{id: row.id}})
         query += "SET "
         indent = " " * 4  # 4 spaces for continuation lines
 
-    for idx, prop in enumerate(properties_list):
-        query += f"n.{prop} = row.{prop}"
-        if idx < len(properties_list) - 1:
-            query += ",\n" + indent
+    set_items = [f"n:{label}" for label in secondary_labels] + [
+        f"n.{prop} = row.{prop}" for prop in properties_list
+    ]
+    query += (",\n" + indent).join(set_items)
 
     return query
 
