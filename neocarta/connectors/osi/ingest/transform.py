@@ -276,6 +276,7 @@ class OsiIngestTransformer:
         table_name: str,
     ) -> tuple[str, str]:
         """Create the OsiTable node, optional Database/Schema, and Domain→Table edge."""
+        source = dataset["source"]
         table_id_str = generate_table_id(
             db_name or PLACEHOLDER_DB,
             schema_name or PLACEHOLDER_SCHEMA,
@@ -317,6 +318,7 @@ class OsiIngestTransformer:
                 id=table_id_str,
                 name=dataset["name"],
                 description=dataset.get("description"),
+                source=source,
                 primary_key=primary_key,
                 unique_keys=unique_keys,
             )
@@ -334,6 +336,7 @@ class OsiIngestTransformer:
         self.query_nodes.append(
             Query(
                 id=query_id_str,
+                name=dataset["name"],
                 content=source,
                 description=dataset.get("description"),
             )

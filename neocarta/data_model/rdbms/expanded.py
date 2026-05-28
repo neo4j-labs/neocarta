@@ -111,9 +111,13 @@ class HasBusinessTerm(BaseModel):
 
 
 class Query(BaseModel):
-    """A Query node representing a query in a query log."""
+    """A Query node representing a query in a query log or an OSI dataset source."""
 
     id: str = Field(..., description="The unique identifier for the query")
+    name: str | None = Field(
+        default=None,
+        description="Logical name for the query (e.g. the OSI dataset name when sourced from OSI)",
+    )
     content: str = Field(..., description="The content of the query")
     description: str | None = Field(default=None, description="The description of the query")
     embedding: list[float] | None = Field(
@@ -195,6 +199,14 @@ class OsiTable(Table):
     Stored as a (:Table&OsiTable) node in Neo4j.
     """
 
+    source: str | None = Field(
+        default=None,
+        description=(
+            "The original OSI ``source`` string for this dataset "
+            "(``db.schema.table``); preserved on the node so the OSI YAML "
+            "round-trip can re-emit the original casing/structure."
+        ),
+    )
     primary_key: list[str] | None = Field(
         default=None,
         description="Ordered list of column names that form the primary key",
