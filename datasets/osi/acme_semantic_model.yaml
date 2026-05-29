@@ -1,0 +1,1340 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/open-semantic-interchange/OSI/main/core-spec/osi-schema.json
+
+# ACME Corp — OSI semantic model
+# Derived from datasets/acme-dataset.sql (33 BigQuery tables across 7 sections).
+# Sources use the 2-part schema.table form to match the SQL DDL; the neocarta OSI
+# ingest fills in a placeholder for the missing database component.
+
+version: "0.2.0"
+
+semantic_model:
+  - name: acme_corp_model
+    description: ACME Corp enterprise data warehouse — HR, customers, sales, products, billing, support, projects, vendors, and web analytics.
+    ai_context:
+      instructions: "Use this semantic model for ACME enterprise analytics across HR, sales, customer success, finance, and support. Time-based analysis pivots on hire_date, close_date, issue_date, paid_at, and event_at. Revenue lives in subscriptions (recurring) and orders (one-time); see metrics for canonical definitions."
+
+    # =============================================================
+    # SECTION 1 — Organization
+    # =============================================================
+    datasets:
+      - name: offices
+        source: acme_corp.offices
+        primary_key: [office_id]
+        description: Physical ACME offices worldwide. One row per office location.
+        ai_context:
+          synonyms: ["locations", "sites", "branches"]
+        fields:
+          - name: office_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: office_id }] }
+            description: Unique office identifier.
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: city
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: city }] }
+          - name: address
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: address }] }
+          - name: timezone
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: timezone }] }
+          - name: headcount_capacity
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: headcount_capacity }] }
+          - name: opened_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: opened_date }] }
+            dimension: { is_time: true }
+          - name: is_hq
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_hq }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      - name: departments
+        source: acme_corp.departments
+        primary_key: [department_id]
+        description: Organizational departments. Self-referencing via parent_department_id.
+        ai_context:
+          synonyms: ["org units", "divisions"]
+        fields:
+          - name: department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: department_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: cost_center
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: cost_center }] }
+          - name: parent_department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: parent_department_id }] }
+          - name: head_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: head_employee_id }] }
+          - name: budget_annual_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: budget_annual_usd }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      - name: teams
+        source: acme_corp.teams
+        primary_key: [team_id]
+        description: Teams within departments. Used for squad-level reporting.
+        fields:
+          - name: team_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: team_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: department_id }] }
+          - name: lead_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: lead_employee_id }] }
+          - name: slack_channel
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: slack_channel }] }
+          - name: formed_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: formed_date }] }
+            dimension: { is_time: true }
+          - name: is_active
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_active }] }
+
+      - name: job_titles
+        source: acme_corp.job_titles
+        primary_key: [job_title_id]
+        description: Canonical job titles with level and salary band.
+        fields:
+          - name: job_title_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: job_title_id }] }
+          - name: title
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: title }] }
+          - name: level
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: level }] }
+          - name: job_family
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: job_family }] }
+          - name: min_salary
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: min_salary }] }
+          - name: max_salary
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: max_salary }] }
+          - name: currency
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
+
+      - name: employees
+        source: acme_corp.employees
+        primary_key: [employee_id]
+        description: All ACME employees, past and present. Current role snapshot lives here; time-series role changes live in employee_role_history.
+        ai_context:
+          synonyms: ["staff", "headcount", "workforce", "people"]
+          examples:
+            - "How many active employees does each department have?"
+            - "Show employees hired in the last quarter."
+        fields:
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: first_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: first_name }] }
+          - name: last_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: last_name }] }
+          - name: email
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: email }] }
+          - name: phone
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: phone }] }
+          - name: hire_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: hire_date }] }
+            dimension: { is_time: true }
+          - name: termination_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: termination_date }] }
+            dimension: { is_time: true }
+          - name: employment_status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employment_status }] }
+          - name: employment_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employment_type }] }
+          - name: manager_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: manager_id }] }
+          - name: department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: department_id }] }
+          - name: team_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: team_id }] }
+          - name: job_title_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: job_title_id }] }
+          - name: office_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: office_id }] }
+          - name: date_of_birth
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: date_of_birth }] }
+            dimension: { is_time: true }
+          - name: gender
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: gender }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+          - name: updated_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: updated_at }] }
+            dimension: { is_time: true }
+
+      - name: employee_role_history
+        source: acme_corp.employee_role_history
+        primary_key: [role_history_id]
+        description: SCD-style time-series of employee role changes.
+        fields:
+          - name: role_history_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: role_history_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: job_title_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: job_title_id }] }
+          - name: department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: department_id }] }
+          - name: team_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: team_id }] }
+          - name: manager_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: manager_id }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: end_date }] }
+            dimension: { is_time: true }
+          - name: change_reason
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: change_reason }] }
+
+      - name: compensation
+        source: acme_corp.compensation
+        primary_key: [compensation_id]
+        description: Compensation change history. Highly sensitive — restricted access.
+        ai_context:
+          synonyms: ["comp", "salary", "pay"]
+        fields:
+          - name: compensation_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: compensation_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: effective_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: effective_date }] }
+            dimension: { is_time: true }
+          - name: base_salary
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: base_salary }] }
+          - name: bonus_target_pct
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: bonus_target_pct }] }
+          - name: equity_grant_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: equity_grant_usd }] }
+          - name: currency
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
+          - name: change_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: change_type }] }
+          - name: approved_by
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: approved_by }] }
+
+      - name: performance_reviews
+        source: acme_corp.performance_reviews
+        primary_key: [review_id]
+        description: Half-yearly performance reviews.
+        fields:
+          - name: review_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: review_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: reviewer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: reviewer_id }] }
+          - name: review_period
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: review_period }] }
+          - name: overall_rating
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: overall_rating }] }
+          - name: numeric_score
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: numeric_score }] }
+          - name: strengths
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: strengths }] }
+          - name: areas_for_improvement
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: areas_for_improvement }] }
+          - name: submitted_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: submitted_at }] }
+            dimension: { is_time: true }
+
+      - name: time_off_requests
+        source: acme_corp.time_off_requests
+        primary_key: [request_id]
+        description: Employee time-off requests.
+        ai_context:
+          synonyms: ["PTO", "leave", "vacation"]
+        fields:
+          - name: request_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: request_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: request_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: request_type }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: end_date }] }
+            dimension: { is_time: true }
+          - name: total_days
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: total_days }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: approver_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: approver_id }] }
+          - name: requested_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: requested_at }] }
+            dimension: { is_time: true }
+
+      - name: training_courses
+        source: acme_corp.training_courses
+        primary_key: [course_id]
+        description: Catalog of training courses available to employees.
+        fields:
+          - name: course_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: course_id }] }
+          - name: title
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: title }] }
+          - name: provider
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: provider }] }
+          - name: category
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: category }] }
+          - name: duration_hours
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: duration_hours }] }
+          - name: is_mandatory
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_mandatory }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      - name: employee_training
+        source: acme_corp.employee_training
+        primary_key: [enrollment_id]
+        description: Junction table tracking employee enrollments in training courses.
+        fields:
+          - name: enrollment_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: enrollment_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: course_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: course_id }] }
+          - name: enrolled_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: enrolled_at }] }
+            dimension: { is_time: true }
+          - name: completed_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: completed_at }] }
+            dimension: { is_time: true }
+          - name: completion_status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: completion_status }] }
+          - name: score
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: score }] }
+
+      # =============================================================
+      # SECTION 2 — Customers
+      # =============================================================
+      - name: customers
+        source: acme_corp.customers
+        primary_key: [customer_id]
+        description: B2B customer accounts. One row per company (logo).
+        ai_context:
+          synonyms: ["accounts", "companies", "logos", "clients"]
+          examples:
+            - "Top 10 customers by lifetime value"
+            - "Customers at risk based on health_score"
+        fields:
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: company_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: company_name }] }
+          - name: industry
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: industry }] }
+          - name: annual_revenue_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: annual_revenue_usd }] }
+          - name: employee_count
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_count }] }
+          - name: website
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: website }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: segment
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: segment }] }
+          - name: acquired_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: acquired_date }] }
+            dimension: { is_time: true }
+          - name: account_owner_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: account_owner_id }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: lifetime_value_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: lifetime_value_usd }] }
+          - name: health_score
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: health_score }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      - name: customer_contacts
+        source: acme_corp.customer_contacts
+        primary_key: [contact_id]
+        description: People at customer accounts.
+        fields:
+          - name: contact_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contact_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: first_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: first_name }] }
+          - name: last_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: last_name }] }
+          - name: email
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: email }] }
+          - name: phone
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: phone }] }
+          - name: title
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: title }] }
+          - name: is_primary
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_primary }] }
+          - name: is_decision_maker
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_decision_maker }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      - name: customer_addresses
+        source: acme_corp.customer_addresses
+        primary_key: [address_id]
+        description: Addresses for customer accounts (billing, shipping, HQ).
+        fields:
+          - name: address_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: address_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: address_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: address_type }] }
+          - name: line1
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: line1 }] }
+          - name: line2
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: line2 }] }
+          - name: city
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: city }] }
+          - name: region
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: region }] }
+          - name: postal_code
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: postal_code }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: is_primary
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_primary }] }
+
+      # =============================================================
+      # SECTION 3 — Sales / CRM
+      # =============================================================
+      - name: campaigns
+        source: acme_corp.campaigns
+        primary_key: [campaign_id]
+        description: Marketing campaigns across channels.
+        fields:
+          - name: campaign_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: campaign_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: channel
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: channel }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: end_date }] }
+            dimension: { is_time: true }
+          - name: budget_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: budget_usd }] }
+          - name: spend_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: spend_usd }] }
+          - name: owner_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
+
+      - name: leads
+        source: acme_corp.leads
+        primary_key: [lead_id]
+        description: Top-of-funnel leads prior to qualification.
+        ai_context:
+          synonyms: ["prospects", "MQLs", "SQLs"]
+        fields:
+          - name: lead_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: lead_id }] }
+          - name: first_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: first_name }] }
+          - name: last_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: last_name }] }
+          - name: email
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: email }] }
+          - name: company
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: company }] }
+          - name: title
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: title }] }
+          - name: source
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: source }] }
+          - name: campaign_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: campaign_id }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: score
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: score }] }
+          - name: assigned_to
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: assigned_to }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+          - name: converted_customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: converted_customer_id }] }
+          - name: converted_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: converted_at }] }
+            dimension: { is_time: true }
+
+      - name: opportunities
+        source: acme_corp.opportunities
+        primary_key: [opportunity_id]
+        description: Sales opportunities (deals). Core pipeline and forecast table.
+        ai_context:
+          synonyms: ["opps", "deals", "pipeline"]
+          examples:
+            - "Weighted pipeline by stage"
+            - "Top loss reasons for closed_lost opportunities"
+        fields:
+          - name: opportunity_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: opportunity_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: stage
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: stage }] }
+          - name: amount_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: amount_usd }] }
+          - name: probability
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: probability }] }
+          - name: close_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: close_date }] }
+            dimension: { is_time: true }
+          - name: owner_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
+          - name: source_lead_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: source_lead_id }] }
+          - name: loss_reason
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: loss_reason }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+          - name: closed_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: closed_at }] }
+            dimension: { is_time: true }
+
+      - name: sales_activities
+        source: acme_corp.sales_activities
+        primary_key: [activity_id]
+        description: Logged sales activities (calls, emails, meetings, demos).
+        fields:
+          - name: activity_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: activity_id }] }
+          - name: opportunity_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: opportunity_id }] }
+          - name: lead_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: lead_id }] }
+          - name: contact_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contact_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: activity_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: activity_type }] }
+          - name: subject
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: subject }] }
+          - name: notes
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: notes }] }
+          - name: activity_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: activity_at }] }
+            dimension: { is_time: true }
+          - name: duration_minutes
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: duration_minutes }] }
+
+      - name: quotes
+        source: acme_corp.quotes
+        primary_key: [quote_id]
+        description: Price quotes generated against opportunities.
+        fields:
+          - name: quote_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: quote_id }] }
+          - name: opportunity_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: opportunity_id }] }
+          - name: version
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: version }] }
+          - name: total_amount_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: total_amount_usd }] }
+          - name: discount_pct
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: discount_pct }] }
+          - name: valid_until
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: valid_until }] }
+            dimension: { is_time: true }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: sent_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: sent_at }] }
+            dimension: { is_time: true }
+          - name: created_by
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_by }] }
+
+      # =============================================================
+      # SECTION 4 — Products / Orders / Billing
+      # =============================================================
+      - name: product_categories
+        source: acme_corp.product_categories
+        primary_key: [category_id]
+        description: Product category tree (self-referencing).
+        fields:
+          - name: category_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: category_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: parent_category_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: parent_category_id }] }
+          - name: description
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: description }] }
+
+      - name: products
+        source: acme_corp.products
+        primary_key: [product_id]
+        description: Sellable products and services.
+        ai_context:
+          synonyms: ["SKUs", "offerings", "catalog"]
+        fields:
+          - name: product_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: product_id }] }
+          - name: sku
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: sku }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: category_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: category_id }] }
+          - name: description
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: description }] }
+          - name: list_price_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: list_price_usd }] }
+          - name: cost_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: cost_usd }] }
+          - name: is_active
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_active }] }
+          - name: launched_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: launched_at }] }
+            dimension: { is_time: true }
+
+      - name: subscriptions
+        source: acme_corp.subscriptions
+        primary_key: [subscription_id]
+        description: SaaS subscriptions (recurring revenue). Source of truth for MRR/ARR.
+        ai_context:
+          synonyms: ["subs", "recurring revenue", "MRR", "ARR"]
+        fields:
+          - name: subscription_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: subscription_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: product_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: product_id }] }
+          - name: plan_name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: plan_name }] }
+          - name: seats
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: seats }] }
+          - name: mrr_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: mrr_usd }] }
+          - name: arr_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: arr_usd }] }
+          - name: billing_cycle
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: billing_cycle }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: renewal_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: renewal_date }] }
+            dimension: { is_time: true }
+          - name: cancelled_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: cancelled_date }] }
+            dimension: { is_time: true }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: owner_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
+
+      - name: orders
+        source: acme_corp.orders
+        primary_key: [order_id]
+        description: One-time orders (non-subscription).
+        ai_context:
+          synonyms: ["purchases", "transactions"]
+        fields:
+          - name: order_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: order_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: order_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: order_date }] }
+            dimension: { is_time: true }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: currency
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
+          - name: subtotal_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: subtotal_usd }] }
+          - name: tax_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: tax_usd }] }
+          - name: shipping_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: shipping_usd }] }
+          - name: total_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: total_usd }] }
+          - name: placed_by_contact_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: placed_by_contact_id }] }
+          - name: sales_rep_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: sales_rep_id }] }
+
+      - name: order_items
+        source: acme_corp.order_items
+        primary_key: [order_item_id]
+        description: Line items on orders.
+        fields:
+          - name: order_item_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: order_item_id }] }
+          - name: order_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: order_id }] }
+          - name: product_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: product_id }] }
+          - name: quantity
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: quantity }] }
+          - name: unit_price_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: unit_price_usd }] }
+          - name: discount_pct
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: discount_pct }] }
+          - name: line_total_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: line_total_usd }] }
+
+      - name: invoices
+        source: acme_corp.invoices
+        primary_key: [invoice_id]
+        description: Invoices issued to customers. Linked to subscription or order.
+        fields:
+          - name: invoice_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: invoice_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: subscription_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: subscription_id }] }
+          - name: order_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: order_id }] }
+          - name: invoice_number
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: invoice_number }] }
+          - name: issue_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: issue_date }] }
+            dimension: { is_time: true }
+          - name: due_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: due_date }] }
+            dimension: { is_time: true }
+          - name: amount_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: amount_usd }] }
+          - name: tax_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: tax_usd }] }
+          - name: total_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: total_usd }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: paid_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: paid_at }] }
+            dimension: { is_time: true }
+
+      - name: payments
+        source: acme_corp.payments
+        primary_key: [payment_id]
+        description: Payment transactions against invoices.
+        fields:
+          - name: payment_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: payment_id }] }
+          - name: invoice_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: invoice_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: payment_method
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: payment_method }] }
+          - name: amount_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: amount_usd }] }
+          - name: currency
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
+          - name: processor
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: processor }] }
+          - name: processor_transaction_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: processor_transaction_id }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: paid_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: paid_at }] }
+            dimension: { is_time: true }
+
+      # =============================================================
+      # SECTION 5 — Support
+      # =============================================================
+      - name: support_tickets
+        source: acme_corp.support_tickets
+        primary_key: [ticket_id]
+        description: Customer support tickets.
+        ai_context:
+          synonyms: ["cases", "issues"]
+        fields:
+          - name: ticket_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: ticket_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: contact_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contact_id }] }
+          - name: subject
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: subject }] }
+          - name: description
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: description }] }
+          - name: priority
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: priority }] }
+          - name: category
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: category }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: assigned_to
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: assigned_to }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+          - name: first_response_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: first_response_at }] }
+            dimension: { is_time: true }
+          - name: resolved_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: resolved_at }] }
+            dimension: { is_time: true }
+          - name: csat_score
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: csat_score }] }
+
+      - name: ticket_comments
+        source: acme_corp.ticket_comments
+        primary_key: [comment_id]
+        description: Chronological comments on support tickets.
+        fields:
+          - name: comment_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: comment_id }] }
+          - name: ticket_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: ticket_id }] }
+          - name: author_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: author_type }] }
+          - name: author_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: author_id }] }
+          - name: body
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: body }] }
+          - name: is_internal
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: is_internal }] }
+          - name: created_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: created_at }] }
+            dimension: { is_time: true }
+
+      # =============================================================
+      # SECTION 6 — Projects & Vendors
+      # =============================================================
+      - name: projects
+        source: acme_corp.projects
+        primary_key: [project_id]
+        description: Internal projects (cross-functional initiatives).
+        fields:
+          - name: project_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: project_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: description
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: description }] }
+          - name: department_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: department_id }] }
+          - name: project_lead_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: project_lead_id }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: target_end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: target_end_date }] }
+            dimension: { is_time: true }
+          - name: actual_end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: actual_end_date }] }
+            dimension: { is_time: true }
+          - name: budget_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: budget_usd }] }
+          - name: spend_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: spend_usd }] }
+
+      - name: project_assignments
+        source: acme_corp.project_assignments
+        primary_key: [assignment_id]
+        description: Employee allocations to projects.
+        fields:
+          - name: assignment_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: assignment_id }] }
+          - name: project_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: project_id }] }
+          - name: employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: employee_id }] }
+          - name: role
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: role }] }
+          - name: allocation_pct
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: allocation_pct }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: end_date }] }
+            dimension: { is_time: true }
+
+      - name: vendors
+        source: acme_corp.vendors
+        primary_key: [vendor_id]
+        description: Third-party vendors / suppliers.
+        fields:
+          - name: vendor_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: vendor_id }] }
+          - name: name
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: name }] }
+          - name: category
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: category }] }
+          - name: contact_email
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contact_email }] }
+          - name: contact_phone
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contact_phone }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: onboarded_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: onboarded_date }] }
+            dimension: { is_time: true }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: risk_rating
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: risk_rating }] }
+
+      - name: vendor_contracts
+        source: acme_corp.vendor_contracts
+        primary_key: [contract_id]
+        description: Contracts with vendors.
+        fields:
+          - name: contract_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: contract_id }] }
+          - name: vendor_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: vendor_id }] }
+          - name: owner_employee_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
+          - name: start_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: start_date }] }
+            dimension: { is_time: true }
+          - name: end_date
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: end_date }] }
+            dimension: { is_time: true }
+          - name: annual_spend_usd
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: annual_spend_usd }] }
+          - name: currency
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
+          - name: auto_renew
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: auto_renew }] }
+          - name: status
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: status }] }
+          - name: signed_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: signed_at }] }
+            dimension: { is_time: true }
+
+      # =============================================================
+      # SECTION 7 — Marketing / Web Analytics
+      # =============================================================
+      - name: web_events
+        source: acme_corp.web_events
+        primary_key: [event_id]
+        description: Web analytics events from acme.example. High-volume; prefer partition-pruned queries.
+        ai_context:
+          synonyms: ["pageviews", "clickstream", "site analytics"]
+        fields:
+          - name: event_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: event_id }] }
+          - name: session_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: session_id }] }
+          - name: visitor_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: visitor_id }] }
+          - name: customer_id
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: customer_id }] }
+          - name: event_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: event_type }] }
+          - name: page_url
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: page_url }] }
+          - name: referrer
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: referrer }] }
+          - name: utm_source
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: utm_source }] }
+          - name: utm_medium
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: utm_medium }] }
+          - name: utm_campaign
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: utm_campaign }] }
+          - name: device_type
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: device_type }] }
+          - name: country
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: country }] }
+          - name: event_at
+            expression: { dialects: [{ dialect: ANSI_SQL, expression: event_at }] }
+            dimension: { is_time: true }
+
+    # =============================================================
+    # Relationships (foreign keys from the SQL DDL)
+    # =============================================================
+    relationships:
+      # Organization
+      - name: teams_to_departments
+        from: teams
+        to: departments
+        from_columns: [department_id]
+        to_columns: [department_id]
+      - name: employees_to_departments
+        from: employees
+        to: departments
+        from_columns: [department_id]
+        to_columns: [department_id]
+      - name: employees_to_teams
+        from: employees
+        to: teams
+        from_columns: [team_id]
+        to_columns: [team_id]
+      - name: employees_to_job_titles
+        from: employees
+        to: job_titles
+        from_columns: [job_title_id]
+        to_columns: [job_title_id]
+      - name: employees_to_offices
+        from: employees
+        to: offices
+        from_columns: [office_id]
+        to_columns: [office_id]
+      - name: role_history_to_employees
+        from: employee_role_history
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: role_history_to_job_titles
+        from: employee_role_history
+        to: job_titles
+        from_columns: [job_title_id]
+        to_columns: [job_title_id]
+      - name: compensation_to_employees
+        from: compensation
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: reviews_to_employees
+        from: performance_reviews
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: reviews_to_reviewers
+        from: performance_reviews
+        to: employees
+        from_columns: [reviewer_id]
+        to_columns: [employee_id]
+      - name: time_off_to_employees
+        from: time_off_requests
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: training_enrollment_to_employees
+        from: employee_training
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: training_enrollment_to_courses
+        from: employee_training
+        to: training_courses
+        from_columns: [course_id]
+        to_columns: [course_id]
+
+      # Customers
+      - name: customers_to_account_owner
+        from: customers
+        to: employees
+        from_columns: [account_owner_id]
+        to_columns: [employee_id]
+      - name: contacts_to_customers
+        from: customer_contacts
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: addresses_to_customers
+        from: customer_addresses
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+
+      # Sales / CRM
+      - name: campaigns_to_owner
+        from: campaigns
+        to: employees
+        from_columns: [owner_employee_id]
+        to_columns: [employee_id]
+      - name: leads_to_campaigns
+        from: leads
+        to: campaigns
+        from_columns: [campaign_id]
+        to_columns: [campaign_id]
+      - name: leads_to_assignee
+        from: leads
+        to: employees
+        from_columns: [assigned_to]
+        to_columns: [employee_id]
+      - name: leads_to_converted_customer
+        from: leads
+        to: customers
+        from_columns: [converted_customer_id]
+        to_columns: [customer_id]
+      - name: opportunities_to_customers
+        from: opportunities
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: opportunities_to_owner
+        from: opportunities
+        to: employees
+        from_columns: [owner_employee_id]
+        to_columns: [employee_id]
+      - name: opportunities_to_source_lead
+        from: opportunities
+        to: leads
+        from_columns: [source_lead_id]
+        to_columns: [lead_id]
+      - name: activities_to_opportunities
+        from: sales_activities
+        to: opportunities
+        from_columns: [opportunity_id]
+        to_columns: [opportunity_id]
+      - name: activities_to_leads
+        from: sales_activities
+        to: leads
+        from_columns: [lead_id]
+        to_columns: [lead_id]
+      - name: activities_to_contacts
+        from: sales_activities
+        to: customer_contacts
+        from_columns: [contact_id]
+        to_columns: [contact_id]
+      - name: activities_to_employees
+        from: sales_activities
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: quotes_to_opportunities
+        from: quotes
+        to: opportunities
+        from_columns: [opportunity_id]
+        to_columns: [opportunity_id]
+      - name: quotes_to_created_by
+        from: quotes
+        to: employees
+        from_columns: [created_by]
+        to_columns: [employee_id]
+
+      # Products / Orders / Billing
+      - name: products_to_categories
+        from: products
+        to: product_categories
+        from_columns: [category_id]
+        to_columns: [category_id]
+      - name: subscriptions_to_customers
+        from: subscriptions
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: subscriptions_to_products
+        from: subscriptions
+        to: products
+        from_columns: [product_id]
+        to_columns: [product_id]
+      - name: subscriptions_to_owner
+        from: subscriptions
+        to: employees
+        from_columns: [owner_employee_id]
+        to_columns: [employee_id]
+      - name: orders_to_customers
+        from: orders
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: orders_to_contact
+        from: orders
+        to: customer_contacts
+        from_columns: [placed_by_contact_id]
+        to_columns: [contact_id]
+      - name: orders_to_sales_rep
+        from: orders
+        to: employees
+        from_columns: [sales_rep_id]
+        to_columns: [employee_id]
+      - name: order_items_to_orders
+        from: order_items
+        to: orders
+        from_columns: [order_id]
+        to_columns: [order_id]
+      - name: order_items_to_products
+        from: order_items
+        to: products
+        from_columns: [product_id]
+        to_columns: [product_id]
+      - name: invoices_to_customers
+        from: invoices
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: invoices_to_subscriptions
+        from: invoices
+        to: subscriptions
+        from_columns: [subscription_id]
+        to_columns: [subscription_id]
+      - name: invoices_to_orders
+        from: invoices
+        to: orders
+        from_columns: [order_id]
+        to_columns: [order_id]
+      - name: payments_to_invoices
+        from: payments
+        to: invoices
+        from_columns: [invoice_id]
+        to_columns: [invoice_id]
+      - name: payments_to_customers
+        from: payments
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+
+      # Support
+      - name: tickets_to_customers
+        from: support_tickets
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+      - name: tickets_to_contacts
+        from: support_tickets
+        to: customer_contacts
+        from_columns: [contact_id]
+        to_columns: [contact_id]
+      - name: tickets_to_assignee
+        from: support_tickets
+        to: employees
+        from_columns: [assigned_to]
+        to_columns: [employee_id]
+      - name: comments_to_tickets
+        from: ticket_comments
+        to: support_tickets
+        from_columns: [ticket_id]
+        to_columns: [ticket_id]
+
+      # Projects & Vendors
+      - name: projects_to_departments
+        from: projects
+        to: departments
+        from_columns: [department_id]
+        to_columns: [department_id]
+      - name: projects_to_lead
+        from: projects
+        to: employees
+        from_columns: [project_lead_id]
+        to_columns: [employee_id]
+      - name: assignments_to_projects
+        from: project_assignments
+        to: projects
+        from_columns: [project_id]
+        to_columns: [project_id]
+      - name: assignments_to_employees
+        from: project_assignments
+        to: employees
+        from_columns: [employee_id]
+        to_columns: [employee_id]
+      - name: vendor_contracts_to_vendors
+        from: vendor_contracts
+        to: vendors
+        from_columns: [vendor_id]
+        to_columns: [vendor_id]
+      - name: vendor_contracts_to_owner
+        from: vendor_contracts
+        to: employees
+        from_columns: [owner_employee_id]
+        to_columns: [employee_id]
+
+      # Web Analytics
+      - name: web_events_to_customers
+        from: web_events
+        to: customers
+        from_columns: [customer_id]
+        to_columns: [customer_id]
+
+    # =============================================================
+    # Metrics
+    # =============================================================
+    metrics:
+      - name: total_arr_usd
+        description: Annual recurring revenue across all active subscriptions, USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(CASE WHEN subscriptions.status = 'active' THEN subscriptions.arr_usd ELSE 0 END)"
+        ai_context:
+          synonyms: ["ARR", "annual recurring revenue", "annualized recurring revenue"]
+
+      - name: total_mrr_usd
+        description: Monthly recurring revenue across all active subscriptions, USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(CASE WHEN subscriptions.status = 'active' THEN subscriptions.mrr_usd ELSE 0 END)"
+        ai_context:
+          synonyms: ["MRR", "monthly recurring revenue"]
+
+      - name: pipeline_amount_usd
+        description: Open pipeline value (opportunities not yet closed), USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(CASE WHEN opportunities.stage NOT IN ('closed_won','closed_lost') THEN opportunities.amount_usd ELSE 0 END)"
+        ai_context:
+          synonyms: ["open pipeline", "deal pipeline"]
+
+      - name: weighted_pipeline_usd
+        description: Probability-weighted pipeline value, USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(CASE WHEN opportunities.stage NOT IN ('closed_won','closed_lost') THEN opportunities.amount_usd * opportunities.probability ELSE 0 END)"
+
+      - name: won_revenue_usd
+        description: Closed-won opportunity revenue, USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(CASE WHEN opportunities.stage = 'closed_won' THEN opportunities.amount_usd ELSE 0 END)"
+        ai_context:
+          synonyms: ["closed won", "bookings"]
+
+      - name: active_headcount
+        description: Count of active employees.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "COUNT(CASE WHEN employees.employment_status = 'active' THEN 1 END)"
+        ai_context:
+          synonyms: ["headcount", "active employees", "FTEs"]
+
+      - name: customer_count
+        description: Distinct active customers.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "COUNT(DISTINCT CASE WHEN customers.status = 'active' THEN customers.customer_id END)"
+        ai_context:
+          synonyms: ["logos", "active customers"]
+
+      - name: avg_csat
+        description: Average customer satisfaction score on resolved support tickets.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "AVG(support_tickets.csat_score)"
+        ai_context:
+          synonyms: ["CSAT", "customer satisfaction"]
+
+      - name: total_invoiced_usd
+        description: Total amount invoiced across all invoices, USD.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: "SUM(invoices.total_usd)"
