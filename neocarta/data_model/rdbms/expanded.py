@@ -227,9 +227,13 @@ class OsiColumn(Column):
     """
 
     label: str | None = Field(default=None, description="The OSI display label for the column")
-    is_time_dimension: bool = Field(
-        default=False,
-        description="Whether this column is a time-based dimension",
+    is_time_dimension: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this column is a time-based dimension. ``None`` when the OSI "
+            "field had no ``dimension`` key at all (so no property is written to "
+            "the graph); ``True`` / ``False`` only when explicitly declared."
+        ),
     )
 
 

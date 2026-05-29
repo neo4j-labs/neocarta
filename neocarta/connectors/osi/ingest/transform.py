@@ -349,7 +349,16 @@ class OsiIngestTransformer:
         field_name = field["name"]
         column_id_str = self._make_column_id(owner_id, owner_label, field_name)
 
-        is_time_dimension = bool((field.get("dimension") or {}).get("is_time"))
+        # Only persist is_time_dimension when the OSI field explicitly declares
+        # ``dimension.is_time`` as a bool. Missing / non-bool values leave the
+        # property unset on the graph node so the absence round-trips cleanly.
+        dimension = field.get("dimension")
+        is_time_value = (
+            dimension.get("is_time") if isinstance(dimension, dict) else None
+        )
+        is_time_dimension: bool | None = (
+            is_time_value if isinstance(is_time_value, bool) else None
+        )
 
         self.column_nodes.append(
             OsiColumn(

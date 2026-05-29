@@ -156,7 +156,7 @@ def test_foreign_key_columns_marked_from_relationships(minimal_spec):
 
 
 def test_time_dimension_field_marked():
-    """field.dimension.is_time=True surfaces as OsiColumn.is_time_dimension=True."""
+    """``dimension.is_time`` is tri-state: True / False are stored verbatim; missing → None."""
     spec = {
         "semantic_model": [
             {
@@ -169,6 +169,7 @@ def test_time_dimension_field_marked():
                             {"name": "ts", "dimension": {"is_time": True}},
                             {"name": "other", "dimension": {"is_time": False}},
                             {"name": "plain"},
+                            {"name": "empty_dim", "dimension": {}},
                         ],
                     }
                 ],
@@ -177,9 +178,13 @@ def test_time_dimension_field_marked():
     }
     t = _run(spec)
     by_name = {c.name: c for c in t.column_nodes}
+    # Explicit declarations preserve their value.
     assert by_name["ts"].is_time_dimension is True
     assert by_name["other"].is_time_dimension is False
-    assert by_name["plain"].is_time_dimension is False
+    # No dimension key at all → property is unset (None), not False.
+    assert by_name["plain"].is_time_dimension is None
+    # Dimension key present without is_time → also None (only bool is_time stores).
+    assert by_name["empty_dim"].is_time_dimension is None
 
 
 def test_osi_column_label_passthrough(minimal_spec):

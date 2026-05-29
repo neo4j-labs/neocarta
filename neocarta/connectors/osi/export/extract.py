@@ -301,7 +301,9 @@ class OsiGraphExtractor:
                     "description": record["description"],
                     "is_primary_key": bool(record["is_primary_key"]),
                     "is_foreign_key": bool(record["is_foreign_key"]),
-                    "is_time_dimension": bool(record["is_time_dimension"]),
+                    # Preserve None — Neo4j returns missing properties as None,
+                    # and the export transformer treats None as "no dimension key".
+                    "is_time_dimension": record["is_time_dimension"],
                     "expressions": expressions,
                     "ai_context": ai,
                     "custom_extensions": customs,

@@ -146,8 +146,11 @@ class OsiExportTransformer:
                 ]
             }
 
-        if field.get("is_time_dimension"):
-            out["dimension"] = {"is_time": True}
+        # ``is_time_dimension`` is tri-state: None means the OSI input had no
+        # ``dimension`` key (omit on export), True/False are explicit declarations.
+        is_time_dim = field.get("is_time_dimension")
+        if is_time_dim is not None:
+            out["dimension"] = {"is_time": is_time_dim}
 
         self._maybe_set(out, "label", field.get("label"))
         self._maybe_set(out, "description", field.get("description"))

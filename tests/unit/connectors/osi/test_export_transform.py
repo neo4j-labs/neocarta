@@ -33,7 +33,7 @@ def _minimal_snapshot() -> dict:
                         "description": "Primary key",
                         "is_primary_key": True,
                         "is_foreign_key": False,
-                        "is_time_dimension": False,
+                        "is_time_dimension": None,
                         "expressions": [{"dialect": "ANSI_SQL", "expression": "order_id"}],
                         "ai_context": None,
                         "custom_extensions": [],
@@ -148,13 +148,25 @@ def test_field_expressions_wrap_into_dialects_subdict():
 
 
 def test_time_dimension_emits_dimension_block():
-    """is_time_dimension=True yields ``dimension: {is_time: True}``; False omits the key."""
+    """is_time_dimension tri-state: None omits key; True/False emit ``dimension: {is_time: ...}``."""
     spec = OsiExportTransformer().transform(_minimal_snapshot())
     fields = spec["semantic_model"][0]["datasets"][0]["fields"]
     order_id, order_date = fields[0], fields[1]
 
+    # None on the snapshot → no dimension key in output
     assert "dimension" not in order_id
+    # True on the snapshot → explicit emission
     assert order_date["dimension"] == {"is_time": True}
+
+
+def test_time_dimension_false_is_emitted_explicitly():
+    """When the OSI input declared dimension.is_time=False, the export emits it explicitly."""
+    snap = _minimal_snapshot()
+    # Mutate the order_date field to is_time_dimension=False
+    snap["datasets"][0]["fields"][1]["is_time_dimension"] = False
+    spec = OsiExportTransformer().transform(snap)
+    order_date = spec["semantic_model"][0]["datasets"][0]["fields"][1]
+    assert order_date["dimension"] == {"is_time": False}
 
 
 def test_field_label_passthrough():
