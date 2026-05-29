@@ -131,6 +131,29 @@ class Connector:
 
 ### Connectors
 
+#### **OSI Connector**
+
+Bidirectional connector for the [Open Semantic Interchange (OSI)](https://github.com/open-semantic-interchange/OSI) spec — a YAML-based interchange format for semantic models. Unlike the other connectors (which only ingest), OSI supports both directions: load an OSI YAML spec into Neo4j, and emit an `OsiSemanticModel` subgraph back out as an OSI YAML file. See the [OSI README](./neocarta/connectors/osi/README.md) for the full data model diagram and behavioral notes.
+
+**What it ingests** (from an OSI YAML at a local path or HTTP(S) URL):
+* `OsiSemanticModel` (a `Domain` subtype) — the top-level container
+* `OsiTable` / `OsiColumn` — datasets and their fields (with primary keys, unique keys, labels, time-dimension flags)
+* `Query` — datasets whose `source` is a SQL query rather than a 3-part identifier
+* `Metric` with dialect-specific `Expression` definitions
+* `Join` with ordered `from_columns` / `to_columns` for composite-key relationships
+* `OsiAiContext` / `OsiCustomExtensions` aspects, including synonyms-derived `BusinessTerm` upserts (MERGE on `name`, so they collide cleanly with catalog-derived BTs from Dataplex etc.)
+
+**What it exports** (from an `:OsiSemanticModel` subgraph, filtered by name):
+* A spec-compliant OSI YAML file with preserved column ordering, native `ai_context` structure, and literal-block JSON for custom extensions.
+
+This connector only requires Neo4j credentials in `.env`:
+* NEO4J_USERNAME=neo4j-username
+* NEO4J_PASSWORD=neo4j-password
+* NEO4J_URI=neo4j-uri
+* NEO4J_DATABASE=neo4j-database
+
+Sample dataset: [`datasets/osi/acme_semantic_model.yaml`](./datasets/osi/acme_semantic_model.yaml) (the full 33-table ACME warehouse modeled as OSI). Runnable example: [`examples/osi_connector.py`](./examples/osi_connector.py).
+
 #### **BigQuery Schema Connector**
 
 Connector for reading BigQuery Information Schema tables and ingesting **schema metadata** into Neo4j. Primary and foreign keys must be defined in the Information Schema tables in order for column level relationships to be created in the Neo4j graph.
