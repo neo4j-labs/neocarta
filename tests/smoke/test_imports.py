@@ -101,3 +101,65 @@ def test_ingest_imports():
     from neocarta.ingest.rdbms import Neo4jRDBMSLoader
 
     assert Neo4jRDBMSLoader
+
+
+def test_osi_connector_imports():
+    from neocarta.connectors.osi import OsiConnector
+    from neocarta.connectors.osi.export import OsiExportTransformer, OsiGraphExtractor
+    from neocarta.connectors.osi.ingest import OsiIngestTransformer, OsiSpecExtractor
+    from neocarta.connectors.osi.load import OsiNeo4jLoader
+
+    assert OsiConnector
+    assert OsiSpecExtractor
+    assert OsiIngestTransformer
+    assert OsiGraphExtractor
+    assert OsiExportTransformer
+    assert OsiNeo4jLoader
+
+
+def test_osi_data_model_imports():
+    from neocarta.data_model.rdbms import (
+        Aspect,
+        Domain,
+        DomainHasTable,
+        Expression,
+        HasAspect,
+        HasExpression,
+        HasMetric,
+        HasQuery,
+        HasSourceTable,
+        HasTargetTable,
+        Join,
+        Metric,
+        OsiAiContext,
+        OsiColumn,
+        OsiCustomExtensions,
+        OsiSemanticModel,
+        OsiTable,
+        QueryHasColumn,
+        UsedInJoin,
+    )
+
+    assert all(
+        [
+            Aspect,
+            Domain,
+            DomainHasTable,
+            Expression,
+            HasAspect,
+            HasExpression,
+            HasMetric,
+            HasQuery,
+            HasSourceTable,
+            HasTargetTable,
+            Join,
+            Metric,
+            OsiAiContext,
+            OsiColumn,
+            OsiCustomExtensions,
+            OsiSemanticModel,
+            OsiTable,
+            QueryHasColumn,
+            UsedInJoin,
+        ]
+    )

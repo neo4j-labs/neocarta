@@ -535,3 +535,369 @@ def test_tpcds_sample_transforms_without_errors(tpcds_spec):
     assert len(t.join_nodes) > 0
     assert len(t.has_source_table_rels) == len(t.join_nodes)
     assert len(t.has_target_table_rels) == len(t.join_nodes)
+
+
+# ---------------------------------------------------------------------- #
+# Multiple semantic models / edge specs
+# ---------------------------------------------------------------------- #
+
+
+def test_multiple_semantic_models_each_get_their_own_domain_node():
+    """Each top-level semantic_model entry yields its own OsiSemanticModel + scoped state."""
+    spec = {
+        "version": "0.2.0",
+        "semantic_model": [
+            {"name": "model_a", "datasets": [{"name": "ta", "source": "db.s.ta", "fields": []}]},
+            {"name": "model_b", "datasets": [{"name": "tb", "source": "db.s.tb", "fields": []}]},
+        ],
+    }
+    t = _run(spec)
+
+    sm_names = {sm.name for sm in t.osi_semantic_model_nodes}
+    assert sm_names == {"model_a", "model_b"}
+
+    # Each SM has its own DomainHasTable edge — total 2.
+    assert len(t.domain_has_table_rels) == 2
+    # Shared db.schema dedupes — only 1 Database / 1 Schema.
+    assert len(t.database_nodes) == 1
+    assert len(t.schema_nodes) == 1
+
+
+def test_cross_semantic_model_synonyms_share_business_term():
+    """A synonym in two different SMs produces one BusinessTerm node with two TAGGED_WITH edges."""
+    spec = {
+        "version": "0.2.0",
+        "semantic_model": [
+            {
+                "name": "m_a",
+                "datasets": [
+                    {
+                        "name": "ta",
+                        "source": "db.s.ta",
+                        "ai_context": {"synonyms": ["shared"]},
+                        "fields": [],
+                    }
+                ],
+            },
+            {
+                "name": "m_b",
+                "datasets": [
+                    {
+                        "name": "tb",
+                        "source": "db.s.tb",
+                        "ai_context": {"synonyms": ["shared"]},
+                        "fields": [],
+                    }
+                ],
+            },
+        ],
+    }
+    t = _run(spec)
+
+    assert len(t.business_term_nodes) == 1
+    assert t.business_term_nodes[0].name == "shared"
+    assert len(t.tagged_with_rels) == 2
+
+
+def test_empty_spec_produces_no_nodes_or_relationships():
+    """A spec with no semantic_model entries is a no-op (no nodes / no rels)."""
+    t = _run({"version": "0.2.0", "semantic_model": []})
+
+    assert t.osi_semantic_model_nodes == []
+    assert t.table_nodes == []
+    assert t.column_nodes == []
+    assert t.has_aspect_rels == []
+    assert t.tagged_with_rels == []
+
+
+def test_semantic_model_with_no_datasets_or_metrics_just_creates_sm_node():
+    """An SM with only a name still produces an OsiSemanticModel node and nothing else."""
+    spec = {"semantic_model": [{"name": "lonely"}]}
+    t = _run(spec)
+
+    assert len(t.osi_semantic_model_nodes) == 1
+    assert t.table_nodes == []
+    assert t.column_nodes == []
+    assert t.metric_nodes == []
+    assert t.join_nodes == []
+    assert t.domain_has_table_rels == []
+
+
+def test_dataset_with_no_fields_creates_table_but_no_columns():
+    """A dataset with empty fields list still creates the OsiTable node and DomainHasTable edge."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [{"name": "empty_t", "source": "db.s.empty_t", "fields": []}],
+            }
+        ]
+    }
+    t = _run(spec)
+
+    assert len(t.table_nodes) == 1
+    assert t.column_nodes == []
+    assert t.has_column_rels == []
+    assert len(t.domain_has_table_rels) == 1
+
+
+# ---------------------------------------------------------------------- #
+# Multi-dialect expressions
+# ---------------------------------------------------------------------- #
+
+
+def test_multiple_dialects_on_same_field_produce_separate_expression_nodes():
+    """Different (dialect, expression) pairs on the same field don't dedupe."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [
+                    {
+                        "name": "t",
+                        "source": "db.s.t",
+                        "fields": [
+                            {
+                                "name": "c",
+                                "expression": {
+                                    "dialects": [
+                                        {"dialect": "ANSI_SQL", "expression": "id"},
+                                        {"dialect": "SNOWFLAKE", "expression": "ID::STRING"},
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+    assert len(t.expression_nodes) == 2
+    dialects = {e.dialect for e in t.expression_nodes}
+    assert dialects == {"ANSI_SQL", "SNOWFLAKE"}
+
+
+# ---------------------------------------------------------------------- #
+# HasAspect polymorphic sources (Metric, Join)
+# ---------------------------------------------------------------------- #
+
+
+def test_metric_ai_context_creates_aspect_with_metric_source_label():
+    """A metric's ai_context attaches an Aspect via (:Metric)-[:HAS_ASPECT]->(:Aspect)."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "metrics": [
+                    {
+                        "name": "rev",
+                        "expression": {"dialects": []},
+                        "ai_context": {"instructions": "revenue metric"},
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+    metric_aspects = [r for r in t.has_aspect_rels if r.source_label == "Metric"]
+    assert len(metric_aspects) == 1
+    assert metric_aspects[0].source_id == t.metric_nodes[0].id
+
+
+def test_join_custom_extension_creates_aspect_with_join_source_label():
+    """A relationship's custom_extensions attach Aspects via (:Join)-[:HAS_ASPECT]->(:Aspect)."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [
+                    {"name": "a", "source": "db.s.a", "fields": [{"name": "x"}]},
+                    {"name": "b", "source": "db.s.b", "fields": [{"name": "x"}]},
+                ],
+                "relationships": [
+                    {
+                        "name": "j",
+                        "from": "a",
+                        "to": "b",
+                        "from_columns": ["x"],
+                        "to_columns": ["x"],
+                        "custom_extensions": [
+                            {"vendor_name": "SNOWFLAKE", "data": "{}"}
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+    join_aspects = [r for r in t.has_aspect_rels if r.source_label == "Join"]
+    assert len(join_aspects) == 1
+    assert join_aspects[0].source_id == t.join_nodes[0].id
+
+
+# ---------------------------------------------------------------------- #
+# Custom extensions data shape
+# ---------------------------------------------------------------------- #
+
+
+def test_custom_extension_data_dict_is_json_encoded():
+    """A dict-valued ``data`` field on a custom extension is JSON-encoded for storage."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [
+                    {
+                        "name": "t",
+                        "source": "db.s.t",
+                        "custom_extensions": [
+                            {"vendor_name": "DBT", "data": {"materialization": "table"}}
+                        ],
+                        "fields": [],
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+    assert len(t.custom_extension_nodes) == 1
+    stored = json.loads(t.custom_extension_nodes[0].data)
+    assert stored == {"materialization": "table"}
+
+
+def test_custom_extension_with_missing_vendor_name_falls_back():
+    """An extension without vendor_name still loads with vendor_name=''."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [
+                    {
+                        "name": "t",
+                        "source": "db.s.t",
+                        "custom_extensions": [{"data": "{}"}],
+                        "fields": [],
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+    assert len(t.custom_extension_nodes) == 1
+    assert t.custom_extension_nodes[0].vendor_name == ""
+
+
+# ---------------------------------------------------------------------- #
+# _parse_source direct branches
+# ---------------------------------------------------------------------- #
+
+
+def test_parse_source_three_part():
+    p = OsiIngestTransformer()._parse_source("db.schema.table")
+    assert p == {
+        "db_name": "db",
+        "schema_name": "schema",
+        "table_name": "table",
+        "query": None,
+        "is_query": False,
+    }
+
+
+def test_parse_source_two_part():
+    p = OsiIngestTransformer()._parse_source("schema.table")
+    assert p["db_name"] is None
+    assert p["schema_name"] == "schema"
+    assert p["table_name"] == "table"
+    assert p["is_query"] is False
+
+
+def test_parse_source_one_part():
+    p = OsiIngestTransformer()._parse_source("table")
+    assert p["db_name"] is None
+    assert p["schema_name"] is None
+    assert p["table_name"] == "table"
+    assert p["is_query"] is False
+
+
+def test_parse_source_query_text_is_flagged():
+    """Anything that isn't 1-3 SQL identifiers is treated as a query."""
+    p = OsiIngestTransformer()._parse_source("SELECT * FROM t WHERE x > 5")
+    assert p["is_query"] is True
+    assert p["query"] == "SELECT * FROM t WHERE x > 5"
+    assert p["table_name"] is None
+
+
+def test_parse_source_empty_string_is_query():
+    """Empty source string also routes to the query branch with query=''."""
+    p = OsiIngestTransformer()._parse_source("")
+    assert p["is_query"] is True
+    assert p["query"] == ""
+
+
+def test_parse_source_four_parts_treated_as_query():
+    """A 4-part dotted source is too many segments for OSI — treated as query."""
+    p = OsiIngestTransformer()._parse_source("a.b.c.d")
+    assert p["is_query"] is True
+
+
+# ---------------------------------------------------------------------- #
+# References edges with no criteria
+# ---------------------------------------------------------------------- #
+
+
+def test_references_edges_have_no_criteria_field_by_default(minimal_spec):
+    """OSI relationship references don't carry a criteria string; default is None."""
+    t = _run(minimal_spec)
+    assert len(t.references_rels) == 1
+    assert t.references_rels[0].criteria is None
+
+
+def test_join_node_stores_ordered_from_to_columns_for_composite_keys():
+    """Join nodes carry the original from_columns / to_columns order for round-trip fidelity."""
+    spec = {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [
+                    {
+                        "name": "orders",
+                        "source": "db.s.orders",
+                        "fields": [{"name": "customer_id"}, {"name": "order_date"}],
+                    },
+                    {
+                        "name": "customers",
+                        "source": "db.s.customers",
+                        "fields": [{"name": "customer_id"}, {"name": "as_of_date"}],
+                    },
+                ],
+                "relationships": [
+                    {
+                        "name": "composite_fk",
+                        "from": "orders",
+                        "to": "customers",
+                        # Order matters: customer_id <-> customer_id, order_date <-> as_of_date
+                        "from_columns": ["customer_id", "order_date"],
+                        "to_columns": ["customer_id", "as_of_date"],
+                    }
+                ],
+            }
+        ]
+    }
+    t = _run(spec)
+
+    assert len(t.join_nodes) == 1
+    join = t.join_nodes[0]
+    assert join.from_columns == ["customer_id", "order_date"]
+    assert join.to_columns == ["customer_id", "as_of_date"]
+
+    # And the positional References pairing matches the declared order
+    pairs = [(r.source_column_id, r.target_column_id) for r in t.references_rels]
+    assert any(
+        "orders.customer_id" in src and "customers.customer_id" in tgt
+        for src, tgt in pairs
+    )
+    assert any(
+        "orders.order_date" in src and "customers.as_of_date" in tgt
+        for src, tgt in pairs
+    )

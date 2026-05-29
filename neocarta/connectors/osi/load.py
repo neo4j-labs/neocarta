@@ -147,9 +147,15 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         self,
         nodes: list[Join],
         overwrite_existing: bool = False,
-        properties_list: list[str] = ["name"],
+        properties_list: list[str] = ["name", "from_columns", "to_columns"],
     ) -> dict:
-        """Load Join nodes."""
+        """
+        Load Join nodes.
+
+        ``from_columns`` and ``to_columns`` are stored as native Neo4j string
+        arrays so their order is preserved across round-trip — the OSI relationship
+        spec requires positional pairing (``from_columns[i]`` ↔ ``to_columns[i]``).
+        """
         _validate_properties_list(Join, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.JOIN])
         query = _build_node_ingest_query(

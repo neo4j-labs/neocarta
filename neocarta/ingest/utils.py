@@ -161,23 +161,26 @@ MERGE (n:{node_label} {{id: row.id}})
 """
 
     secondary_labels = secondary_labels or []
-    # Only add ON CREATE and SET if there are secondary labels or properties to set
     if len(properties_list) == 0 and not secondary_labels:
         return query.rstrip()
 
-    # Determine indentation based on overwrite setting
-    if not overwrite_existing:
-        query += "ON CREATE\n    SET "
-        indent = " " * 8  # 8 spaces for continuation lines
-    else:
-        query += "SET "
-        indent = " " * 4  # 4 spaces for continuation lines
+    label_items = [f"n:{label}" for label in secondary_labels]
+    prop_items = [f"n.{prop} = row.{prop}" for prop in properties_list]
 
-    set_items = [f"n:{label}" for label in secondary_labels] + [
-        f"n.{prop} = row.{prop}" for prop in properties_list
-    ]
-    query += (",\n" + indent).join(set_items)
+    if overwrite_existing:
+        # Apply labels AND properties on every MERGE.
+        all_items = label_items + prop_items
+        query += "SET " + (",\n    ").join(all_items)
+        return query
 
+    # overwrite_existing=False: properties only fire on first create, but secondary
+    # labels must apply regardless so the OSI subtype label sticks even when the
+    # node was created by a prior call or another connector. This requires both
+    # ON CREATE SET and ON MATCH SET clauses.
+    create_items = label_items + prop_items
+    query += "ON CREATE\n    SET " + (",\n        ").join(create_items)
+    if label_items:
+        query += "\nON MATCH\n    SET " + (",\n        ").join(label_items)
     return query
 
 

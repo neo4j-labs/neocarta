@@ -283,10 +283,26 @@ class Expression(BaseModel):
 
 
 class Join(BaseModel):
-    """A Join node representing a join definition between two tables in an OSI model."""
+    """
+    A Join node representing a join definition between two tables in an OSI model.
+
+    ``from_columns`` and ``to_columns`` carry the ordered column-name lists from
+    the OSI relationship so that composite-key joins round-trip with the original
+    pairing intact (``from_columns[i]`` ↔ ``to_columns[i]``). The corresponding
+    USED_IN_JOIN edges from each Column to the Join are kept for graph traversal
+    but are not used to recover ordering on export.
+    """
 
     id: str = Field(..., description="The unique identifier for the join")
     name: str = Field(..., description="The name of the join")
+    from_columns: list[str] | None = Field(
+        default=None,
+        description="Ordered list of column names on the 'from' (FK) side of the join",
+    )
+    to_columns: list[str] | None = Field(
+        default=None,
+        description="Ordered list of column names on the 'to' (PK/UK) side of the join",
+    )
 
 
 class HasAspect(BaseModel):

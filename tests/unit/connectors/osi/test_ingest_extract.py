@@ -84,3 +84,26 @@ def test_extract_missing_file_raises(tmp_path: Path):
     """Missing local file raises FileNotFoundError from the underlying read."""
     with pytest.raises(FileNotFoundError):
         OsiSpecExtractor(tmp_path / "does_not_exist.yaml").extract()
+
+
+def test_extract_empty_yaml_raises(tmp_path: Path):
+    """An empty YAML file parses to None, which is not a mapping — ValueError."""
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="did not parse to a mapping"):
+        OsiSpecExtractor(empty).extract()
+
+
+def test_extract_url_http_error_propagates():
+    """4xx/5xx responses surface via response.raise_for_status()."""
+    import httpx
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError("404", request=MagicMock(), response=MagicMock())
+    )
+
+    with patch("neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response):
+        with pytest.raises(httpx.HTTPStatusError):
+            OsiSpecExtractor("https://example.com/missing.yaml").extract()

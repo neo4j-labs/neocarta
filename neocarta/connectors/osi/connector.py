@@ -112,17 +112,18 @@ class OsiConnector:
         """
         loader = self.loader
 
-        # Nodes — structural first, OSI-specific last so secondary labels apply
-        # on top of any existing structural nodes from prior ingests.
+        # Each OSI-specific node loader MERGEs on the primary label (e.g. :Table)
+        # and adds the OSI subtype label (e.g. :OsiTable) in the same write, so we
+        # don't also call the base loader's load_table_nodes — that would create
+        # the node first and the second call's ON CREATE props (source,
+        # primary_key, unique_keys) would never fire.
         if transformer.database_nodes:
             loader.load_database_nodes(transformer.database_nodes)
         if transformer.schema_nodes:
             loader.load_schema_nodes(transformer.schema_nodes)
         if transformer.table_nodes:
-            loader.load_table_nodes(transformer.table_nodes)
             loader.load_osi_table_nodes(transformer.table_nodes)
         if transformer.column_nodes:
-            loader.load_column_nodes(transformer.column_nodes)
             loader.load_osi_column_nodes(transformer.column_nodes)
         if transformer.query_nodes:
             loader.load_query_nodes(

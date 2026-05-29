@@ -247,3 +247,322 @@ def test_extractor_and_export_transformer_produce_yaml_with_field_names(
             assert orig_field_names <= exp_field_names, (
                 f"Missing fields for {orig_ds['name']}: {orig_field_names - exp_field_names}"
             )
+
+
+# ---------------------------------------------------------------------- #
+# Cypher edge verification (References, HasAspect, TaggedWith, HasExpression)
+# ---------------------------------------------------------------------- #
+
+
+def test_ingest_creates_references_edges_between_join_columns(neo4j_driver, tpcds_yaml_path: Path):
+    """OSI relationships emit positional (:Column)-[:REFERENCES]->(:Column) edges in the graph."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        count = session.run(
+            "MATCH (:Column)-[r:REFERENCES]->(:Column) RETURN count(r) AS c"
+        ).single()["c"]
+    assert count > 0
+
+
+def test_ingest_creates_has_aspect_edges_for_multiple_source_labels(
+    neo4j_driver, tpcds_yaml_path: Path
+):
+    """HAS_ASPECT polymorphic source matching resolves Schema/Table/Column/Metric correctly."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        # The TPCDS sample has ai_context on the SM (Domain), on datasets (Tables), and on
+        # fields (Columns). Verify HAS_ASPECT edges exist from each source label.
+        for label in ("Domain", "Table", "Column"):
+            row = session.run(
+                f"MATCH (s:{label})-[:HAS_ASPECT]->(:Aspect) RETURN count(*) AS c"
+            ).single()
+            assert row["c"] > 0, f"No HAS_ASPECT edges from {label}"
+
+
+def test_ingest_creates_tagged_with_edges_to_business_terms(
+    neo4j_driver, tpcds_yaml_path: Path
+):
+    """OSI synonyms produce (:Column|:Table)-[:TAGGED_WITH]->(:BusinessTerm) edges."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        column_tags = session.run(
+            "MATCH (:Column)-[r:TAGGED_WITH]->(:BusinessTerm) RETURN count(r) AS c"
+        ).single()["c"]
+        table_tags = session.run(
+            "MATCH (:Table)-[r:TAGGED_WITH]->(:BusinessTerm) RETURN count(r) AS c"
+        ).single()["c"]
+    assert column_tags > 0, "No Column→BusinessTerm tags created from OSI synonyms"
+    assert table_tags > 0, "No Table→BusinessTerm tags created from OSI synonyms"
+
+
+def test_ingest_creates_has_expression_edges_for_columns_and_metrics(
+    neo4j_driver, tpcds_yaml_path: Path
+):
+    """HAS_EXPRESSION attaches Expression nodes to both Columns and Metrics."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        column_exprs = session.run(
+            "MATCH (:Column)-[r:HAS_EXPRESSION]->(:Expression) RETURN count(r) AS c"
+        ).single()["c"]
+        metric_exprs = session.run(
+            "MATCH (:Metric)-[r:HAS_EXPRESSION]->(:Expression) RETURN count(r) AS c"
+        ).single()["c"]
+    assert column_exprs > 0
+    assert metric_exprs > 0
+
+
+# ---------------------------------------------------------------------- #
+# Aspect content dedup in graph
+# ---------------------------------------------------------------------- #
+
+
+def test_identical_ai_context_payloads_collapse_to_one_aspect_node(neo4j_driver, tmp_path: Path):
+    """Two datasets sharing the same ai_context produce one Aspect node referenced twice."""
+    shared = {"synonyms": ["alpha"]}
+    spec_path = tmp_path / "shared_ctx.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": "0.2.0",
+                "semantic_model": [
+                    {
+                        "name": "shared_ctx_model",
+                        "datasets": [
+                            {
+                                "name": "ds1",
+                                "source": "db.s.ds1",
+                                "ai_context": shared,
+                                "fields": [],
+                            },
+                            {
+                                "name": "ds2",
+                                "source": "db.s.ds2",
+                                "ai_context": shared,
+                                "fields": [],
+                            },
+                        ],
+                    }
+                ],
+            },
+            sort_keys=False,
+        )
+    )
+
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(spec_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        ai_nodes = session.run(
+            "MATCH (a:OsiAiContext) RETURN count(a) AS c"
+        ).single()["c"]
+        attached = session.run(
+            "MATCH (:Table)-[r:HAS_ASPECT]->(:OsiAiContext) RETURN count(r) AS c"
+        ).single()["c"]
+
+    assert ai_nodes == 1
+    assert attached == 2
+
+
+# ---------------------------------------------------------------------- #
+# Query source end-to-end
+# ---------------------------------------------------------------------- #
+
+
+def test_query_source_ingest_creates_query_node_with_columns(neo4j_driver, tmp_path: Path):
+    """A dataset whose source is a SQL query lands as a :Query node with attached columns."""
+    spec_path = tmp_path / "query_model.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": "0.2.0",
+                "semantic_model": [
+                    {
+                        "name": "query_model",
+                        "datasets": [
+                            {
+                                "name": "active_customers",
+                                "source": "SELECT id, name FROM customers WHERE active = true",
+                                "fields": [
+                                    {"name": "id"},
+                                    {"name": "name"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            },
+            sort_keys=False,
+        )
+    )
+
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(spec_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        # Query node exists with the original SQL and dataset name
+        q = session.run(
+            "MATCH (q:Query) RETURN q.name AS name, q.content AS content"
+        ).single()
+        assert q["name"] == "active_customers"
+        assert q["content"].startswith("SELECT")
+
+        # Domain → Query rel
+        d_q = session.run(
+            "MATCH (:Domain)-[r:HAS_QUERY]->(:Query) RETURN count(r) AS c"
+        ).single()["c"]
+        assert d_q == 1
+
+        # Query → Column rel for each field
+        q_c = session.run(
+            "MATCH (:Query)-[r:HAS_COLUMN]->(:Column) RETURN count(r) AS c"
+        ).single()["c"]
+        assert q_c == 2
+
+        # No OsiTable was created for the query-backed dataset
+        ot = session.run("MATCH (n:OsiTable) RETURN count(n) AS c").single()["c"]
+        assert ot == 0
+
+
+# ---------------------------------------------------------------------- #
+# Multi-SM and idempotent export
+# ---------------------------------------------------------------------- #
+
+
+def test_two_semantic_models_coexist_and_export_isolates(neo4j_driver, tmp_path: Path):
+    """Ingesting two separate OSI specs into the same graph; export by name returns just one."""
+    def _spec_path(name: str, source: str, path: Path) -> Path:
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "version": "0.2.0",
+                    "semantic_model": [
+                        {
+                            "name": name,
+                            "datasets": [
+                                {"name": "t", "source": source, "fields": [{"name": "x"}]}
+                            ],
+                        }
+                    ],
+                },
+                sort_keys=False,
+            )
+        )
+        return path
+
+    p_a = _spec_path("model_a", "db.s.ta", tmp_path / "a.yaml")
+    p_b = _spec_path("model_b", "db.s.tb", tmp_path / "b.yaml")
+
+    connector = OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j")
+    connector.ingest(p_a)
+    connector.ingest(p_b)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        sm_count = session.run(
+            "MATCH (n:OsiSemanticModel) RETURN count(n) AS c"
+        ).single()["c"]
+    assert sm_count == 2
+
+    out = tmp_path / "model_a_out.yaml"
+    connector.export(semantic_model_name="model_a", output_path=out)
+    exported = yaml.safe_load(out.read_text(encoding="utf-8"))
+
+    assert len(exported["semantic_model"]) == 1
+    assert exported["semantic_model"][0]["name"] == "model_a"
+    # model_b's table is NOT in model_a's export
+    dataset_names = {d["name"] for d in exported["semantic_model"][0]["datasets"]}
+    assert dataset_names == {"t"}
+
+
+def test_export_is_idempotent(neo4j_driver, tpcds_yaml_path: Path, tmp_path: Path):
+    """Exporting the same semantic model twice produces byte-identical YAML."""
+    connector = OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j")
+    connector.ingest(tpcds_yaml_path)
+
+    out1 = tmp_path / "exp1.yaml"
+    out2 = tmp_path / "exp2.yaml"
+    connector.export("tpcds_retail_model", out1)
+    connector.export("tpcds_retail_model", out2)
+
+    assert out1.read_text(encoding="utf-8") == out2.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------- #
+# Constraints applied at ingest time
+# ---------------------------------------------------------------------- #
+
+
+def test_join_composite_key_column_order_round_trips(neo4j_driver, tmp_path: Path):
+    """Composite-key from_columns / to_columns survive ingest + export with original order intact."""
+    spec_path = tmp_path / "composite_join.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": "0.2.0",
+                "semantic_model": [
+                    {
+                        "name": "composite_model",
+                        "datasets": [
+                            {
+                                "name": "orders",
+                                "source": "db.public.orders",
+                                "fields": [
+                                    {"name": "customer_id"},
+                                    {"name": "order_date"},
+                                    {"name": "region_code"},
+                                ],
+                            },
+                            {
+                                "name": "customer_history",
+                                "source": "db.public.customer_history",
+                                "fields": [
+                                    {"name": "customer_id"},
+                                    {"name": "as_of_date"},
+                                    {"name": "region_code"},
+                                ],
+                            },
+                        ],
+                        "relationships": [
+                            {
+                                "name": "orders_to_history",
+                                "from": "orders",
+                                "to": "customer_history",
+                                # Deliberately not alphabetical — order matters.
+                                "from_columns": ["region_code", "customer_id", "order_date"],
+                                "to_columns": ["region_code", "customer_id", "as_of_date"],
+                            }
+                        ],
+                    }
+                ],
+            },
+            sort_keys=False,
+        )
+    )
+
+    connector = OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j")
+    connector.ingest(spec_path)
+
+    out = tmp_path / "composite_out.yaml"
+    connector.export(semantic_model_name="composite_model", output_path=out)
+
+    exported = yaml.safe_load(out.read_text(encoding="utf-8"))
+    rel = exported["semantic_model"][0]["relationships"][0]
+    assert rel["from_columns"] == ["region_code", "customer_id", "order_date"]
+    assert rel["to_columns"] == ["region_code", "customer_id", "as_of_date"]
+
+
+def test_ingest_writes_constraints_for_new_osi_node_labels(neo4j_driver, tpcds_yaml_path: Path):
+    """Constraint creation runs during ingest for the new OSI primary labels."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        result = session.run("SHOW CONSTRAINTS YIELD labelsOrTypes RETURN labelsOrTypes")
+        constraint_labels: set[str] = set()
+        for record in result:
+            for lbl in record["labelsOrTypes"] or []:
+                constraint_labels.add(lbl)
+
+    expected = {"Domain", "Metric", "Join", "Expression", "Aspect"}
+    missing = expected - constraint_labels
+    assert not missing, f"Missing constraints for OSI labels: {missing}"

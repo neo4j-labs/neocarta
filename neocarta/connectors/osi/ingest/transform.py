@@ -406,7 +406,18 @@ class OsiIngestTransformer:
     def _transform_relationship(self, sm_id: str, relationship: dict[str, Any]) -> None:
         rel_name = relationship["name"]
         join_id_str = generate_join_id(self._current_sm_name, rel_name)
-        self.join_nodes.append(Join(id=join_id_str, name=rel_name))
+
+        from_columns = list(relationship.get("from_columns") or [])
+        to_columns = list(relationship.get("to_columns") or [])
+
+        self.join_nodes.append(
+            Join(
+                id=join_id_str,
+                name=rel_name,
+                from_columns=from_columns or None,
+                to_columns=to_columns or None,
+            )
+        )
 
         from_owner_id = self._dataset_name_to_owner_id.get(relationship.get("from"))
         to_owner_id = self._dataset_name_to_owner_id.get(relationship.get("to"))
@@ -428,9 +439,6 @@ class OsiIngestTransformer:
             self.has_target_table_rels.append(
                 HasTargetTable(join_id=join_id_str, table_id=to_owner_id)
             )
-
-        from_columns = relationship.get("from_columns") or []
-        to_columns = relationship.get("to_columns") or []
 
         if from_owner_id:
             for col_name in from_columns:

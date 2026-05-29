@@ -225,6 +225,57 @@ def test_to_yaml_before_transform_raises(tmp_path: Path):
         OsiExportTransformer().to_yaml(tmp_path / "x.yaml")
 
 
+def test_empty_snapshot_produces_minimal_yaml():
+    """A snapshot with no datasets / relationships / metrics produces a spec with empty datasets list."""
+    snap = {
+        "name": "lonely_model",
+        "description": None,
+        "osi_version": "0.2.0",
+        "ai_context": None,
+        "custom_extensions": [],
+        "datasets": [],
+        "relationships": [],
+        "metrics": [],
+    }
+    spec = OsiExportTransformer().transform(snap)
+
+    model = spec["semantic_model"][0]
+    assert model["name"] == "lonely_model"
+    assert model["datasets"] == []
+    assert "relationships" not in model
+    assert "metrics" not in model
+    assert "description" not in model
+    assert "ai_context" not in model
+
+
+def test_metric_only_semantic_model_emits_metrics_block_without_datasets():
+    """An SM with only metrics still emits the metrics section."""
+    snap = {
+        "name": "metrics_only",
+        "description": None,
+        "osi_version": None,
+        "ai_context": None,
+        "custom_extensions": [],
+        "datasets": [],
+        "relationships": [],
+        "metrics": [
+            {
+                "name": "count",
+                "description": None,
+                "expressions": [{"dialect": "ANSI_SQL", "expression": "COUNT(*)"}],
+                "ai_context": None,
+                "custom_extensions": [],
+            }
+        ],
+    }
+    spec = OsiExportTransformer().transform(snap)
+    model = spec["semantic_model"][0]
+
+    assert model["datasets"] == []
+    assert len(model["metrics"]) == 1
+    assert model["metrics"][0]["name"] == "count"
+
+
 def test_round_trip_ingest_then_export(tpcds_spec):
     """Ingest the TPC-DS sample, build a snapshot-like dict, export, and verify key shape.
 

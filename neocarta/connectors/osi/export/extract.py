@@ -312,21 +312,21 @@ class OsiGraphExtractor:
         Read OSI relationships (Join nodes) whose source and target are both owned
         by this semantic model. Returns one entry per Join with resolved dataset
         names and the ordered column pairs participating in the join.
+
+        ``from_columns`` and ``to_columns`` come from the Join node's own properties
+        (populated at ingest time) so positional pairing for composite-key joins is
+        preserved. We don't try to recover order from USED_IN_JOIN edges — Cypher's
+        ``collect`` doesn't guarantee order, and USED_IN_JOIN has no position field.
         """
         cypher = """
         MATCH (sm:OsiSemanticModel {id: $sm_id})-[:HAS_TABLE|HAS_QUERY]->(src)
         MATCH (sm)-[:HAS_TABLE|HAS_QUERY]->(tgt)
         MATCH (j:Join)-[:HAS_SOURCE_TABLE]->(src)
         MATCH (j)-[:HAS_TARGET_TABLE]->(tgt)
-        OPTIONAL MATCH (src)-[:HAS_COLUMN]->(fc:Column)-[:USED_IN_JOIN]->(j)
-        OPTIONAL MATCH (tgt)-[:HAS_COLUMN]->(tc:Column)-[:USED_IN_JOIN]->(j)
-        WITH j, src, tgt,
-             collect(DISTINCT fc.name) AS from_columns,
-             collect(DISTINCT tc.name) AS to_columns
         RETURN j.id AS id, j.name AS name, src.name AS from_dataset,
                tgt.name AS to_dataset,
-               [n IN from_columns WHERE n IS NOT NULL] AS from_columns,
-               [n IN to_columns WHERE n IS NOT NULL] AS to_columns
+               j.from_columns AS from_columns,
+               j.to_columns AS to_columns
         """
         result = session.run(cypher, sm_id=sm_id)
         relationships: list[dict[str, Any]] = []
