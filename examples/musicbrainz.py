@@ -12,6 +12,7 @@ allowing the semantic MCP retrieval tools to work without any server changes.
 
 import argparse
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
@@ -21,7 +22,8 @@ from neocarta import NodeLabel, RelationshipType
 from neocarta.connectors.csv import CSVConnector
 from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
 
-MUSICBRAINZ_CSV_DIRECTORY = "datasets/musicbrainz"
+# Resolved from this file's location so the script runs from any directory.
+MUSICBRAINZ_CSV_DIRECTORY = Path(__file__).resolve().parent.parent / "datasets" / "musicbrainz"
 
 
 def main(with_embeddings: bool = True) -> None:
@@ -34,6 +36,11 @@ def main(with_embeddings: bool = True) -> None:
         loaded Table and Column nodes after the schema has been ingested.
     """
     load_dotenv()
+
+    missing = [v for v in ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD") if not os.getenv(v)]
+    if missing:
+        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+
     print("Starting MusicBrainz connector...")
     print("Creating Neo4j driver and OpenAI client...")
     neo4j_driver = GraphDatabase.driver(
@@ -47,7 +54,7 @@ def main(with_embeddings: bool = True) -> None:
 
     print("Extracting, transforming, and loading MusicBrainz schema into Neo4j...")
     connector = CSVConnector(
-        csv_directory=MUSICBRAINZ_CSV_DIRECTORY,
+        csv_directory=str(MUSICBRAINZ_CSV_DIRECTORY),
         neo4j_driver=neo4j_driver,
         database_name=neo4j_database,
     )
@@ -62,6 +69,8 @@ def main(with_embeddings: bool = True) -> None:
     )
 
     if with_embeddings:
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OPENAI_API_KEY is required to generate embeddings")
         print("Generating 1536-dim embeddings for Table and Column nodes...")
         embeddings_connector = OpenAIEmbeddingsConnector(
             neo4j_driver=neo4j_driver,

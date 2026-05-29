@@ -7,6 +7,7 @@ These run without Neo4j: they load datasets/musicbrainz/ through the same
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from neocarta.connectors.csv.extract import CSVExtractor
@@ -22,8 +23,8 @@ def extractor() -> CSVExtractor:
     return e
 
 
-def _is_true(series) -> "list[bool]":
-    """Normalize a CSV boolean-ish column to actual booleans."""
+def _is_true(series: pd.Series) -> pd.Series:
+    """Normalize a CSV boolean-ish column to a boolean Series."""
     return series.astype(str).str.lower() == "true"
 
 
