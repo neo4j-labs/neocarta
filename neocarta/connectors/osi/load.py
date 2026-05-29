@@ -27,7 +27,6 @@ from ...data_model.rdbms import (
     OsiCustomExtensions,
     OsiSemanticModel,
     OsiTable,
-    QueryHasColumn,
     TaggedWith,
     UsedInJoin,
 )
@@ -269,24 +268,6 @@ ON CREATE SET n.id = row.id{', ' + set_extras if set_extras else ''}
             NodeLabel.QUERY,
             "domain_id",
             "query_id",
-            overwrite_existing,
-            properties_list,
-        )
-        return self._run_write(query, [r.model_dump() for r in rels])
-
-    def load_query_has_column_relationships(
-        self,
-        rels: list[QueryHasColumn],
-        overwrite_existing: bool = False,
-        properties_list: list[str] = [],
-    ) -> dict:
-        """(:Query)-[:HAS_COLUMN]->(:Column) — shares the rel type with Table→Column."""
-        query = _build_relationship_ingest_query(
-            RelationshipType.HAS_COLUMN,
-            NodeLabel.QUERY,
-            NodeLabel.COLUMN,
-            "query_id",
-            "column_id",
             overwrite_existing,
             properties_list,
         )

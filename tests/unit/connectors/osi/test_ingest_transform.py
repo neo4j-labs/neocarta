@@ -151,13 +151,13 @@ def test_query_source_produces_query_node_not_osi_table(query_source_spec):
     assert t.domain_has_table_rels == []
 
 
-def test_query_source_fields_use_query_has_column(query_source_spec):
-    """For query datasets, columns attach via QueryHasColumn (rel type still :HAS_COLUMN)."""
+def test_query_source_fields_use_uses_column(query_source_spec):
+    """Query-backed datasets attach columns via (Query)-[:USES_COLUMN]->(Column)."""
     t = _run(query_source_spec)
     assert len(t.column_nodes) == 1
     assert t.has_column_rels == []
-    assert len(t.query_has_column_rels) == 1
-    assert t.query_has_column_rels[0].query_id == t.query_nodes[0].id
+    assert len(t.uses_column_rels) == 1
+    assert t.uses_column_rels[0].query_id == t.query_nodes[0].id
 
 
 # ---------------------------------------------------------------------- #

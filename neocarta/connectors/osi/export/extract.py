@@ -266,10 +266,17 @@ class OsiGraphExtractor:
         owner_ids: list[str],
         aspects_by_parent: dict[str, list[dict[str, Any]]],
     ) -> dict[str, list[dict[str, Any]]]:
-        """Read column rows for the given owner ids and group by owner."""
+        """
+        Read column rows for the given owner ids and group by owner.
+
+        Table-backed datasets attach columns via ``:HAS_COLUMN``; query-backed
+        datasets attach via ``:USES_COLUMN`` (matching the query_log connector's
+        existing semantics). The Cypher matches either rel type so both flavors
+        of OSI dataset return their fields uniformly.
+        """
         cypher = (
             "UNWIND $owner_ids AS owner_id "
-            "MATCH (owner {id: owner_id})-[:HAS_COLUMN]->(c:Column) "
+            "MATCH (owner {id: owner_id})-[:HAS_COLUMN|USES_COLUMN]->(c:Column) "
             "OPTIONAL MATCH (c)-[:HAS_EXPRESSION]->(e:Expression) "
             "WITH owner_id, c, "
             "collect(DISTINCT CASE WHEN e IS NOT NULL "

@@ -416,7 +416,7 @@ def test_query_source_ingest_creates_query_node_with_columns(neo4j_driver, tmp_p
 
         # Query → Column rel for each field
         q_c = session.run(
-            "MATCH (:Query)-[r:HAS_COLUMN]->(:Column) RETURN count(r) AS c"
+            "MATCH (:Query)-[r:USES_COLUMN]->(:Column) RETURN count(r) AS c"
         ).single()["c"]
         assert q_c == 2
 

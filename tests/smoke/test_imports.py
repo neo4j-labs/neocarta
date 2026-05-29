@@ -136,7 +136,6 @@ def test_osi_data_model_imports():
         OsiCustomExtensions,
         OsiSemanticModel,
         OsiTable,
-        QueryHasColumn,
         UsedInJoin,
     )
 
@@ -159,7 +158,6 @@ def test_osi_data_model_imports():
             OsiCustomExtensions,
             OsiSemanticModel,
             OsiTable,
-            QueryHasColumn,
             UsedInJoin,
         ]
     )

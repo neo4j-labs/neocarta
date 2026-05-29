@@ -26,11 +26,11 @@ from ....data_model.rdbms import (
     OsiSemanticModel,
     OsiTable,
     Query,
-    QueryHasColumn,
     References,
     Schema,
     TaggedWith,
     UsedInJoin,
+    UsesColumn,
 )
 from ...utils.generate_id import (
     create_query_id,
@@ -120,7 +120,8 @@ class OsiIngestTransformer:
         self.domain_has_table_rels: list[DomainHasTable] = []  # Domain → Table (:HAS_TABLE)
         self.has_query_rels: list[HasQuery] = []  # Domain → Query (:HAS_QUERY)
         self.has_column_rels: list[HasColumn] = []  # Table → Column
-        self.query_has_column_rels: list[QueryHasColumn] = []  # Query → Column (:HAS_COLUMN)
+        # Query → Column uses :USES_COLUMN (existing query_log rel type).
+        self.uses_column_rels: list[UsesColumn] = []
         self.references_rels: list[References] = []
         self.has_metric_rels: list[HasMetric] = []
         self.has_source_table_rels: list[HasSourceTable] = []
@@ -374,8 +375,8 @@ class OsiIngestTransformer:
             )
         )
         if owner_label == "Query":
-            self.query_has_column_rels.append(
-                QueryHasColumn(query_id=owner_id, column_id=column_id_str)
+            self.uses_column_rels.append(
+                UsesColumn(query_id=owner_id, column_id=column_id_str)
             )
         else:
             self.has_column_rels.append(

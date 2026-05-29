@@ -384,20 +384,6 @@ class HasQuery(BaseModel):
     query_id: str = Field(..., description="The unique identifier for the query")
 
 
-class QueryHasColumn(BaseModel):
-    """
-    A relationship between a Query and a Column it projects.
-    (Query)-[:HAS_COLUMN]->(Column).
-
-    Shares the ``:HAS_COLUMN`` Cypher relationship type with the existing
-    :class:`HasColumn` (Table → Column). When an OSI dataset's source is a
-    query, the dataset's fields become columns owned by the Query node.
-    """
-
-    query_id: str = Field(..., description="The unique identifier for the query")
-    column_id: str = Field(..., description="The unique identifier for the column")
-
-
 class HasSourceTable(BaseModel):
     """
     A relationship between a Join and its source Table.
