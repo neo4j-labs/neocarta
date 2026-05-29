@@ -195,10 +195,10 @@ class OsiIngestTransformer:
 
         # Semantic-model-level aspects.
         self._maybe_add_ai_context(
-            entity_id=sm.id, source_label="Domain", value=model.get("ai_context")
+            source_id=sm.id, source_label="Domain", value=model.get("ai_context")
         )
         self._add_custom_extensions(
-            entity_id=sm.id, source_label="Domain", extensions=model.get("custom_extensions")
+            source_id=sm.id, source_label="Domain", extensions=model.get("custom_extensions")
         )
 
     def _collect_foreign_key_column_ids(self, relationships: list[dict[str, Any]]) -> set[str]:
@@ -251,10 +251,10 @@ class OsiIngestTransformer:
         self._dataset_name_to_owner_label[name] = owner_label
 
         self._maybe_add_ai_context(
-            entity_id=owner_id, source_label=owner_label, value=dataset.get("ai_context")
+            source_id=owner_id, source_label=owner_label, value=dataset.get("ai_context")
         )
         self._add_custom_extensions(
-            entity_id=owner_id,
+            source_id=owner_id,
             source_label=owner_label,
             extensions=dataset.get("custom_extensions"),
         )
@@ -374,10 +374,10 @@ class OsiIngestTransformer:
             )
 
         self._maybe_add_ai_context(
-            entity_id=column_id_str, source_label="Column", value=field.get("ai_context")
+            source_id=column_id_str, source_label="Column", value=field.get("ai_context")
         )
         self._add_custom_extensions(
-            entity_id=column_id_str,
+            source_id=column_id_str,
             source_label="Column",
             extensions=field.get("custom_extensions"),
         )
@@ -452,7 +452,7 @@ class OsiIngestTransformer:
                 )
 
         self._add_custom_extensions(
-            entity_id=join_id_str,
+            source_id=join_id_str,
             source_label="Join",
             extensions=relationship.get("custom_extensions"),
         )
@@ -478,10 +478,10 @@ class OsiIngestTransformer:
             )
 
         self._maybe_add_ai_context(
-            entity_id=metric_id_str, source_label="Metric", value=metric.get("ai_context")
+            source_id=metric_id_str, source_label="Metric", value=metric.get("ai_context")
         )
         self._add_custom_extensions(
-            entity_id=metric_id_str,
+            source_id=metric_id_str,
             source_label="Metric",
             extensions=metric.get("custom_extensions"),
         )
@@ -490,9 +490,9 @@ class OsiIngestTransformer:
     # Aspects: AI context and custom extensions
     # ------------------------------------------------------------------ #
 
-    def _maybe_add_ai_context(self, entity_id: str, source_label: str, value: Any) -> None:
+    def _maybe_add_ai_context(self, source_id: str, source_label: str, value: Any) -> None:
         """
-        Create an OsiAiContext aspect for ``entity_id`` if ``value`` is present.
+        Create an OsiAiContext aspect for ``source_id`` if ``value`` is present.
 
         The aspect id is ``{semantic_model_name}.{hash(data)}`` so identical AI
         context payloads under the same semantic model collapse to one Aspect
@@ -519,7 +519,7 @@ class OsiIngestTransformer:
             self.ai_context_nodes.append(OsiAiContext(id=aspect_id_str, data=data_str))
             self._seen_aspect_ids.add(aspect_id_str)
         self.has_aspect_rels.append(
-            HasAspect(source_label=source_label, source_id=entity_id, aspect_id=aspect_id_str)
+            HasAspect(source_label=source_label, source_id=source_id, aspect_id=aspect_id_str)
         )
 
         if not isinstance(parsed, dict):
@@ -542,12 +542,12 @@ class OsiIngestTransformer:
             self.tagged_with_rels.append(
                 TaggedWith(
                     source_label=source_label,
-                    source_id=entity_id,
+                    source_id=source_id,
                     business_term_id=term_id,
                 )
             )
 
-    def _add_custom_extensions(self, entity_id: str, source_label: str, extensions: Any) -> None:
+    def _add_custom_extensions(self, source_id: str, source_label: str, extensions: Any) -> None:
         if not extensions:
             return
         for ext in extensions:
@@ -565,7 +565,7 @@ class OsiIngestTransformer:
                 )
                 self._seen_aspect_ids.add(ext_id_str)
             self.has_aspect_rels.append(
-                HasAspect(source_label=source_label, source_id=entity_id, aspect_id=ext_id_str)
+                HasAspect(source_label=source_label, source_id=source_id, aspect_id=ext_id_str)
             )
 
     # ------------------------------------------------------------------ #
