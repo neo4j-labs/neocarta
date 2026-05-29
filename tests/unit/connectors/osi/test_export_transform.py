@@ -104,13 +104,14 @@ def test_top_level_omits_version_when_missing():
 
 
 def test_semantic_model_carries_name_description_ai_context():
-    """name + description + ai_context flow into the per-model dict."""
+    """name + description + ai_context flow into the per-model dict (ai_context as native YAML)."""
     spec = OsiExportTransformer().transform(_minimal_snapshot())
     model = spec["semantic_model"][0]
 
     assert model["name"] == "sales_model"
     assert model["description"] == "Sales test model"
-    assert model["ai_context"] == '{"instructions": "test"}'
+    # Stored ai_context JSON parses back to its native dict shape.
+    assert model["ai_context"] == {"instructions": "test"}
 
 
 def test_dataset_preserves_source_primary_unique_keys():
@@ -198,13 +199,16 @@ def test_empty_lists_and_none_fields_omitted_from_output():
     assert "ai_context" not in order_id_field
 
 
-def test_custom_extensions_reshape():
-    """Snapshot custom_extensions [{vendor_name, data}, ...] passes through unchanged."""
+def test_custom_extensions_data_is_pretty_printed_json_literal_block():
+    """custom_extensions.data is JSON-parsed and emitted as a pretty-printed literal block."""
     spec = OsiExportTransformer().transform(_minimal_snapshot())
     model = spec["semantic_model"][0]
-    assert model["custom_extensions"] == [
-        {"vendor_name": "SNOWFLAKE", "data": '{"warehouse": "X"}'}
-    ]
+
+    ext = model["custom_extensions"][0]
+    assert ext["vendor_name"] == "SNOWFLAKE"
+    # data is an indented multi-line JSON string with a trailing newline so PyYAML
+    # emits it as ``|`` (clip) rather than ``|-`` (strip).
+    assert ext["data"] == '{\n  "warehouse": "X"\n}\n'
 
 
 def test_to_yaml_writes_parseable_yaml(tmp_path: Path):
@@ -223,6 +227,59 @@ def test_to_yaml_before_transform_raises(tmp_path: Path):
     """Calling to_yaml without transform first raises a RuntimeError."""
     with pytest.raises(RuntimeError, match="transform must be called"):
         OsiExportTransformer().to_yaml(tmp_path / "x.yaml")
+
+
+def test_simple_string_lists_render_in_flow_style(tmp_path: Path):
+    """primary_key / unique_keys-inner / from_columns / to_columns render as ``[a, b]``."""
+    transformer = OsiExportTransformer()
+    transformer.transform(_minimal_snapshot())
+
+    out = tmp_path / "spec.yaml"
+    transformer.to_yaml(out)
+    text = out.read_text(encoding="utf-8")
+
+    # primary_key is flow
+    assert "primary_key: [order_id]" in text
+    # unique_keys outer is block; each inner is flow (no ugly `- -`)
+    assert "unique_keys:" in text
+    assert "- [order_id]" in text
+    assert "- [customer_id, order_date]" in text
+    assert "- - " not in text  # the unwanted nested-block notation
+    # relationship from/to_columns are flow
+    assert "from_columns: [customer_id]" in text
+    assert "to_columns: [customer_id]" in text
+
+
+def test_ai_context_renders_as_native_yaml_structure(tmp_path: Path):
+    """ai_context stored as JSON-encoded dict round-trips into native YAML structure."""
+    transformer = OsiExportTransformer()
+    transformer.transform(_minimal_snapshot())
+
+    out = tmp_path / "spec.yaml"
+    transformer.to_yaml(out)
+    text = out.read_text(encoding="utf-8")
+
+    # SM-level ai_context (dict) emitted as native YAML, not a quoted JSON string.
+    assert "ai_context:\n    instructions: test\n" in text
+    # Dataset-level ai_context with synonyms parses back to a list of strings.
+    assert "ai_context:\n      synonyms:\n      - sales\n" in text
+    # No raw JSON-string form anywhere in the output.
+    assert "'{\"synonyms\":" not in text
+
+
+def test_custom_extension_data_renders_as_literal_block(tmp_path: Path):
+    """custom_extensions.data is emitted as a YAML literal block (``|``) with indented JSON."""
+    transformer = OsiExportTransformer()
+    transformer.transform(_minimal_snapshot())
+
+    out = tmp_path / "spec.yaml"
+    transformer.to_yaml(out)
+    text = out.read_text(encoding="utf-8")
+
+    # ``data: |`` (clip style, no minus) followed by indented multi-line JSON.
+    assert "data: |\n" in text
+    assert '"warehouse": "X"' in text
+    assert "data: |-" not in text
 
 
 def test_empty_snapshot_produces_minimal_yaml():
