@@ -1,4 +1,4 @@
-.PHONY: help agent create-graph create-graph-no-embeddings clean
+.PHONY: help agent create-graph create-graph-no-embeddings musicbrainz-agent create-graph-from-musicbrainz create-graph-from-musicbrainz-no-embeddings clean
 
 help:
 	@echo "Available commands:"
@@ -11,6 +11,10 @@ help:
 	@echo "  make agent ................... Run the Text2SQL agent"
 	@echo "  make create-graph ............ Extract BigQuery metadata and load into Neo4j with embeddings"
 	@echo "  make create-graph-no-embeddings  Extract BigQuery metadata (skip embeddings)"
+	@echo "  .............................."
+	@echo "  make create-graph-from-musicbrainz ............... Load the MusicBrainz schema into Neo4j with embeddings"
+	@echo "  make create-graph-from-musicbrainz-no-embeddings  Load the MusicBrainz schema (skip embeddings)"
+	@echo "  make musicbrainz-agent ....... Run the MusicBrainz agent"
 	@echo "  .............................."
 	@echo "  make clean ................... Remove Python cache files and temporary directories"
 	@echo "  make fmt ..................... Format the code with Ruff"
@@ -27,6 +31,15 @@ create-graph-from-bigquery:
 
 create-graph-from-bigquery-no-embeddings:
 	uv run examples/bigquery.py --skip-embeddings
+
+create-graph-from-musicbrainz:
+	uv run examples/musicbrainz.py
+
+create-graph-from-musicbrainz-no-embeddings:
+	uv run examples/musicbrainz.py --skip-embeddings
+
+musicbrainz-agent:
+	uv run agent/musicbrainz_agent.py
 
 load-ecommerce-dataset-into-bigquery:
 	uv run datasets/ecommerce_bigquery.py
