@@ -48,9 +48,7 @@ def minimal_spec() -> dict:
                             {
                                 "name": "order_id",
                                 "expression": {
-                                    "dialects": [
-                                        {"dialect": "ANSI_SQL", "expression": "order_id"}
-                                    ]
+                                    "dialects": [{"dialect": "ANSI_SQL", "expression": "order_id"}]
                                 },
                                 "description": "Primary key",
                             },

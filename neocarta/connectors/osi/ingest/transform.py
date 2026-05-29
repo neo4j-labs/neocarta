@@ -200,9 +200,7 @@ class OsiIngestTransformer:
             entity_id=sm.id, source_label="Domain", extensions=model.get("custom_extensions")
         )
 
-    def _collect_foreign_key_column_ids(
-        self, relationships: list[dict[str, Any]]
-    ) -> set[str]:
+    def _collect_foreign_key_column_ids(self, relationships: list[dict[str, Any]]) -> set[str]:
         """
         Pre-scan relationships to derive the set of foreign-key column ids.
 
@@ -294,12 +292,8 @@ class OsiIngestTransformer:
         if schema_id_str not in self._seen_schema_ids:
             self.schema_nodes.append(Schema(id=schema_id_str, name=schema_name))
             self._seen_schema_ids.add(schema_id_str)
-            self.has_schema_rels.append(
-                HasSchema(database_id=db_id_str, schema_id=schema_id_str)
-            )
-        self.has_table_rels.append(
-            HasTable(schema_id=schema_id_str, table_id=table_id_str)
-        )
+            self.has_schema_rels.append(HasSchema(database_id=db_id_str, schema_id=schema_id_str))
+        self.has_table_rels.append(HasTable(schema_id=schema_id_str, table_id=table_id_str))
 
         primary_key = dataset.get("primary_key") or None
         unique_keys = dataset.get("unique_keys")
@@ -317,9 +311,7 @@ class OsiIngestTransformer:
                 unique_keys=unique_keys,
             )
         )
-        self.domain_has_table_rels.append(
-            DomainHasTable(domain_id=sm_id, table_id=table_id_str)
-        )
+        self.domain_has_table_rels.append(DomainHasTable(domain_id=sm_id, table_id=table_id_str))
         return table_id_str, "Table"
 
     def _materialize_query_dataset(
@@ -353,12 +345,8 @@ class OsiIngestTransformer:
         # ``dimension.is_time`` as a bool. Missing / non-bool values leave the
         # property unset on the graph node so the absence round-trips cleanly.
         dimension = field.get("dimension")
-        is_time_value = (
-            dimension.get("is_time") if isinstance(dimension, dict) else None
-        )
-        is_time_dimension: bool | None = (
-            is_time_value if isinstance(is_time_value, bool) else None
-        )
+        is_time_value = dimension.get("is_time") if isinstance(dimension, dict) else None
+        is_time_dimension: bool | None = is_time_value if isinstance(is_time_value, bool) else None
 
         self.column_nodes.append(
             OsiColumn(
@@ -372,13 +360,9 @@ class OsiIngestTransformer:
             )
         )
         if owner_label == "Query":
-            self.uses_column_rels.append(
-                UsesColumn(query_id=owner_id, column_id=column_id_str)
-            )
+            self.uses_column_rels.append(UsesColumn(query_id=owner_id, column_id=column_id_str))
         else:
-            self.has_column_rels.append(
-                HasColumn(table_id=owner_id, column_id=column_id_str)
-            )
+            self.has_column_rels.append(HasColumn(table_id=owner_id, column_id=column_id_str))
 
         for dialect_entry in ((field.get("expression") or {}).get("dialects")) or []:
             self._add_expression(
@@ -419,12 +403,8 @@ class OsiIngestTransformer:
 
         from_owner_id = self._dataset_name_to_owner_id.get(relationship.get("from"))
         to_owner_id = self._dataset_name_to_owner_id.get(relationship.get("to"))
-        from_owner_label = self._dataset_name_to_owner_label.get(
-            relationship.get("from"), "Table"
-        )
-        to_owner_label = self._dataset_name_to_owner_label.get(
-            relationship.get("to"), "Table"
-        )
+        from_owner_label = self._dataset_name_to_owner_label.get(relationship.get("from"), "Table")
+        to_owner_label = self._dataset_name_to_owner_label.get(relationship.get("to"), "Table")
 
         # HasSourceTable / HasTargetTable point at the dataset's backing node id.
         # When that node is a Query (rather than a Table), the rel still resolves
@@ -442,9 +422,7 @@ class OsiIngestTransformer:
             for col_name in from_columns:
                 self.used_in_join_rels.append(
                     UsedInJoin(
-                        column_id=self._make_column_id(
-                            from_owner_id, from_owner_label, col_name
-                        ),
+                        column_id=self._make_column_id(from_owner_id, from_owner_label, col_name),
                         join_id=join_id_str,
                     )
                 )
@@ -452,9 +430,7 @@ class OsiIngestTransformer:
             for col_name in to_columns:
                 self.used_in_join_rels.append(
                     UsedInJoin(
-                        column_id=self._make_column_id(
-                            to_owner_id, to_owner_label, col_name
-                        ),
+                        column_id=self._make_column_id(to_owner_id, to_owner_label, col_name),
                         join_id=join_id_str,
                     )
                 )
@@ -470,9 +446,7 @@ class OsiIngestTransformer:
                         source_column_id=self._make_column_id(
                             from_owner_id, from_owner_label, from_col
                         ),
-                        target_column_id=self._make_column_id(
-                            to_owner_id, to_owner_label, to_col
-                        ),
+                        target_column_id=self._make_column_id(to_owner_id, to_owner_label, to_col),
                     )
                 )
 
@@ -490,9 +464,7 @@ class OsiIngestTransformer:
         metric_name = metric["name"]
         metric_id_str = generate_metric_id(self._current_sm_name, metric_name)
         self.metric_nodes.append(
-            Metric(
-                id=metric_id_str, name=metric_name, description=metric.get("description")
-            )
+            Metric(id=metric_id_str, name=metric_name, description=metric.get("description"))
         )
         self.has_metric_rels.append(HasMetric(domain_id=sm_id, metric_id=metric_id_str))
 
@@ -517,9 +489,7 @@ class OsiIngestTransformer:
     # Aspects: AI context and custom extensions
     # ------------------------------------------------------------------ #
 
-    def _maybe_add_ai_context(
-        self, entity_id: str, source_label: str, value: Any
-    ) -> None:
+    def _maybe_add_ai_context(self, entity_id: str, source_label: str, value: Any) -> None:
         """
         Create an OsiAiContext aspect for ``entity_id`` if ``value`` is present.
 
@@ -548,9 +518,7 @@ class OsiIngestTransformer:
             self.ai_context_nodes.append(OsiAiContext(id=aspect_id_str, data=data_str))
             self._seen_aspect_ids.add(aspect_id_str)
         self.has_aspect_rels.append(
-            HasAspect(
-                source_label=source_label, source_id=entity_id, aspect_id=aspect_id_str
-            )
+            HasAspect(source_label=source_label, source_id=entity_id, aspect_id=aspect_id_str)
         )
 
         if not isinstance(parsed, dict):
@@ -566,9 +534,7 @@ class OsiIngestTransformer:
         for synonym in synonyms:
             if not isinstance(synonym, str) or not synonym.strip():
                 continue
-            term_id = generate_business_term_id(
-                _OSI_BT_GLOSSARY, _OSI_BT_CATEGORY, synonym
-            )
+            term_id = generate_business_term_id(_OSI_BT_GLOSSARY, _OSI_BT_CATEGORY, synonym)
             if term_id not in self._seen_business_term_ids:
                 self.business_term_nodes.append(BusinessTerm(id=term_id, name=synonym))
                 self._seen_business_term_ids.add(term_id)
@@ -580,9 +546,7 @@ class OsiIngestTransformer:
                 )
             )
 
-    def _add_custom_extensions(
-        self, entity_id: str, source_label: str, extensions: Any
-    ) -> None:
+    def _add_custom_extensions(self, entity_id: str, source_label: str, extensions: Any) -> None:
         if not extensions:
             return
         for ext in extensions:
@@ -592,21 +556,15 @@ class OsiIngestTransformer:
             payload = ext.get("data")
             if payload is None:
                 continue
-            data_str = (
-                payload if isinstance(payload, str) else json.dumps(payload, sort_keys=True)
-            )
-            ext_id_str = generate_custom_extension_id(
-                self._current_sm_name, vendor, data_str
-            )
+            data_str = payload if isinstance(payload, str) else json.dumps(payload, sort_keys=True)
+            ext_id_str = generate_custom_extension_id(self._current_sm_name, vendor, data_str)
             if ext_id_str not in self._seen_aspect_ids:
                 self.custom_extension_nodes.append(
                     OsiCustomExtensions(id=ext_id_str, vendor_name=vendor, data=data_str)
                 )
                 self._seen_aspect_ids.add(ext_id_str)
             self.has_aspect_rels.append(
-                HasAspect(
-                    source_label=source_label, source_id=entity_id, aspect_id=ext_id_str
-                )
+                HasAspect(source_label=source_label, source_id=entity_id, aspect_id=ext_id_str)
             )
 
     # ------------------------------------------------------------------ #

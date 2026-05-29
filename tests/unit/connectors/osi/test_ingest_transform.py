@@ -691,9 +691,7 @@ def test_join_custom_extension_creates_aspect_with_join_source_label():
                         "to": "b",
                         "from_columns": ["x"],
                         "to_columns": ["x"],
-                        "custom_extensions": [
-                            {"vendor_name": "SNOWFLAKE", "data": "{}"}
-                        ],
+                        "custom_extensions": [{"vendor_name": "SNOWFLAKE", "data": "{}"}],
                     }
                 ],
             }
@@ -857,11 +855,5 @@ def test_join_node_stores_ordered_from_to_columns_for_composite_keys():
 
     # And the positional References pairing matches the declared order
     pairs = [(r.source_column_id, r.target_column_id) for r in t.references_rels]
-    assert any(
-        "orders.customer_id" in src and "customers.customer_id" in tgt
-        for src, tgt in pairs
-    )
-    assert any(
-        "orders.order_date" in src and "customers.as_of_date" in tgt
-        for src, tgt in pairs
-    )
+    assert any("orders.customer_id" in src and "customers.customer_id" in tgt for src, tgt in pairs)
+    assert any("orders.order_date" in src and "customers.as_of_date" in tgt for src, tgt in pairs)

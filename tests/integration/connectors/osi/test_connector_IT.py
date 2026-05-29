@@ -42,9 +42,7 @@ def test_osi_connector_round_trip_tpcds(neo4j_driver, tpcds_yaml_path: Path, tmp
     assert exp_model["name"] == orig_model["name"]
 
     # Dataset names match (order independent)
-    assert {d["name"] for d in exp_model["datasets"]} == {
-        d["name"] for d in orig_model["datasets"]
-    }
+    assert {d["name"] for d in exp_model["datasets"]} == {d["name"] for d in orig_model["datasets"]}
 
     # Dataset sources match exactly
     exp_sources = {d["source"] for d in exp_model["datasets"]}
@@ -165,21 +163,15 @@ def test_loader_writes_secondary_labels_and_dedupes_bts_by_name(
 
     with neo4j_driver.session(database="neo4j") as session:
         # OsiSemanticModel nodes are also :Domain
-        row = session.run(
-            "MATCH (n:OsiSemanticModel) RETURN labels(n) AS labels LIMIT 1"
-        ).single()
+        row = session.run("MATCH (n:OsiSemanticModel) RETURN labels(n) AS labels LIMIT 1").single()
         assert "Domain" in row["labels"]
 
         # OsiTable nodes are also :Table
-        row = session.run(
-            "MATCH (n:OsiTable) RETURN labels(n) AS labels LIMIT 1"
-        ).single()
+        row = session.run("MATCH (n:OsiTable) RETURN labels(n) AS labels LIMIT 1").single()
         assert "Table" in row["labels"]
 
         # OsiAiContext nodes are also :Aspect
-        row = session.run(
-            "MATCH (n:OsiAiContext) RETURN labels(n) AS labels LIMIT 1"
-        ).single()
+        row = session.run("MATCH (n:OsiAiContext) RETURN labels(n) AS labels LIMIT 1").single()
         assert "Aspect" in row["labels"]
 
         # BTs are unique by name
@@ -211,7 +203,9 @@ def test_loader_bt_merge_on_name_keeps_existing_id(neo4j_driver):
     )
 
     with neo4j_driver.session(database="neo4j") as session:
-        rows = list(session.run("MATCH (b:BusinessTerm {name: $n}) RETURN b.id AS id", n="customer"))
+        rows = list(
+            session.run("MATCH (b:BusinessTerm {name: $n}) RETURN b.id AS id", n="customer")
+        )
 
     assert len(rows) == 1
     assert rows[0]["id"] == "projects/foo/glossaries/bar/terms/customer"
@@ -281,9 +275,7 @@ def test_ingest_creates_has_aspect_edges_for_multiple_source_labels(
             assert row["c"] > 0, f"No HAS_ASPECT edges from {label}"
 
 
-def test_ingest_creates_tagged_with_edges_to_business_terms(
-    neo4j_driver, tpcds_yaml_path: Path
-):
+def test_ingest_creates_tagged_with_edges_to_business_terms(neo4j_driver, tpcds_yaml_path: Path):
     """OSI synonyms produce (:Column|:Table)-[:TAGGED_WITH]->(:BusinessTerm) edges."""
     OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
 
@@ -355,9 +347,7 @@ def test_identical_ai_context_payloads_collapse_to_one_aspect_node(neo4j_driver,
     OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(spec_path)
 
     with neo4j_driver.session(database="neo4j") as session:
-        ai_nodes = session.run(
-            "MATCH (a:OsiAiContext) RETURN count(a) AS c"
-        ).single()["c"]
+        ai_nodes = session.run("MATCH (a:OsiAiContext) RETURN count(a) AS c").single()["c"]
         attached = session.run(
             "MATCH (:Table)-[r:HAS_ASPECT]->(:OsiAiContext) RETURN count(r) AS c"
         ).single()["c"]
@@ -402,16 +392,14 @@ def test_query_source_ingest_creates_query_node_with_columns(neo4j_driver, tmp_p
 
     with neo4j_driver.session(database="neo4j") as session:
         # Query node exists with the original SQL and dataset name
-        q = session.run(
-            "MATCH (q:Query) RETURN q.name AS name, q.content AS content"
-        ).single()
+        q = session.run("MATCH (q:Query) RETURN q.name AS name, q.content AS content").single()
         assert q["name"] == "active_customers"
         assert q["content"].startswith("SELECT")
 
         # Domain → Query rel
-        d_q = session.run(
-            "MATCH (:Domain)-[r:HAS_QUERY]->(:Query) RETURN count(r) AS c"
-        ).single()["c"]
+        d_q = session.run("MATCH (:Domain)-[r:HAS_QUERY]->(:Query) RETURN count(r) AS c").single()[
+            "c"
+        ]
         assert d_q == 1
 
         # Query → Column rel for each field
@@ -432,6 +420,7 @@ def test_query_source_ingest_creates_query_node_with_columns(neo4j_driver, tmp_p
 
 def test_two_semantic_models_coexist_and_export_isolates(neo4j_driver, tmp_path: Path):
     """Ingesting two separate OSI specs into the same graph; export by name returns just one."""
+
     def _spec_path(name: str, source: str, path: Path) -> Path:
         path.write_text(
             yaml.safe_dump(
@@ -459,9 +448,7 @@ def test_two_semantic_models_coexist_and_export_isolates(neo4j_driver, tmp_path:
     connector.ingest(p_b)
 
     with neo4j_driver.session(database="neo4j") as session:
-        sm_count = session.run(
-            "MATCH (n:OsiSemanticModel) RETURN count(n) AS c"
-        ).single()["c"]
+        sm_count = session.run("MATCH (n:OsiSemanticModel) RETURN count(n) AS c").single()["c"]
     assert sm_count == 2
 
     out = tmp_path / "model_a_out.yaml"

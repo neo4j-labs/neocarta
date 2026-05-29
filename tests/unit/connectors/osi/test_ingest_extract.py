@@ -48,7 +48,9 @@ semantic_model:
     mock_response.text = yaml_body
     mock_response.raise_for_status = MagicMock()
 
-    with patch("neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response) as mock_get:
+    with patch(
+        "neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response
+    ) as mock_get:
         extractor = OsiSpecExtractor("https://example.com/spec.yaml", http_timeout=5.0)
         spec = extractor.extract()
 

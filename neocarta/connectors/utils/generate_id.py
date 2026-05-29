@@ -288,9 +288,9 @@ def generate_expression_id(owner_id: str, dialect: str, expression: str) -> str:
     >>> generate_expression_id("sales_model.gross_revenue", "ANSI_SQL", "SUM(amount)")
     'sales_model.gross_revenue.55cfe9b30c52a6f9d6c9c91e7af83c40'
     """
-    digest = hashlib.md5(
-        f"{dialect}::{expression}".encode(), usedforsecurity=False
-    ).hexdigest()[:32]
+    digest = hashlib.md5(f"{dialect}::{expression}".encode(), usedforsecurity=False).hexdigest()[
+        :32
+    ]
     return f"{owner_id}.{digest}"
 
 
@@ -336,7 +336,5 @@ def generate_custom_extension_id(semantic_model: str, vendor: str, data: str) ->
     >>> generate_custom_extension_id("sales_model", "SNOWFLAKE", '{"warehouse": "S"}')
     'sales_model.<hash>'  # doctest: +SKIP
     """
-    digest = hashlib.md5(
-        f"{vendor}::{data}".encode(), usedforsecurity=False
-    ).hexdigest()[:32]
+    digest = hashlib.md5(f"{vendor}::{data}".encode(), usedforsecurity=False).hexdigest()[:32]
     return f"{_normalize(semantic_model)}.{digest}"

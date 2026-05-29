@@ -56,9 +56,7 @@ class OsiGraphExtractor:
         with self.driver.session(database=self.database_name) as session:
             sm = self._read_semantic_model(session, semantic_model_name)
             if sm is None:
-                raise ValueError(
-                    f"No OsiSemanticModel found with name {semantic_model_name!r}"
-                )
+                raise ValueError(f"No OsiSemanticModel found with name {semantic_model_name!r}")
 
             aspects_by_parent = self._read_aspects(session, sm["id"])
             sm_ai_context, sm_custom_extensions = self._partition_aspects(
@@ -67,13 +65,9 @@ class OsiGraphExtractor:
 
             tables = self._read_tables(session, sm["id"], aspects_by_parent)
             queries = self._read_queries(session, sm["id"], aspects_by_parent)
-            datasets = self._merge_datasets(
-                session, sm["id"], tables, queries, aspects_by_parent
-            )
+            datasets = self._merge_datasets(session, sm["id"], tables, queries, aspects_by_parent)
 
-            relationships = self._read_relationships(
-                session, sm["id"], aspects_by_parent
-            )
+            relationships = self._read_relationships(session, sm["id"], aspects_by_parent)
             metrics = self._read_metrics(session, sm["id"], aspects_by_parent)
 
         snapshot: dict[str, Any] = {
@@ -93,9 +87,7 @@ class OsiGraphExtractor:
     # Cypher reads
     # ------------------------------------------------------------------ #
 
-    def _read_semantic_model(
-        self, session: Any, name: str
-    ) -> dict[str, Any] | None:
+    def _read_semantic_model(self, session: Any, name: str) -> dict[str, Any] | None:
         """Read the OsiSemanticModel root node by name."""
         cypher = (
             "MATCH (sm:OsiSemanticModel {name: $name}) "
@@ -289,9 +281,7 @@ class OsiGraphExtractor:
         result = session.run(cypher, owner_ids=owner_ids)
         fields_by_owner: dict[str, list[dict[str, Any]]] = {}
         for record in result:
-            ai, customs = self._partition_aspects(
-                aspects_by_parent.get(record["column_id"], [])
-            )
+            ai, customs = self._partition_aspects(aspects_by_parent.get(record["column_id"], []))
             expressions = [e for e in (record["expressions"] or []) if e is not None]
             fields_by_owner.setdefault(record["owner_id"], []).append(
                 {

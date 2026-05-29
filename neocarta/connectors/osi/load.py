@@ -137,9 +137,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """Load Metric nodes."""
         _validate_properties_list(Metric, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.METRIC])
-        query = _build_node_ingest_query(
-            NodeLabel.METRIC, overwrite_existing, properties_list
-        )
+        query = _build_node_ingest_query(NodeLabel.METRIC, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
     def load_join_nodes(
@@ -157,9 +155,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """
         _validate_properties_list(Join, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.JOIN])
-        query = _build_node_ingest_query(
-            NodeLabel.JOIN, overwrite_existing, properties_list
-        )
+        query = _build_node_ingest_query(NodeLabel.JOIN, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
     def load_expression_nodes(
@@ -171,9 +167,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """Load Expression nodes."""
         _validate_properties_list(Expression, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.EXPRESSION])
-        query = _build_node_ingest_query(
-            NodeLabel.EXPRESSION, overwrite_existing, properties_list
-        )
+        query = _build_node_ingest_query(NodeLabel.EXPRESSION, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
     def load_osi_ai_context_nodes(
@@ -229,7 +223,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         cypher = f"""
 UNWIND $rows AS row
 MERGE (n:{NodeLabel.BUSINESS_TERM} {{name: row.name}})
-ON CREATE SET n.id = row.id{', ' + set_extras if set_extras else ''}
+ON CREATE SET n.id = row.id{", " + set_extras if set_extras else ""}
 """.strip()
         return self._run_write(cypher, [n.model_dump() for n in nodes])
 
@@ -307,9 +301,7 @@ MERGE (s)-[:{RelationshipType.HAS_ASPECT}]->(a)
 """.strip()
         return self._run_write(cypher, [r.model_dump() for r in rels])
 
-    def load_has_expression_relationships(
-        self, rels: list[HasExpression]
-    ) -> dict:
+    def load_has_expression_relationships(self, rels: list[HasExpression]) -> dict:
         """
         Polymorphic source → Expression: (Column|Metric)-[:HAS_EXPRESSION]->(:Expression).
         Source matched by id only.
@@ -322,9 +314,7 @@ MERGE (s)-[:{RelationshipType.HAS_EXPRESSION}]->(e)
 """.strip()
         return self._run_write(cypher, [r.model_dump() for r in rels])
 
-    def load_has_source_table_relationships(
-        self, rels: list[HasSourceTable]
-    ) -> dict:
+    def load_has_source_table_relationships(self, rels: list[HasSourceTable]) -> dict:
         """(:Join)-[:HAS_SOURCE_TABLE]->(:Table) (target matched by id, may be Query)."""
         cypher = f"""
 UNWIND $rows AS row
@@ -334,9 +324,7 @@ MERGE (j)-[:{RelationshipType.HAS_SOURCE_TABLE}]->(t)
 """.strip()
         return self._run_write(cypher, [r.model_dump() for r in rels])
 
-    def load_has_target_table_relationships(
-        self, rels: list[HasTargetTable]
-    ) -> dict:
+    def load_has_target_table_relationships(self, rels: list[HasTargetTable]) -> dict:
         """(:Join)-[:HAS_TARGET_TABLE]->(:Table) (target matched by id, may be Query)."""
         cypher = f"""
 UNWIND $rows AS row

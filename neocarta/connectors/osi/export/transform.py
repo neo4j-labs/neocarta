@@ -141,8 +141,7 @@ class OsiExportTransformer:
         if expressions:
             out["expression"] = {
                 "dialects": [
-                    {"dialect": e["dialect"], "expression": e["expression"]}
-                    for e in expressions
+                    {"dialect": e["dialect"], "expression": e["expression"]} for e in expressions
                 ]
             }
 
@@ -181,8 +180,7 @@ class OsiExportTransformer:
         if expressions:
             out["expression"] = {
                 "dialects": [
-                    {"dialect": e["dialect"], "expression": e["expression"]}
-                    for e in expressions
+                    {"dialect": e["dialect"], "expression": e["expression"]} for e in expressions
                 ]
             }
 

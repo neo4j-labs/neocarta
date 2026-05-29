@@ -276,7 +276,7 @@ def test_ai_context_renders_as_native_yaml_structure(tmp_path: Path):
     # Dataset-level ai_context with synonyms parses back to a list of strings.
     assert "ai_context:\n      synonyms:\n      - sales\n" in text
     # No raw JSON-string form anywhere in the output.
-    assert "'{\"synonyms\":" not in text
+    assert '\'{"synonyms":' not in text
 
 
 def test_custom_extension_data_renders_as_literal_block(tmp_path: Path):

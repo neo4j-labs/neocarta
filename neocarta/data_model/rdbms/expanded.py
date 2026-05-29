@@ -83,10 +83,10 @@ class TaggedWith(BaseModel):
     (:Metric)-[:TAGGED_WITH]->(:BusinessTerm)
     """  # noqa: D415
 
-    source_label: Literal["Column", "Table", "Schema", "Metric"] = Field(..., description="The label of the source entity")
-    source_id: str = Field(
-        ..., description="The unique identifier for the source entity"
+    source_label: Literal["Column", "Table", "Schema", "Metric"] = Field(
+        ..., description="The label of the source entity"
     )
+    source_id: str = Field(..., description="The unique identifier for the source entity")
     business_term_id: str = Field(..., description="The unique identifier for the business term")
 
 
@@ -169,6 +169,7 @@ class Defines(BaseModel):
     query_id: str = Field(..., description="The unique identifier for the query")
     cte_id: str = Field(..., description="The unique identifier for the CTE")
 
+
 class Domain(BaseModel):
     """A Domain node representing a semantic grouping of data assets."""
 
@@ -250,7 +251,7 @@ class Metric(BaseModel):
 
 class Aspect(BaseModel):
     """
-    An Aspect node providing additional context to graph components. 
+    An Aspect node providing additional context to graph components.
     This may be comments, annotations, or other metadata.
     """
 
@@ -265,11 +266,12 @@ class OsiAiContext(Aspect):
     - synonyms: Alternative names and terms
     - examples: Sample questions or use cases
     """
+
     data: str = Field(..., description="The aspect payload as a JSON-encoded string")
 
 
 class OsiCustomExtensions(Aspect):
-    """Custom extensions allow vendors to add platform-specific metadata without breaking core compatibility. 
+    """Custom extensions allow vendors to add platform-specific metadata without breaking core compatibility.
     Each extension includes a vendor name and arbitrary JSON data."""
 
     data: str = Field(..., description="The aspect payload as a JSON-encoded string")
@@ -320,9 +322,10 @@ class HasAspect(BaseModel):
     (:Metric)-[:HAS_ASPECT]->(:Aspect)
     (:Join)-[:HAS_ASPECT]->(:Aspect)
     """  # noqa: D415
-    source_label: Literal[
-        "Schema", "Table", "Column", "Query", "Metric", "Join", "Domain"
-    ] = Field(..., description="The label of the source entity")
+
+    source_label: Literal["Schema", "Table", "Column", "Query", "Metric", "Join", "Domain"] = Field(
+        ..., description="The label of the source entity"
+    )
     source_id: str = Field(..., description="The unique identifier for the source entity")
     aspect_id: str = Field(..., description="The unique identifier for the aspect")
 
@@ -344,9 +347,12 @@ class HasExpression(BaseModel):
     (:Metric)-[:HAS_EXPRESSION]->(:Expression)
     """  # noqa: D415
 
-    source_label: Literal["Column", "Metric"] = Field(..., description="The label of the source entity")
+    source_label: Literal["Column", "Metric"] = Field(
+        ..., description="The label of the source entity"
+    )
     source_id: str = Field(..., description="The unique identifier for the source entity")
     expression_id: str = Field(..., description="The unique identifier for the expression")
+
 
 class HasMetric(BaseModel):
     """
