@@ -1,9 +1,11 @@
 """OSI (Open Semantic Interchange) connector — bidirectional Neo4j integration."""
 
+import warnings
 from pathlib import Path
 
 from neo4j import Driver
 
+from ...warnings import UnsupportedOsiVersionWarning
 from .export.extract import OsiGraphExtractor
 from .export.transform import OsiExportTransformer
 from .ingest.extract import OsiSpecExtractor
@@ -21,6 +23,21 @@ class OsiConnector:
     - :meth:`export` reads an OSI semantic model from Neo4j (filtered by name) and emits
       an OSI YAML spec.
 
+    Version handling
+    ----------------
+    The connector targets a known set of OSI spec versions (see
+    :attr:`SUPPORTED_VERSIONS`). The ``version`` argument on :meth:`ingest`
+    declares which version the caller expects for that particular file; the
+    connector emits a ``UserWarning`` if:
+
+    - ``version`` is not in :attr:`SUPPORTED_VERSIONS` (the connector may miss
+      features or behave unexpectedly), or
+    - the parsed spec's ``version`` field is missing or does not match ``version``.
+
+    ``version`` is purely an *ingest-time* compatibility check. :meth:`export`
+    emits whatever ``osi_version`` was stored on the ``OsiSemanticModel`` node
+    at ingest time — there is no export-side ``version`` argument.
+
     Parameters
     ----------
     neo4j_driver : neo4j.Driver
@@ -30,6 +47,9 @@ class OsiConnector:
     http_timeout : float, default 30.0
         Timeout in seconds when fetching an OSI spec by URL.
     """
+
+    #: OSI spec versions the connector has been built against.
+    SUPPORTED_VERSIONS: tuple[str, ...] = ("0.1.1",)
 
     def __init__(
         self,
@@ -43,7 +63,7 @@ class OsiConnector:
         self.http_timeout = http_timeout
         self.loader = OsiNeo4jLoader(neo4j_driver, database_name)
 
-    def ingest(self, spec_source: str | Path) -> None:
+    def ingest(self, spec_source: str | Path, version: str = "0.1.1") -> None:
         """
         Read an OSI YAML spec and load it into Neo4j.
 
@@ -51,10 +71,25 @@ class OsiConnector:
         ----------
         spec_source : str | Path
             A local filesystem path or an ``http(s)://`` URL pointing to the OSI YAML.
+        version : str, default ``"0.1.1"``
+            Declared OSI spec version. Emits a ``UserWarning`` if outside
+            :attr:`SUPPORTED_VERSIONS` or if the parsed spec's ``version`` field
+            is missing / doesn't match.
         """
+        if version not in self.SUPPORTED_VERSIONS:
+            warnings.warn(
+                f"OSI version {version!r} is outside the supported set "
+                f"{self.SUPPORTED_VERSIONS}; the connector may miss features "
+                "or behave unexpectedly.",
+                UnsupportedOsiVersionWarning,
+                stacklevel=2,
+            )
+
         print(f"Extracting OSI spec from {spec_source}...")
         extractor = OsiSpecExtractor(spec_source, http_timeout=self.http_timeout)
         spec = extractor.extract()
+
+        self._check_spec_version(spec, version)
 
         print("Transforming OSI spec...")
         transformer = OsiIngestTransformer()
@@ -104,6 +139,30 @@ class OsiConnector:
     # ------------------------------------------------------------------ #
     # Loader orchestration
     # ------------------------------------------------------------------ #
+
+    def _check_spec_version(self, spec: dict, expected_version: str) -> None:
+        """
+        Warn (don't raise) when the parsed spec's ``version`` doesn't match
+        ``expected_version`` or is missing entirely. Compatibility is best-effort —
+        the ingest proceeds either way.
+        """
+        spec_version = spec.get("version")
+        if spec_version is None:
+            warnings.warn(
+                "OSI YAML has no top-level `version` field; can't verify "
+                f"compatibility with expected version {expected_version!r}.",
+                UnsupportedOsiVersionWarning,
+                stacklevel=3,
+            )
+            return
+        if str(spec_version) != expected_version:
+            warnings.warn(
+                f"OSI YAML declares version {str(spec_version)!r} but ingest was "
+                f"called with version {expected_version!r}; ingest may be lossy "
+                "or miss features.",
+                UnsupportedOsiVersionWarning,
+                stacklevel=3,
+            )
 
     def _load_ingest(self, transformer: OsiIngestTransformer) -> None:
         """Load all nodes and relationships produced by an ingest transformer.

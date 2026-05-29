@@ -11,9 +11,6 @@ spec — a YAML-based interchange format for semantic models.
 
 ![OSI data model](../../../assets/images/data_model/osi-data-model-1.png)
 
-The mermaid source lives at
-[`assets/mermaid/data_model/osi-data-model-1.mmd`](../../../assets/mermaid/data_model/osi-data-model-1.mmd)
-and is rebuilt via `make refresh-mermaid-data-model-images`.
 
 OSI-specific node labels (`OsiSemanticModel`, `OsiTable`, `OsiColumn`,
 `OsiAiContext`, `OsiCustomExtensions`) are *secondary* labels layered on top of
@@ -49,6 +46,36 @@ is the full 33-table ACME Corp warehouse modeled as OSI, exercising relationship
 metrics, joins with composite keys, and `ai_context` synonyms.
 
 ## Behavior
+
+### Targeted OSI spec version
+
+The connector is built against OSI **0.1.1** (see
+`OsiConnector.SUPPORTED_VERSIONS`). Pass the expected version per ingest call:
+
+```python
+connector.ingest("path/to/spec.yaml", version="0.1.1")  # default
+```
+
+An `UnsupportedOsiVersionWarning` (subclass of `UserWarning`) is emitted when:
+
+- The `version` argument is outside `SUPPORTED_VERSIONS`.
+- The parsed OSI YAML's top-level `version` field is missing or doesn't match
+  the declared `version`.
+
+The warning class lives in the package-level [`neocarta.warnings`](../../warnings.py)
+module (alongside the `neocarta.errors` hierarchy) and is also re-exported from
+`neocarta.connectors.osi`. Callers can silence it specifically:
+
+```python
+import warnings
+from neocarta.warnings import UnsupportedOsiVersionWarning
+warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
+```
+
+`version` is a per-ingest compatibility check — a single connector instance can
+ingest multiple files at different versions. There is no export-side `version`
+argument; `connector.export(...)` emits whatever ``osi_version`` was stored on
+the `OsiSemanticModel` node at ingest time.
 
 ### `dataset.source` must be 3-part or a query
 

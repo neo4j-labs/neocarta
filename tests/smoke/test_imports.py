@@ -104,17 +104,25 @@ def test_ingest_imports():
 
 
 def test_osi_connector_imports():
-    from neocarta.connectors.osi import OsiConnector
+    from neocarta.connectors.osi import OsiConnector, UnsupportedOsiVersionWarning
     from neocarta.connectors.osi.export import OsiExportTransformer, OsiGraphExtractor
     from neocarta.connectors.osi.ingest import OsiIngestTransformer, OsiSpecExtractor
     from neocarta.connectors.osi.load import OsiNeo4jLoader
 
     assert OsiConnector
+    assert UnsupportedOsiVersionWarning
     assert OsiSpecExtractor
     assert OsiIngestTransformer
     assert OsiGraphExtractor
     assert OsiExportTransformer
     assert OsiNeo4jLoader
+
+
+def test_warnings_module_imports():
+    from neocarta.warnings import NeocartaWarning, UnsupportedOsiVersionWarning
+
+    assert issubclass(NeocartaWarning, UserWarning)
+    assert issubclass(UnsupportedOsiVersionWarning, NeocartaWarning)
 
 
 def test_osi_data_model_imports():

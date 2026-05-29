@@ -59,7 +59,7 @@ def main(sample: str) -> None:
     connector = OsiConnector(neo4j_driver=neo4j_driver, database_name=neo4j_database)
 
     # Ingest accepts either a local filesystem path (Path or str) or an HTTP(S) URL.
-    connector.ingest(source)
+    connector.ingest(source, version="0.1.1")
 
     # Export the ingested semantic model back to an OSI YAML file.
     output_path = Path(f"{sample}_export.yaml")

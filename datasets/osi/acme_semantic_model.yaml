@@ -5,7 +5,7 @@
 # All sources are 3-part `database.schema.table` per the OSI spec; the SQL DDL's
 # implicit BigQuery project is materialized here as `acme_warehouse`.
 
-version: "0.2.0"
+version: "0.1.1"
 
 semantic_model:
   - name: acme_corp_model
