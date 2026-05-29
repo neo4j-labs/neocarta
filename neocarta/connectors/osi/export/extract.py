@@ -54,7 +54,16 @@ class OsiGraphExtractor:
         ValueError
             If no OsiSemanticModel with the given name is found.
         """
-        with self.driver.session(database=self.database_name) as session:
+        # Suppress UNRECOGNIZED notifications: the export Cypher deliberately
+        # references the full OSI feature set (e.g. ``HAS_QUERY`` / ``Query`` /
+        # ``USES_COLUMN`` / ``c.label``). When the input model doesn't use a
+        # feature, those labels/rels/properties legitimately don't exist in the
+        # graph and Neo4j emits an UNRECOGNIZED notification — expected, not a bug.
+        # DEPRECATION / PERFORMANCE / SECURITY notifications stay visible.
+        with self.driver.session(
+            database=self.database_name,
+            notifications_disabled_classifications=["UNRECOGNIZED"],
+        ) as session:
             sm = self._read_semantic_model(session, semantic_model_name)
             if sm is None:
                 raise ValueError(f"No OsiSemanticModel found with name {semantic_model_name!r}")
@@ -107,26 +116,23 @@ class OsiGraphExtractor:
         ``id``, ``data``, ``vendor_name``, and ``labels`` (the Neo4j label list,
         used to distinguish OsiAiContext vs OsiCustomExtensions in the transformer).
         """
+        # Uses the Neo4j 5+ ``CALL (sm) { ... }`` variable-scope clause syntax
+        # rather than the deprecated ``CALL { WITH sm ... }`` form.
         cypher = """
         MATCH (sm:OsiSemanticModel {id: $sm_id})
-        CALL {
-            WITH sm
+        CALL (sm) {
             MATCH (sm)-[:HAS_ASPECT]->(a:Aspect)
             RETURN sm.id AS parent_id, a
             UNION
-            WITH sm
             MATCH (sm)-[:HAS_TABLE|HAS_QUERY]->(owner)-[:HAS_ASPECT]->(a:Aspect)
             RETURN owner.id AS parent_id, a
             UNION
-            WITH sm
             MATCH (sm)-[:HAS_TABLE|HAS_QUERY]->(owner)-[:HAS_COLUMN]->(c:Column)-[:HAS_ASPECT]->(a:Aspect)
             RETURN c.id AS parent_id, a
             UNION
-            WITH sm
             MATCH (sm)-[:HAS_METRIC]->(m:Metric)-[:HAS_ASPECT]->(a:Aspect)
             RETURN m.id AS parent_id, a
             UNION
-            WITH sm
             MATCH (sm)-[:HAS_TABLE|HAS_QUERY]->(owner)
             MATCH (j:Join)-[:HAS_SOURCE_TABLE|HAS_TARGET_TABLE]->(owner)
             MATCH (j)-[:HAS_ASPECT]->(a:Aspect)
