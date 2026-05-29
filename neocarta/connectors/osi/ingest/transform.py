@@ -50,13 +50,6 @@ from ...utils.generate_id import (
 
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-#: Placeholder tokens passed to ``generate_table_id`` / ``generate_schema_id`` when
-#: the OSI ``source`` string is missing structural components. No corresponding
-#: Database / Schema nodes are emitted — the placeholders only keep ids stable
-#: and globally unique.
-PLACEHOLDER_DB = "_unknown_db"
-PLACEHOLDER_SCHEMA = "_unknown_schema"
-
 #: Synthetic glossary / category used for BusinessTerms derived from OSI ai_context
 #: synonyms. BusinessTerm uniqueness in the graph is enforced by ``name`` at load
 #: time (MERGE on name), so OSI synonyms can dedupe against catalog-derived BTs
@@ -247,12 +240,13 @@ class OsiIngestTransformer:
                 sm_id, dataset, parsed["query"] or ""
             )
         else:
+            # _parse_source guarantees these are non-None when is_query=False.
             owner_id, owner_label = self._materialize_table_dataset(
                 sm_id,
                 dataset,
-                parsed["db_name"],
-                parsed["schema_name"],
-                parsed["table_name"] or "",
+                parsed["db_name"],  # type: ignore[arg-type]
+                parsed["schema_name"],  # type: ignore[arg-type]
+                parsed["table_name"],  # type: ignore[arg-type]
             )
         self._dataset_name_to_owner_id[name] = owner_id
         self._dataset_name_to_owner_label[name] = owner_label
@@ -277,41 +271,35 @@ class OsiIngestTransformer:
         self,
         sm_id: str,
         dataset: dict[str, Any],
-        db_name: str | None,
-        schema_name: str | None,
+        db_name: str,
+        schema_name: str,
         table_name: str,
     ) -> tuple[str, str]:
-        """Create the OsiTable node, optional Database/Schema, and Domain→Table edge."""
+        """
+        Create the OsiTable, Database, Schema, and structural edges for a
+        spec-compliant 3-part dataset source.
+
+        ``_parse_source`` enforces that ``db_name`` / ``schema_name`` / ``table_name``
+        are all non-empty identifiers before this is called.
+        """
         source = dataset["source"]
-        table_id_str = generate_table_id(
-            db_name or PLACEHOLDER_DB,
-            schema_name or PLACEHOLDER_SCHEMA,
-            table_name,
-        )
+        table_id_str = generate_table_id(db_name, schema_name, table_name)
 
-        # Database / Schema and their structural edges are only emitted when the
-        # corresponding component was actually present in the source string.
-        if db_name is not None:
-            db_id_str = generate_database_id(db_name)
-            if db_id_str not in self._seen_database_ids:
-                self.database_nodes.append(Database(id=db_id_str, name=db_name))
-                self._seen_database_ids.add(db_id_str)
+        db_id_str = generate_database_id(db_name)
+        if db_id_str not in self._seen_database_ids:
+            self.database_nodes.append(Database(id=db_id_str, name=db_name))
+            self._seen_database_ids.add(db_id_str)
 
-        if schema_name is not None:
-            schema_id_str = generate_schema_id(db_name or PLACEHOLDER_DB, schema_name)
-            if schema_id_str not in self._seen_schema_ids:
-                self.schema_nodes.append(Schema(id=schema_id_str, name=schema_name))
-                self._seen_schema_ids.add(schema_id_str)
-                if db_name is not None:
-                    self.has_schema_rels.append(
-                        HasSchema(
-                            database_id=generate_database_id(db_name),
-                            schema_id=schema_id_str,
-                        )
-                    )
-            self.has_table_rels.append(
-                HasTable(schema_id=schema_id_str, table_id=table_id_str)
+        schema_id_str = generate_schema_id(db_name, schema_name)
+        if schema_id_str not in self._seen_schema_ids:
+            self.schema_nodes.append(Schema(id=schema_id_str, name=schema_name))
+            self._seen_schema_ids.add(schema_id_str)
+            self.has_schema_rels.append(
+                HasSchema(database_id=db_id_str, schema_id=schema_id_str)
             )
+        self.has_table_rels.append(
+            HasTable(schema_id=schema_id_str, table_id=table_id_str)
+        )
 
         primary_key = dataset.get("primary_key") or None
         unique_keys = dataset.get("unique_keys")
@@ -645,16 +633,17 @@ class OsiIngestTransformer:
         backing graph node without emitting any nodes.
 
         Used during the pre-scan so relationship FK resolution can produce column
-        ids before fields are materialized.
+        ids before fields are materialized. :meth:`_parse_source` guarantees that
+        when ``is_query=False`` all three structural fields are set.
         """
         parsed = self._parse_source(source)
         if parsed["is_query"]:
             return create_query_id(parsed["query"] or ""), "Query"
         return (
             generate_table_id(
-                parsed["db_name"] or PLACEHOLDER_DB,
-                parsed["schema_name"] or PLACEHOLDER_SCHEMA,
-                parsed["table_name"] or "",
+                parsed["db_name"],  # type: ignore[arg-type]
+                parsed["schema_name"],  # type: ignore[arg-type]
+                parsed["table_name"],  # type: ignore[arg-type]
             ),
             "Table",
         )
@@ -679,39 +668,39 @@ class OsiIngestTransformer:
         Parse an OSI ``source`` string into a :class:`ParsedSource` discriminated
         on ``is_query``.
 
-        Dotted identifiers populate ``db_name`` / ``schema_name`` / ``table_name``
-        as available, leaving ``query`` as ``None``. Anything that isn't a 1-3 part
-        SQL identifier (queries, ill-formed strings) is treated as a query: the
-        full source text goes into ``query`` and the structural fields are all
-        ``None``.
+        Per the OSI spec, ``dataset.source`` must be either a 3-part
+        ``database.schema.table`` identifier or a SQL query. 1-part and 2-part
+        dotted identifiers are spec violations and raise :class:`ValueError`.
+        Anything that isn't valid SQL identifiers (multi-token text, special
+        characters, etc.) is treated as a query.
+
+        Raises:
+        ------
+        ValueError
+            If ``source`` is empty or is a 1-part / 2-part dotted identifier.
         """
-        parts = source.split(".") if source else []
-        if 1 <= len(parts) <= 3 and all(_IDENT_RE.match(part) for part in parts):
-            if len(parts) == 3:
-                db, schema, table = parts
-                return {
-                    "db_name": db,
-                    "schema_name": schema,
-                    "table_name": table,
-                    "query": None,
-                    "is_query": False,
-                }
-            if len(parts) == 2:
-                schema, table = parts
-                return {
-                    "db_name": None,
-                    "schema_name": schema,
-                    "table_name": table,
-                    "query": None,
-                    "is_query": False,
-                }
+        if not source:
+            raise ValueError("dataset.source must not be empty")
+
+        parts = source.split(".")
+        all_identifiers = all(_IDENT_RE.match(part) for part in parts)
+
+        if len(parts) == 3 and all_identifiers:
+            db, schema, table = parts
             return {
-                "db_name": None,
-                "schema_name": None,
-                "table_name": parts[0],
+                "db_name": db,
+                "schema_name": schema,
+                "table_name": table,
                 "query": None,
                 "is_query": False,
             }
+
+        if 1 <= len(parts) <= 2 and all_identifiers:
+            raise ValueError(
+                f"dataset.source {source!r} is not OSI-spec-compliant: must be "
+                "either a 3-part `database.schema.table` identifier or a SQL query."
+            )
+
         return {
             "db_name": None,
             "schema_name": None,

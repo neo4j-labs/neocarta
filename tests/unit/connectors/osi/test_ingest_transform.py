@@ -4,11 +4,7 @@ import json
 
 import pytest
 
-from neocarta.connectors.osi.ingest.transform import (
-    PLACEHOLDER_DB,
-    PLACEHOLDER_SCHEMA,
-    OsiIngestTransformer,
-)
+from neocarta.connectors.osi.ingest.transform import OsiIngestTransformer
 
 
 def _run(spec: dict) -> OsiIngestTransformer:
@@ -65,31 +61,22 @@ def test_three_part_source_emits_database_schema_table(minimal_spec):
     assert len(t.database_nodes) == 1
 
 
-def test_two_part_source_uses_placeholder_db_no_database_node():
-    """schema.table source: Schema created under placeholder db; no Database node, no HasSchema."""
+def test_two_part_source_is_rejected_as_spec_violation():
+    """Per the OSI spec, dataset.source must be 3-part `db.schema.table` or a query."""
     spec = {
         "semantic_model": [
             {
                 "name": "m",
-                "datasets": [
-                    {"name": "t1", "source": "public.t1", "fields": []},
-                ],
+                "datasets": [{"name": "t1", "source": "public.t1", "fields": []}],
             }
         ]
     }
-    t = _run(spec)
-
-    assert t.database_nodes == []
-    assert len(t.schema_nodes) == 1
-    assert t.schema_nodes[0].name == "public"
-    assert t.schema_nodes[0].id.startswith(PLACEHOLDER_DB + ".")
-    assert t.has_schema_rels == []
-    assert len(t.has_table_rels) == 1
-    assert len(t.domain_has_table_rels) == 1
+    with pytest.raises(ValueError, match="not OSI-spec-compliant"):
+        _run(spec)
 
 
-def test_one_part_source_no_database_no_schema():
-    """Bare table source: only OsiTable + DomainHasTable; no Database/Schema/structural edges."""
+def test_one_part_source_is_rejected_as_spec_violation():
+    """Bare table sources (1-part identifier) violate the OSI spec and raise."""
     spec = {
         "semantic_model": [
             {
@@ -98,31 +85,8 @@ def test_one_part_source_no_database_no_schema():
             }
         ]
     }
-    t = _run(spec)
-
-    assert t.database_nodes == []
-    assert t.schema_nodes == []
-    assert t.has_schema_rels == []
-    assert t.has_table_rels == []
-    assert len(t.table_nodes) == 1
-    assert len(t.domain_has_table_rels) == 1
-
-
-def test_table_id_uses_placeholders_when_components_missing():
-    """OsiTable.id is fully qualified with placeholders when source omits structural parts."""
-    spec = {
-        "semantic_model": [
-            {
-                "name": "m",
-                "datasets": [{"name": "t", "source": "customers", "fields": []}],
-            }
-        ]
-    }
-    t = _run(spec)
-    table_id = t.table_nodes[0].id
-    assert PLACEHOLDER_DB in table_id
-    assert PLACEHOLDER_SCHEMA in table_id
-    assert table_id.endswith("customers")
+    with pytest.raises(ValueError, match="not OSI-spec-compliant"):
+        _run(spec)
 
 
 def test_osi_table_preserves_original_source_string(minimal_spec):
@@ -804,39 +768,34 @@ def test_parse_source_three_part():
     }
 
 
-def test_parse_source_two_part():
-    p = OsiIngestTransformer()._parse_source("schema.table")
-    assert p["db_name"] is None
-    assert p["schema_name"] == "schema"
-    assert p["table_name"] == "table"
-    assert p["is_query"] is False
+def test_parse_source_two_part_raises():
+    """2-part `schema.table` violates the OSI spec; the parser raises."""
+    with pytest.raises(ValueError, match="not OSI-spec-compliant"):
+        OsiIngestTransformer()._parse_source("schema.table")
 
 
-def test_parse_source_one_part():
-    p = OsiIngestTransformer()._parse_source("table")
-    assert p["db_name"] is None
-    assert p["schema_name"] is None
-    assert p["table_name"] == "table"
-    assert p["is_query"] is False
+def test_parse_source_one_part_raises():
+    """1-part `table` violates the OSI spec; the parser raises."""
+    with pytest.raises(ValueError, match="not OSI-spec-compliant"):
+        OsiIngestTransformer()._parse_source("table")
 
 
 def test_parse_source_query_text_is_flagged():
-    """Anything that isn't 1-3 SQL identifiers is treated as a query."""
+    """Anything that isn't 3 SQL identifiers is treated as a query."""
     p = OsiIngestTransformer()._parse_source("SELECT * FROM t WHERE x > 5")
     assert p["is_query"] is True
     assert p["query"] == "SELECT * FROM t WHERE x > 5"
     assert p["table_name"] is None
 
 
-def test_parse_source_empty_string_is_query():
-    """Empty source string also routes to the query branch with query=''."""
-    p = OsiIngestTransformer()._parse_source("")
-    assert p["is_query"] is True
-    assert p["query"] == ""
+def test_parse_source_empty_string_raises():
+    """Empty source string violates the OSI spec; the parser raises."""
+    with pytest.raises(ValueError, match="must not be empty"):
+        OsiIngestTransformer()._parse_source("")
 
 
 def test_parse_source_four_parts_treated_as_query():
-    """A 4-part dotted source is too many segments for OSI — treated as query."""
+    """A 4-part dotted source is too many segments for OSI — treated as a query."""
     p = OsiIngestTransformer()._parse_source("a.b.c.d")
     assert p["is_query"] is True
 

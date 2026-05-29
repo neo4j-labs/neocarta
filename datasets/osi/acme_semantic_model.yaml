@@ -2,8 +2,9 @@
 
 # ACME Corp — OSI semantic model
 # Derived from datasets/acme-dataset.sql (33 BigQuery tables across 7 sections).
-# Sources use the 2-part schema.table form to match the SQL DDL; the neocarta OSI
-# ingest fills in a placeholder for the missing database component.
+# Per the OSI spec, dataset.source is a 3-part `database.schema.table` identifier
+# (or a SQL query). The SQL DDL uses the 2-part BigQuery `dataset.table` form;
+# here the implicit project is materialized as `acme_warehouse`.
 
 version: "0.2.0"
 
@@ -18,7 +19,7 @@ semantic_model:
     # =============================================================
     datasets:
       - name: offices
-        source: acme_corp.offices
+        source: acme_warehouse.acme_corp.offices
         primary_key: [office_id]
         description: Physical ACME offices worldwide. One row per office location.
         ai_context:
@@ -49,7 +50,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: departments
-        source: acme_corp.departments
+        source: acme_warehouse.acme_corp.departments
         primary_key: [department_id]
         description: Organizational departments. Self-referencing via parent_department_id.
         ai_context:
@@ -72,7 +73,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: teams
-        source: acme_corp.teams
+        source: acme_warehouse.acme_corp.teams
         primary_key: [team_id]
         description: Teams within departments. Used for squad-level reporting.
         fields:
@@ -93,7 +94,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: is_active }] }
 
       - name: job_titles
-        source: acme_corp.job_titles
+        source: acme_warehouse.acme_corp.job_titles
         primary_key: [job_title_id]
         description: Canonical job titles with level and salary band.
         fields:
@@ -113,7 +114,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: currency }] }
 
       - name: employees
-        source: acme_corp.employees
+        source: acme_warehouse.acme_corp.employees
         primary_key: [employee_id]
         description: All ACME employees, past and present. Current role snapshot lives here; time-series role changes live in employee_role_history.
         ai_context:
@@ -167,7 +168,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: employee_role_history
-        source: acme_corp.employee_role_history
+        source: acme_warehouse.acme_corp.employee_role_history
         primary_key: [role_history_id]
         description: SCD-style time-series of employee role changes.
         fields:
@@ -193,7 +194,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: change_reason }] }
 
       - name: compensation
-        source: acme_corp.compensation
+        source: acme_warehouse.acme_corp.compensation
         primary_key: [compensation_id]
         description: Compensation change history. Highly sensitive — restricted access.
         ai_context:
@@ -220,7 +221,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: approved_by }] }
 
       - name: performance_reviews
-        source: acme_corp.performance_reviews
+        source: acme_warehouse.acme_corp.performance_reviews
         primary_key: [review_id]
         description: Half-yearly performance reviews.
         fields:
@@ -245,7 +246,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: time_off_requests
-        source: acme_corp.time_off_requests
+        source: acme_warehouse.acme_corp.time_off_requests
         primary_key: [request_id]
         description: Employee time-off requests.
         ai_context:
@@ -274,7 +275,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: training_courses
-        source: acme_corp.training_courses
+        source: acme_warehouse.acme_corp.training_courses
         primary_key: [course_id]
         description: Catalog of training courses available to employees.
         fields:
@@ -295,7 +296,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: employee_training
-        source: acme_corp.employee_training
+        source: acme_warehouse.acme_corp.employee_training
         primary_key: [enrollment_id]
         description: Junction table tracking employee enrollments in training courses.
         fields:
@@ -320,7 +321,7 @@ semantic_model:
       # SECTION 2 — Customers
       # =============================================================
       - name: customers
-        source: acme_corp.customers
+        source: acme_warehouse.acme_corp.customers
         primary_key: [customer_id]
         description: B2B customer accounts. One row per company (logo).
         ai_context:
@@ -361,7 +362,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: customer_contacts
-        source: acme_corp.customer_contacts
+        source: acme_warehouse.acme_corp.customer_contacts
         primary_key: [contact_id]
         description: People at customer accounts.
         fields:
@@ -388,7 +389,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: customer_addresses
-        source: acme_corp.customer_addresses
+        source: acme_warehouse.acme_corp.customer_addresses
         primary_key: [address_id]
         description: Addresses for customer accounts (billing, shipping, HQ).
         fields:
@@ -417,7 +418,7 @@ semantic_model:
       # SECTION 3 — Sales / CRM
       # =============================================================
       - name: campaigns
-        source: acme_corp.campaigns
+        source: acme_warehouse.acme_corp.campaigns
         primary_key: [campaign_id]
         description: Marketing campaigns across channels.
         fields:
@@ -441,7 +442,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
 
       - name: leads
-        source: acme_corp.leads
+        source: acme_warehouse.acme_corp.leads
         primary_key: [lead_id]
         description: Top-of-funnel leads prior to qualification.
         ai_context:
@@ -479,7 +480,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: opportunities
-        source: acme_corp.opportunities
+        source: acme_warehouse.acme_corp.opportunities
         primary_key: [opportunity_id]
         description: Sales opportunities (deals). Core pipeline and forecast table.
         ai_context:
@@ -517,7 +518,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: sales_activities
-        source: acme_corp.sales_activities
+        source: acme_warehouse.acme_corp.sales_activities
         primary_key: [activity_id]
         description: Logged sales activities (calls, emails, meetings, demos).
         fields:
@@ -544,7 +545,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: duration_minutes }] }
 
       - name: quotes
-        source: acme_corp.quotes
+        source: acme_warehouse.acme_corp.quotes
         primary_key: [quote_id]
         description: Price quotes generated against opportunities.
         fields:
@@ -573,7 +574,7 @@ semantic_model:
       # SECTION 4 — Products / Orders / Billing
       # =============================================================
       - name: product_categories
-        source: acme_corp.product_categories
+        source: acme_warehouse.acme_corp.product_categories
         primary_key: [category_id]
         description: Product category tree (self-referencing).
         fields:
@@ -587,7 +588,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: description }] }
 
       - name: products
-        source: acme_corp.products
+        source: acme_warehouse.acme_corp.products
         primary_key: [product_id]
         description: Sellable products and services.
         ai_context:
@@ -614,7 +615,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: subscriptions
-        source: acme_corp.subscriptions
+        source: acme_warehouse.acme_corp.subscriptions
         primary_key: [subscription_id]
         description: SaaS subscriptions (recurring revenue). Source of truth for MRR/ARR.
         ai_context:
@@ -651,7 +652,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: owner_employee_id }] }
 
       - name: orders
-        source: acme_corp.orders
+        source: acme_warehouse.acme_corp.orders
         primary_key: [order_id]
         description: One-time orders (non-subscription).
         ai_context:
@@ -682,7 +683,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: sales_rep_id }] }
 
       - name: order_items
-        source: acme_corp.order_items
+        source: acme_warehouse.acme_corp.order_items
         primary_key: [order_item_id]
         description: Line items on orders.
         fields:
@@ -702,7 +703,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: line_total_usd }] }
 
       - name: invoices
-        source: acme_corp.invoices
+        source: acme_warehouse.acme_corp.invoices
         primary_key: [invoice_id]
         description: Invoices issued to customers. Linked to subscription or order.
         fields:
@@ -735,7 +736,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: payments
-        source: acme_corp.payments
+        source: acme_warehouse.acme_corp.payments
         primary_key: [payment_id]
         description: Payment transactions against invoices.
         fields:
@@ -765,7 +766,7 @@ semantic_model:
       # SECTION 5 — Support
       # =============================================================
       - name: support_tickets
-        source: acme_corp.support_tickets
+        source: acme_warehouse.acme_corp.support_tickets
         primary_key: [ticket_id]
         description: Customer support tickets.
         ai_context:
@@ -802,7 +803,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: csat_score }] }
 
       - name: ticket_comments
-        source: acme_corp.ticket_comments
+        source: acme_warehouse.acme_corp.ticket_comments
         primary_key: [comment_id]
         description: Chronological comments on support tickets.
         fields:
@@ -826,7 +827,7 @@ semantic_model:
       # SECTION 6 — Projects & Vendors
       # =============================================================
       - name: projects
-        source: acme_corp.projects
+        source: acme_warehouse.acme_corp.projects
         primary_key: [project_id]
         description: Internal projects (cross-functional initiatives).
         fields:
@@ -857,7 +858,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: spend_usd }] }
 
       - name: project_assignments
-        source: acme_corp.project_assignments
+        source: acme_warehouse.acme_corp.project_assignments
         primary_key: [assignment_id]
         description: Employee allocations to projects.
         fields:
@@ -879,7 +880,7 @@ semantic_model:
             dimension: { is_time: true }
 
       - name: vendors
-        source: acme_corp.vendors
+        source: acme_warehouse.acme_corp.vendors
         primary_key: [vendor_id]
         description: Third-party vendors / suppliers.
         fields:
@@ -904,7 +905,7 @@ semantic_model:
             expression: { dialects: [{ dialect: ANSI_SQL, expression: risk_rating }] }
 
       - name: vendor_contracts
-        source: acme_corp.vendor_contracts
+        source: acme_warehouse.acme_corp.vendor_contracts
         primary_key: [contract_id]
         description: Contracts with vendors.
         fields:
@@ -936,7 +937,7 @@ semantic_model:
       # SECTION 7 — Marketing / Web Analytics
       # =============================================================
       - name: web_events
-        source: acme_corp.web_events
+        source: acme_warehouse.acme_corp.web_events
         primary_key: [event_id]
         description: Web analytics events from acme.example. High-volume; prefer partition-pruned queries.
         ai_context:
