@@ -23,8 +23,7 @@ from neo4j import GraphDatabase
 from neocarta.connectors.osi import OsiConnector
 
 # Upstream OSI sample — a TPC-DS-flavored semantic model. Use the raw URL
-# (``raw.githubusercontent.com``); the ``github.com/.../blob/...`` form serves
-# the HTML preview page, not the YAML file.
+# (``raw.githubusercontent.com``)
 TPCDS_OSI_URL = (
     "https://raw.githubusercontent.com/open-semantic-interchange/OSI/"
     "osi-0.1.1-rc1/examples/tpcds_semantic_model.yaml"
