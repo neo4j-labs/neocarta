@@ -3,4 +3,4 @@
 from .extract import OsiSpecExtractor
 from .transform import OsiIngestTransformer
 
-__all__ = ["OsiSpecExtractor", "OsiIngestTransformer"]
+__all__ = ["OsiIngestTransformer", "OsiSpecExtractor"]

@@ -42,8 +42,7 @@ def main() -> None:
 
     connector = OsiConnector(neo4j_driver=neo4j_driver, database_name=neo4j_database)
 
-    # Ingest from the upstream URL. A local path (str or Path) also works:
-    #   connector.ingest("path/to/spec.yaml")
+    # Ingest from the upstream URL. A local filesystem path (str or Path) also works.
     connector.ingest(TPCDS_OSI_URL)
 
     # Export the ingested semantic model back to an OSI YAML file.

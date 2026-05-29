@@ -37,6 +37,7 @@ class OsiConnector:
         database_name: str = "neo4j",
         http_timeout: float = 30.0,
     ) -> None:
+        """Initialize the OSI connector with a Neo4j driver and an OSI-aware loader."""
         self.neo4j_driver = neo4j_driver
         self.database_name = database_name
         self.http_timeout = http_timeout

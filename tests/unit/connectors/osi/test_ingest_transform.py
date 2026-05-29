@@ -132,7 +132,6 @@ def test_query_source_fields_use_uses_column(query_source_spec):
 def test_primary_key_columns_marked_is_primary_key(minimal_spec):
     """Columns whose names appear in dataset.primary_key get is_primary_key=True."""
     t = _run(minimal_spec)
-    by_id = {c.id: c for c in t.column_nodes}
     order_id = next(c for c in t.column_nodes if c.name == "order_id" and "orders" in c.id)
     assert order_id.is_primary_key is True
 
@@ -422,7 +421,7 @@ def test_custom_extensions_create_aspect_with_vendor_name():
 
 
 # ---------------------------------------------------------------------- #
-# Relationships (Joins) and References
+# Relationships -- joins and references between datasets
 # ---------------------------------------------------------------------- #
 
 
@@ -468,7 +467,7 @@ def test_relationship_with_mismatched_column_counts_raises():
             }
         ]
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="zip"):
         _run(spec)
 
 

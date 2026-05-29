@@ -7,6 +7,7 @@ loader, ingest+export transformers, and the graph extractor.
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from neocarta.connectors.osi import OsiConnector
@@ -15,7 +16,6 @@ from neocarta.connectors.osi.export.transform import OsiExportTransformer
 from neocarta.connectors.osi.ingest.extract import OsiSpecExtractor
 from neocarta.connectors.osi.ingest.transform import OsiIngestTransformer
 from neocarta.connectors.osi.load import OsiNeo4jLoader
-
 
 # ---------------------------------------------------------------------- #
 # Round-trip: full connector
@@ -62,13 +62,12 @@ def test_osi_connector_round_trip_tpcds(neo4j_driver, tpcds_yaml_path: Path, tmp
         }
 
 
-def test_osi_connector_export_unknown_model_raises(neo4j_driver):
+def test_osi_connector_export_unknown_model_raises(neo4j_driver, tmp_path: Path):
     """Exporting a semantic model name that doesn't exist surfaces a clear error."""
     connector = OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j")
-    import pytest
 
     with pytest.raises(ValueError, match="No OsiSemanticModel found"):
-        connector.export(semantic_model_name="does_not_exist", output_path="/tmp/x.yaml")
+        connector.export(semantic_model_name="does_not_exist", output_path=tmp_path / "x.yaml")
 
 
 def test_osi_connector_idempotent_reingest(neo4j_driver, tpcds_yaml_path: Path):
@@ -143,8 +142,6 @@ def test_export_extractor_reads_back_loaded_graph(neo4j_driver, tpcds_yaml_path:
 
 def test_export_extractor_raises_for_unknown_model(neo4j_driver):
     """Extracting a missing semantic model name raises ValueError."""
-    import pytest
-
     extractor = OsiGraphExtractor(neo4j_driver, database_name="neo4j")
     with pytest.raises(ValueError, match="No OsiSemanticModel found"):
         extractor.extract("does_not_exist")

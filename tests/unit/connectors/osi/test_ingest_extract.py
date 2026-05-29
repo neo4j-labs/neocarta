@@ -74,11 +74,11 @@ def test_extract_http_url_also_routed_to_httpx():
 
 
 def test_extract_non_mapping_yaml_raises(tmp_path: Path):
-    """YAML that parses to a non-dict (e.g. a list) raises ValueError."""
+    """YAML that parses to a non-dict (e.g. a list) raises TypeError."""
     bad = tmp_path / "bad.yaml"
     bad.write_text("- just\n- a\n- list\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="did not parse to a mapping"):
+    with pytest.raises(TypeError, match="did not parse to a mapping"):
         OsiSpecExtractor(bad).extract()
 
 
@@ -89,11 +89,11 @@ def test_extract_missing_file_raises(tmp_path: Path):
 
 
 def test_extract_empty_yaml_raises(tmp_path: Path):
-    """An empty YAML file parses to None, which is not a mapping — ValueError."""
+    """An empty YAML file parses to None, which is not a mapping — TypeError."""
     empty = tmp_path / "empty.yaml"
     empty.write_text("", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="did not parse to a mapping"):
+    with pytest.raises(TypeError, match="did not parse to a mapping"):
         OsiSpecExtractor(empty).extract()
 
 

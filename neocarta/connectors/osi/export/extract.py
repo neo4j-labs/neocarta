@@ -23,6 +23,7 @@ class OsiGraphExtractor:
     """
 
     def __init__(self, driver: Driver, database_name: str = "neo4j") -> None:
+        """Initialize the extractor with a Neo4j driver and target database name."""
         self.driver = driver
         self.database_name = database_name
         self.snapshot: dict[str, Any] | None = None
@@ -65,7 +66,7 @@ class OsiGraphExtractor:
 
             tables = self._read_tables(session, sm["id"], aspects_by_parent)
             queries = self._read_queries(session, sm["id"], aspects_by_parent)
-            datasets = self._merge_datasets(session, sm["id"], tables, queries, aspects_by_parent)
+            datasets = self._merge_datasets(session, tables, queries, aspects_by_parent)
 
             relationships = self._read_relationships(session, sm["id"], aspects_by_parent)
             metrics = self._read_metrics(session, sm["id"], aspects_by_parent)
@@ -222,7 +223,6 @@ class OsiGraphExtractor:
     def _merge_datasets(
         self,
         session: Any,
-        sm_id: str,
         tables: list[dict[str, Any]],
         queries: list[dict[str, Any]],
         aspects_by_parent: dict[str, list[dict[str, Any]]],

@@ -21,6 +21,7 @@ class OsiSpecExtractor:
     """
 
     def __init__(self, spec_source: str | Path, http_timeout: float = 30.0) -> None:
+        """Initialize the extractor with a local path/URL and an HTTP timeout."""
         self.spec_source = spec_source
         self.http_timeout = http_timeout
         self.spec: dict[str, Any] | None = None
@@ -37,7 +38,7 @@ class OsiSpecExtractor:
         raw = self._read_raw(self.spec_source)
         parsed = yaml.safe_load(raw)
         if not isinstance(parsed, dict):
-            raise ValueError(
+            raise TypeError(
                 f"OSI spec at {self.spec_source!r} did not parse to a mapping; got {type(parsed).__name__}"
             )
         self.spec = parsed

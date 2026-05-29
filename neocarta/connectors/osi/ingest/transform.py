@@ -90,6 +90,7 @@ class OsiIngestTransformer:
     """
 
     def __init__(self) -> None:
+        """Initialize the transformer with empty per-entity caches."""
         # OSI top-level
         self.osi_semantic_model_nodes: list[OsiSemanticModel] = []
         # Structure
@@ -188,7 +189,7 @@ class OsiIngestTransformer:
         for dataset in datasets:
             self._transform_dataset(sm.id, dataset, foreign_key_column_ids)
         for relationship in relationships:
-            self._transform_relationship(sm.id, relationship)
+            self._transform_relationship(relationship)
         for metric in model.get("metrics", []) or []:
             self._transform_metric(sm.id, metric)
 
@@ -385,7 +386,7 @@ class OsiIngestTransformer:
     # Relationships (Join nodes)
     # ------------------------------------------------------------------ #
 
-    def _transform_relationship(self, sm_id: str, relationship: dict[str, Any]) -> None:
+    def _transform_relationship(self, relationship: dict[str, Any]) -> None:
         rel_name = relationship["name"]
         join_id_str = generate_join_id(self._current_sm_name, rel_name)
 

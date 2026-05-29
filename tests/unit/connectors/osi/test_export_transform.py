@@ -87,7 +87,7 @@ def test_top_level_spec_has_version_and_semantic_model_list():
     """The output is a dict with top-level ``version`` and ``semantic_model: [...]``."""
     spec = OsiExportTransformer().transform(_minimal_snapshot())
 
-    assert list(spec.keys())[0] == "version"
+    assert next(iter(spec.keys())) == "version"
     assert spec["version"] == "0.2.0"
     assert isinstance(spec["semantic_model"], list)
     assert len(spec["semantic_model"]) == 1

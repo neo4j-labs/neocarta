@@ -261,6 +261,7 @@ class Aspect(BaseModel):
 class OsiAiContext(Aspect):
     """
     An OSI AI Context aspect carrying agent-facing context as a JSON-encoded string.
+
     Recommended data attributes are:
     - instructions: instructions for AI on how to use this entity
     - synonyms: Alternative names and terms
@@ -272,7 +273,8 @@ class OsiAiContext(Aspect):
 
 class OsiCustomExtensions(Aspect):
     """Custom extensions allow vendors to add platform-specific metadata without breaking core compatibility.
-    Each extension includes a vendor name and arbitrary JSON data."""
+    Each extension includes a vendor name and arbitrary JSON data.
+    """
 
     data: str = Field(..., description="The aspect payload as a JSON-encoded string")
     vendor_name: str = Field(..., description="The name of the vendor")

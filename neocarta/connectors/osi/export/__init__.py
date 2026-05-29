@@ -3,4 +3,4 @@
 from .extract import OsiGraphExtractor
 from .transform import OsiExportTransformer
 
-__all__ = ["OsiGraphExtractor", "OsiExportTransformer"]
+__all__ = ["OsiExportTransformer", "OsiGraphExtractor"]

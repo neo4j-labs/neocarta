@@ -15,6 +15,8 @@ class _InlineList(list):
     formatting used in upstream OSI sample files and keeps the YAML compact.
     """
 
+    __slots__ = ()
+
 
 class _LiteralBlock(str):
     """String subclass that PyYAML renders as a literal block scalar (``|``).
@@ -23,6 +25,8 @@ class _LiteralBlock(str):
     the YAML output as indented multi-line literals rather than a single
     quoted string.
     """
+
+    __slots__ = ()
 
 
 def _represent_inline_list(dumper: yaml.SafeDumper, data: _InlineList) -> Any:
@@ -47,6 +51,7 @@ class OsiExportTransformer:
     """
 
     def __init__(self) -> None:
+        """Initialize the transformer with an empty cached spec."""
         self.spec: dict[str, Any] | None = None
 
     def transform(self, snapshot: dict[str, Any]) -> dict[str, Any]:
