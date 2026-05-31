@@ -85,3 +85,43 @@ CREATE FULLTEXT INDEX {"_".join(labels_lower_sorted) + "_full_text_index"} IF NO
         database_=database_name,
     )
     return summary.counters.__dict__
+
+
+def create_name_range_index(
+    neo4j_driver: Driver,
+    node_label: str,
+    database_name: str = "neo4j",
+) -> dict:
+    """
+    Create a range index on a node's ``name`` property.
+
+    A range index backs exact-equality ``MATCH (n:Label {name: $value})`` lookups, such as the
+    ones the MCP catalog queries issue. Vector and full-text indexes do not back equality
+    matches, so a dedicated range index is required for these lookups to seek rather than scan.
+
+    Parameters
+    ----------
+    neo4j_driver: Driver
+        The Neo4j driver to use.
+    node_label: str
+        The label of the node to create a name range index for. Must be a label whose nodes
+        carry a ``name`` property.
+    database_name: str
+        The name of the database to create the index in.
+
+    Returns:
+    -------
+    dict
+        The summary of the index created.
+    """
+    name_index_query = f"""
+CREATE INDEX {node_label.lower() + "_name_index"} IF NOT EXISTS
+    FOR (n:{node_label})
+    ON (n.name)
+"""
+    _, summary, _ = neo4j_driver.execute_query(
+        query_=name_index_query,
+        routing_=RoutingControl.WRITE,
+        database_=database_name,
+    )
+    return summary.counters.__dict__
