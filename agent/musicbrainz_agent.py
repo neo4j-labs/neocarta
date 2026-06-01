@@ -20,8 +20,6 @@ import os
 
 import httpx
 from dotenv import load_dotenv
-from google.auth import default
-from google.auth.transport.requests import Request
 from langchain.agents import create_agent
 from langchain.tools import BaseTool, tool
 from langchain_litellm import ChatLiteLLM
@@ -37,7 +35,7 @@ load_dotenv()
 
 MUSICBRAINZ_BASE_URL = "https://musicbrainz.org/ws/2"
 # MusicBrainz requires a descriptive User-Agent identifying the application.
-USER_AGENT = "neocarta-musicbrainz-agent/0.1 ( rajvardhan.patil@neo4j.com )"
+USER_AGENT = "neocarta-musicbrainz-agent/0.1"
 VALID_ENTITIES = {
     "artist",
     "release",
@@ -150,21 +148,6 @@ def create_musicbrainz_agent(tools: list[BaseTool]) -> CompiledStateGraph:
 # Interactive runner
 # ---------------------------------------------------------------------------
 
-
-class GoogleAuth(httpx.Auth):
-    """Custom httpx auth handler that injects Google Cloud bearer tokens."""
-
-    def __init__(self) -> None:
-        """Initialize credentials using the application default credentials."""
-        self.credentials, _ = default()
-
-    def auth_flow(self, request):  # noqa: ANN001, ANN201
-        """Refresh the token and inject it into the request."""
-        self.credentials.refresh(Request())
-        request.headers["Authorization"] = f"Bearer {self.credentials.token}"
-        yield request
-
-
 # Env vars forwarded to the MCP subprocess. `StdioServerParameters` rejects None
 # values, so any var not set in the parent environment is dropped below.
 _mcp_env_candidates = {
@@ -178,64 +161,25 @@ _mcp_env_candidates = {
 
 CONFIG = {"configurable": {"thread_id": "1"}}
 
-# The BigQuery MCP server exposes many tools; we only want SQL execution.
-BIGQUERY_ALLOWED_TOOLS = {"execute_sql"}
-
-
-def _build_mcp_servers() -> tuple[dict, bool]:
-    """Build the MCP server params, including BigQuery only when usable.
-
-    Returns:
-    -------
-    tuple[dict, bool]
-        The server-params mapping and whether the BigQuery server was added.
-        BigQuery requires Google application default credentials, so it is
-        skipped (with a notice) when those are unavailable.
-    """
-    servers = {
-        "sql_metadata_graph": {
-            "transport": "stdio",
-            "command": "uv",
-            "args": ["run", "neocarta-mcp"],
-            "env": {k: v for k, v in _mcp_env_candidates.items() if v is not None},
-        }
-    }
-
-    bigquery_available = False
-    try:
-        servers["bigquery"] = {
-            "transport": "http",
-            "url": "https://bigquery.googleapis.com/mcp",
-            "auth": GoogleAuth(),
-            "headers": {"Content-Type": "application/json"},
-        }
-        bigquery_available = True
-    except Exception as e:
-        print(f"BigQuery MCP server disabled (no Google credentials): {e}")
-
-    return servers, bigquery_available
-
 
 async def main() -> None:
-    """Connect to MCP servers, build the agent, and run an interactive chat loop."""
-    servers, bigquery_available = _build_mcp_servers()
-    client = MultiServerMCPClient(servers)
+    """Connect to the Neocarta MCP server, build the agent, and run a chat loop."""
+    client = MultiServerMCPClient(
+        {
+            "sql_metadata_graph": {
+                "transport": "stdio",
+                "command": "uv",
+                "args": ["run", "neocarta-mcp"],
+                "env": {k: v for k, v in _mcp_env_candidates.items() if v is not None},
+            }
+        }
+    )
 
     # The neocarta server self-filters its tool set based on the target
-    # database's index inventory, so we trust everything it exposes.
+    # database's index inventory, so we trust everything it exposes. Add the
+    # custom live MusicBrainz REST API tool alongside it.
     neocarta_tools = await client.get_tools(server_name="sql_metadata_graph")
-    tools: list[BaseTool] = list(neocarta_tools)
-
-    # The BigQuery MCP server exposes more than we want; allowlist execute_sql.
-    if bigquery_available:
-        try:
-            bigquery_tools = await client.get_tools(server_name="bigquery")
-            tools += [t for t in bigquery_tools if t.name in BIGQUERY_ALLOWED_TOOLS]
-        except Exception as e:
-            print(f"Could not load BigQuery tools: {e}")
-
-    # The custom live MusicBrainz REST API tool.
-    tools.append(musicbrainz_search)
+    tools: list[BaseTool] = [*neocarta_tools, musicbrainz_search]
 
     agent = create_musicbrainz_agent(tools)
 
