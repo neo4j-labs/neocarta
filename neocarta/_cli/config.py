@@ -31,6 +31,7 @@ ENV_VARS: dict[str, str] = {
     "BIGQUERY_DATASET_ID": "Default BigQuery dataset ID.",
     "BIGQUERY_REGION": "BigQuery region for INFORMATION_SCHEMA queries.",
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
+    "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv load`).",
 }
 
 
@@ -58,6 +59,9 @@ class CLISettings(BaseSettings):
     gcp_project_id: str | None = Field(default=None, validation_alias="GCP_PROJECT_ID")
     bigquery_dataset_id: str | None = Field(default=None, validation_alias="BIGQUERY_DATASET_ID")
     bigquery_region: str = Field(default="region-us", validation_alias="BIGQUERY_REGION")
+
+    # CSV
+    csv_directory: str | None = Field(default=None, validation_alias="CSV_DIRECTORY")
 
 
 def load_settings() -> CLISettings:
