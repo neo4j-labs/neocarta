@@ -80,6 +80,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
             "primary_key",
             "unique_keys",
         ],
+        create_name_index: bool = True,
     ) -> dict:
         """
         Load OsiTable nodes (``:Table:OsiTable``).
@@ -90,6 +91,8 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """
         _validate_properties_list(OsiTable, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.TABLE])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.TABLE)
         query = _build_node_ingest_query(
             NodeLabel.TABLE,
             overwrite_existing,
@@ -116,10 +119,13 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
             "is_foreign_key",
             "is_time_dimension",
         ],
+        create_name_index: bool = True,
     ) -> dict:
         """Load OsiColumn nodes (``:Column:OsiColumn``)."""
         _validate_properties_list(OsiColumn, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.COLUMN])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.COLUMN)
         query = _build_node_ingest_query(
             NodeLabel.COLUMN,
             overwrite_existing,
@@ -133,10 +139,13 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         nodes: list[Metric],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_name_index: bool = True,
     ) -> dict:
         """Load Metric nodes."""
         _validate_properties_list(Metric, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.METRIC])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.METRIC)
         query = _build_node_ingest_query(NodeLabel.METRIC, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
@@ -145,6 +154,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         nodes: list[Join],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "from_columns", "to_columns"],
+        create_name_index: bool = True,
     ) -> dict:
         """
         Load Join nodes.
@@ -155,6 +165,8 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """
         _validate_properties_list(Join, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.JOIN])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.JOIN)
         query = _build_node_ingest_query(NodeLabel.JOIN, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
@@ -208,6 +220,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         self,
         nodes: list[BusinessTerm],
         properties_list: list[str] = ["description"],
+        create_name_index: bool = True,
     ) -> dict:
         """
         MERGE BusinessTerm nodes on ``name`` rather than ``id``.
@@ -218,6 +231,8 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         """
         _validate_properties_list(BusinessTerm, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.BUSINESS_TERM])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.BUSINESS_TERM)
         set_extras = ", ".join(f"n.{p} = row.{p}" for p in properties_list)
         # Only set id on first create — never overwrite an existing BT's id.
         cypher = f"""
