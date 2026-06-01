@@ -26,6 +26,7 @@
 - Add `generate_osi_semantic_model_id`, `generate_metric_id`, `generate_join_id`, `generate_expression_id`, `generate_ai_context_id`, `generate_custom_extension_id`, `generate_query_column_id` to `connectors.utils.generate_id`.
 - Extend `_build_node_ingest_query` with an optional `secondary_labels` argument so subtype labels (e.g. `:Table:OsiTable`, `:Aspect:OsiAiContext`) can be applied in a single MERGE. Existing call sites are unaffected (default is no secondary labels).
 - Add `_run_write` helper to `Neo4jRDBMSLoader` for the common `execute_query`/`summary.counters` write pattern; reused by the new `OsiNeo4jLoader` subclass.
+- Add `create_name_range_index` in `neocarta.ingest.indexes` and wire it into `Neo4jRDBMSLoader` so a RANGE index on `n.name` is created (when node constraints are written, before ingestion) for every name-bearing label: `Database`, `Schema`, `Table`, `Column`, `Glossary`, `Category`, `BusinessTerm`, and `CTE`. This backs the exact-equality `MATCH (n {name: ...})` lookups used by the MCP catalog queries, which previously fell back to a full label scan (vector and full-text indexes do not back equality matches). Creation is on by default and can be disabled per load method via `create_name_index=False`.
 
 ## v0.5.0
 
