@@ -27,7 +27,7 @@ def csv() -> None:
     """Run CSV connectors against a directory of metadata files."""
 
 
-@csv.command("load")
+@csv.command("ingest")
 @click.option(
     "--csv-directory",
     default=None,
@@ -37,7 +37,7 @@ def csv() -> None:
     "--embeddings/--no-embeddings",
     "embeddings",
     default=False,
-    help="Generate embeddings for ingested nodes after load (default: disabled).",
+    help="Generate embeddings for ingested nodes after ingest (default: disabled).",
 )
 @click.option(
     "--embedding-model",
@@ -64,7 +64,7 @@ def csv() -> None:
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
 @click.pass_context
-def csv_load(
+def csv_ingest(
     ctx: click.Context,
     *,
     csv_directory: str | None,
@@ -74,9 +74,9 @@ def csv_load(
     dry_run: bool,
     json_flag: bool,
 ) -> None:
-    """Load metadata from CSV files into the Neo4j semantic graph.
+    """Ingest metadata from CSV files into the Neo4j semantic graph.
 
-    Loads every entity CSV found in the directory (Database, Schema, Table,
+    Ingests every entity CSV found in the directory (Database, Schema, Table,
     Column, Value, Query, and glossary nodes) plus their relationships; files
     that are not present are skipped. When --embeddings is enabled, description
     embeddings are generated and written back to the graph (requires
@@ -102,7 +102,7 @@ def csv_load(
 
     if dry_run:
         payload = {
-            "csv_load": {
+            "csv_ingest": {
                 "dry_run": True,
                 "csv_directory": csv_directory,
                 "database": settings.neo4j_database,
@@ -141,7 +141,7 @@ def csv_load(
             raise cli_error_from(exc) from exc
 
     payload = {
-        "csv_load": {
+        "csv_ingest": {
             "csv_directory": csv_directory,
             "database": settings.neo4j_database,
             "embeddings": embeddings,
@@ -152,7 +152,7 @@ def csv_load(
         emit_json(payload)
     else:
         stdout.print(
-            f"Loaded CSV metadata from [bold]{csv_directory}[/bold] into "
+            f"Ingested CSV metadata from [bold]{csv_directory}[/bold] into "
             f"[bold]{settings.neo4j_database}[/bold] "
             f"({'with' if embeddings else 'without'} embeddings)."
         )

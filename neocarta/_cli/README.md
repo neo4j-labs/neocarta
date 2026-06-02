@@ -25,7 +25,7 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `BIGQUERY_DATASET_ID` | Yes for `bigquery *` | — | Default BigQuery dataset ID |
 | `BIGQUERY_REGION` | No | `region-us` | BigQuery region for `INFORMATION_SCHEMA` queries |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
-| `CSV_DIRECTORY` | For `csv load` | — | Directory containing CSV metadata files |
+| `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
 
 Secrets are env-only and never logged.
 
@@ -88,13 +88,13 @@ neocarta bigquery logs --dataset-id sales --include-failed-queries
 
 ---
 
-### `neocarta csv load`
+### `neocarta csv ingest`
 
 Loads metadata from a directory of CSV files into the Neocarta graph using `CSVConnector`. Every entity CSV found in the directory is loaded (`Database`, `Schema`, `Table`, `Column`, `Value`, `Query`, and glossary nodes) along with their relationships; files that are not present are skipped. When `--embeddings` is enabled, description embeddings are generated and written back.
 
 - **Flags:**
   - `--csv-directory TEXT` — Directory containing the CSV metadata files. Overrides `CSV_DIRECTORY`.
-  - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: disabled.
+  - `--embeddings / --no-embeddings` — Generate embeddings after ingest. Default: disabled.
   - `--embedding-model TEXT` — OpenAI embedding model (default: `text-embedding-3-small`).
   - `--embedding-dimensions INT` — Embedding vector dimensions (default: `768`).
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
@@ -102,9 +102,9 @@ Loads metadata from a directory of CSV files into the Neocarta graph using `CSVC
 - **Use when:** ingesting curated metadata from CSV files, or loading the bundled sample dataset for local testing.
 
 ```bash
-neocarta csv load --csv-directory ./datasets/csv
-neocarta csv load --csv-directory ./datasets/csv --embeddings
-CSV_DIRECTORY=./datasets/csv neocarta csv load --dry-run --json
+neocarta csv ingest --csv-directory ./datasets/csv
+neocarta csv ingest --csv-directory ./datasets/csv --embeddings
+CSV_DIRECTORY=./datasets/csv neocarta csv ingest --dry-run --json
 ```
 
 ---

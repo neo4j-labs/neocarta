@@ -45,7 +45,7 @@ def test_csv_group_help_lists_verbs():
     runner = CliRunner()
     result = runner.invoke(cli, ["csv", "--help"])
     assert result.exit_code == 0
-    assert "load" in result.output
+    assert "ingest" in result.output
 
 
 def test_agent_context_emits_valid_json():
@@ -59,7 +59,7 @@ def test_agent_context_emits_valid_json():
     assert "schema" in payload["commands"]["bigquery"]["subcommands"]
     assert "logs" in payload["commands"]["bigquery"]["subcommands"]
     assert "csv" in payload["commands"]
-    assert "load" in payload["commands"]["csv"]["subcommands"]
+    assert "ingest" in payload["commands"]["csv"]["subcommands"]
     # The exit-code map is part of the public contract; spot-check a known entry.
     assert payload["exit_codes"]["success"]["code"] == 0
     assert payload["exit_codes"]["usage_error"]["code"] == 2
