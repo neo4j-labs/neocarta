@@ -551,7 +551,8 @@ class CSVTransformer:
 
         relationships = [
             TaggedWith(
-                entity_id=row.column_id,
+                source_label="Column",
+                source_id=row.column_id,
                 business_term_id=row.business_term_id,
             )
             for row in df.itertuples(index=False)
@@ -566,7 +567,8 @@ class CSVTransformer:
 
         relationships = [
             TaggedWith(
-                entity_id=row.table_id,
+                source_label="Table",
+                source_id=row.table_id,
                 business_term_id=row.business_term_id,
             )
             for row in df.itertuples(index=False)

@@ -592,7 +592,11 @@ class DataplexTransformer:
         list[TaggedWith]
         """
         relationships = [
-            TaggedWith(entity_id=row.entity_id, business_term_id=row.business_term_id)
+            TaggedWith(
+                source_label="Column",
+                source_id=row.entity_id,
+                business_term_id=row.business_term_id,
+            )
             for _, row in column_term_info.iterrows()
         ]
 
@@ -620,7 +624,11 @@ class DataplexTransformer:
         list[TaggedWith]
         """
         relationships = [
-            TaggedWith(entity_id=row.entity_id, business_term_id=row.business_term_id)
+            TaggedWith(
+                source_label="Table",
+                source_id=row.entity_id,
+                business_term_id=row.business_term_id,
+            )
             for _, row in table_term_info.iterrows()
         ]
 
