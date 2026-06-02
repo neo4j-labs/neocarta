@@ -15,6 +15,7 @@
 - **Breaking:** MCP server settings: `openai_api_key` and `embedding_dimensions` removed. `embedding_model` is the only embedding-related setting. Provider auth (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `AZURE_`*, `AWS_`*, ...) is read directly by LiteLLM from standard env vars. Advanced overrides (LiteLLM Proxy, custom endpoints) move into the connector's `litellm_kwargs` argument.
 - `create_openai_embedder` in `neocarta/_mcp/embeddings.py` renamed to `create_embedder`.
 - Text2SQL agent chat LLM is now provider-agnostic via `langchain-litellm`. Model is configurable through the `AGENT_MODEL` env var (default `openai/gpt-4o-mini`); any LiteLLM model id is accepted (e.g. `gemini/gemini-2.0-flash`, `anthropic/claude-sonnet-4-5`).
+- Shared Neo4j-driver and embedder helpers are factored from BigQuery CLI module into `neocarta/_cli/commands/_common.py` for all CLI commands to use.
 
 ### Added
 
@@ -27,6 +28,7 @@
 - Extend `_build_node_ingest_query` with an optional `secondary_labels` argument so subtype labels (e.g. `:Table:OsiTable`, `:Aspect:OsiAiContext`) can be applied in a single MERGE. Existing call sites are unaffected (default is no secondary labels).
 - Add `_run_write` helper to `Neo4jRDBMSLoader` for the common `execute_query`/`summary.counters` write pattern; reused by the new `OsiNeo4jLoader` subclass.
 - Add `create_name_range_index` in `neocarta.ingest.indexes` and wire it into `Neo4jRDBMSLoader` so a RANGE index on `n.name` is created (when node constraints are written, before ingestion) for every name-bearing label: `Database`, `Schema`, `Table`, `Column`, `Glossary`, `Category`, `BusinessTerm`, and `CTE`. This backs the exact-equality `MATCH (n {name: ...})` lookups used by the MCP catalog queries, which previously fell back to a full label scan (vector and full-text indexes do not back equality matches). Creation is on by default and can be disabled per load method via `create_name_index=False`.
+* Add `neocarta csv ingest` CLI command wrapping `CSVConnector` to load metadata from a directory of CSV files into Neo4j. Loads every entity CSV present (skipping missing files); the directory comes from `--csv-directory` or the `CSV_DIRECTORY` env var. Supports `--dry-run` and `--json`; embeddings are opt-in via `--embeddings` (default off). 
 
 ## v0.5.0
 
