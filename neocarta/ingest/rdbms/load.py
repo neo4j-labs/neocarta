@@ -71,15 +71,15 @@ class Neo4jRDBMSLoader:
             database_name=self.database_name,
         )
 
-        def _run_write(self, cypher: str, rows: list[dict]) -> dict:
-            """Execute a write Cypher against the configured database and return counters."""
-            _, summary, _ = self.neo4j_driver.execute_query(
-                query_=cypher,
-                parameters_={"rows": rows},
-                routing_=RoutingControl.WRITE,
-                database_=self.database_name,
-            )
-            return summary.counters.__dict__
+    def _run_write(self, cypher: str, rows: list[dict]) -> dict:
+        """Execute a write Cypher against the configured database and return counters."""
+        _, summary, _ = self.neo4j_driver.execute_query(
+            query_=cypher,
+            parameters_={"rows": rows},
+            routing_=RoutingControl.WRITE,
+            database_=self.database_name,
+        )
+        return summary.counters.__dict__
 
     def load_database_nodes(
         self,

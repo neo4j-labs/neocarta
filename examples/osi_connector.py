@@ -29,7 +29,9 @@ from neo4j import GraphDatabase
 from neocarta.connectors.osi import OsiConnector
 
 # Local ACME sample — the 33-table semantic model in datasets/osi/.
-ACME_OSI_PATH = Path(__file__).resolve().parent.parent / "datasets" / "osi" / "acme_semantic_model.yaml"
+ACME_OSI_PATH = (
+    Path(__file__).resolve().parent.parent / "datasets" / "osi" / "acme_semantic_model.yaml"
+)
 
 # Upstream OSI sample — a TPC-DS-flavored semantic model.
 # Use the raw URL (``raw.githubusercontent.com``).

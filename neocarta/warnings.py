@@ -6,6 +6,7 @@ specifically::
 
     import warnings
     from neocarta.warnings import NeocartaWarning
+
     warnings.filterwarnings("ignore", category=NeocartaWarning)
 
 Sibling of :mod:`neocarta.errors`. Errors are raised; warnings are emitted.
@@ -38,5 +39,6 @@ class UnsupportedOsiVersionWarning(NeocartaWarning):
 
         import warnings
         from neocarta.warnings import UnsupportedOsiVersionWarning
+
         warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
     """
