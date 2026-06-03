@@ -1,8 +1,11 @@
 """CSV Connector for loading metadata from CSV files into Neo4j."""
 
+import warnings
+
 from neo4j import Driver
 
 from ...enums import NodeLabel, RelationshipType
+from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import CSVExtractor
 from .transform import CSVTransformer
@@ -12,10 +15,26 @@ class CSVConnector:
     """
     Connector for loading metadata from CSV files into Neo4j.
 
-    Follows an Extract → Transform → Load pattern:
-    - Extract: CSVExtractor reads and validates CSV files into DataFrames.
-    - Transform: CSVTransformer converts DataFrames into typed data model objects.
-    - Load: Neo4jRDBMSLoader writes the objects to Neo4j.
+    Follows an Extract → Transform → Load pipeline:
+
+    - :meth:`extract` reads and validates CSV files into DataFrames.
+    - :meth:`transform` converts DataFrames into typed data model objects.
+    - :meth:`load` writes the objects to Neo4j.
+
+    :meth:`ingest` runs all three stages in order and records the neocarta graph
+    metadata node at the end.
+
+    Parameters
+    ----------
+    csv_directory : str
+        Path to directory containing CSV files.
+    neo4j_driver : Driver
+        Neo4j driver instance.
+    database_name : str, optional
+        Neo4j database name, by default "neo4j".
+    csv_file_map : dict[str, str], optional
+        Custom mapping of entity keys to CSV filenames.
+        Merges with CSVExtractor.DEFAULT_FILE_MAP, allowing partial overrides.
     """
 
     def __init__(
@@ -25,27 +44,15 @@ class CSVConnector:
         database_name: str = "neo4j",
         csv_file_map: dict[str, str] | None = None,
     ) -> None:
-        """
-        Initialize the CSV connector.
-
-        Parameters
-        ----------
-        csv_directory : str
-            Path to directory containing CSV files.
-        neo4j_driver : Driver
-            Neo4j driver instance.
-        database_name : str, optional
-            Neo4j database name, by default "neo4j".
-        csv_file_map : dict[str, str], optional
-            Custom mapping of entity keys to CSV filenames.
-            Merges with CSVExtractor.DEFAULT_FILE_MAP, allowing partial overrides.
-        """
+        """Initialize the CSV connector."""
         self.extractor = CSVExtractor(csv_directory, csv_file_map)
         self.transformer = CSVTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
+        self._extracted = False
 
-    def extract_metadata(
+    def extract(
         self,
+        *,
         include_nodes: list[NodeLabel] | None = None,
         include_relationships: list[RelationshipType] | None = None,
     ) -> None:
@@ -60,13 +67,23 @@ class CSVConnector:
             Relationship types to extract. If None, all relationship CSVs are read.
         """
         self.extractor.extract_all(include_nodes, include_relationships)
+        self._extracted = True
 
-    def transform_metadata(self) -> None:
+    def transform(self) -> None:
         """
         Convert extracted DataFrames into data model objects.
 
-        extract_metadata() must be called before this method.
+        Raises
+        ------
+        StateError
+            If called before :meth:`extract`.
         """
+        if not self._extracted:
+            raise StateError(
+                "CSVConnector.transform() called before extract(); call .extract() first.",
+                suggestion="Call connector.extract() before connector.transform().",
+            )
+
         e = self.extractor
         t = self.transformer
 
@@ -92,14 +109,23 @@ class CSVConnector:
         t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
         t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
 
-    def load_metadata(self) -> None:
+    def load(self) -> None:
         """
         Write transformed data model objects into Neo4j.
 
-        transform_metadata() must be called before this method.
         Nodes are always loaded before relationships.
+
+        Raises
+        ------
+        StateError
+            If called before :meth:`transform`.
         """
         t = self.transformer
+        if not self._extracted:
+            raise StateError(
+                "CSVConnector.load() called before extract()/transform().",
+                suggestion="Call connector.extract() and connector.transform() first.",
+            )
 
         print("\n=== Loading Nodes ===")
         if t.database_nodes:
@@ -215,8 +241,9 @@ class CSVConnector:
                 self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
             )
 
-    def run(
+    def ingest(
         self,
+        *,
         include_nodes: list[NodeLabel] | None = None,
         include_relationships: list[RelationshipType] | None = None,
     ) -> None:
@@ -228,16 +255,16 @@ class CSVConnector:
         Parameters
         ----------
         include_nodes : list[NodeLabel], optional
-            Node types to load. If None, all available node CSVs are loaded. Allowed values are from the `NodeLabel` enum.
+            Node types to load. If None, all available node CSVs are loaded.
         include_relationships : list[RelationshipType], optional
             Relationship types to load. If None, all available relationship CSVs
-            are loaded. Allowed values are from the `RelationshipType` enum.
+            are loaded.
 
         Examples:
         --------
         Load only core schema entities:
 
-        >>> connector.run(
+        >>> connector.ingest(
         ...     include_nodes=[
         ...         NodeLabel.DATABASE,
         ...         NodeLabel.SCHEMA,
@@ -253,14 +280,32 @@ class CSVConnector:
 
         Load everything:
 
-        >>> connector.run()
+        >>> connector.ingest()
         """
         print("Extracting metadata from CSV files...")
-        self.extract_metadata(include_nodes, include_relationships)
+        self.extract(include_nodes=include_nodes, include_relationships=include_relationships)
         print("Transforming metadata...")
-        self.transform_metadata()
+        self.transform()
         print("Loading metadata into Neo4j...")
-        self.load_metadata()
+        self.load()
         print("Recording neocarta graph metadata...")
         print(self.loader.upsert_neocarta_graph_node().model_dump())
         print("\nCSV connector completed successfully!")
+
+    def run(
+        self,
+        include_nodes: list[NodeLabel] | None = None,
+        include_relationships: list[RelationshipType] | None = None,
+    ) -> None:
+        """
+        Run the CSV connector.
+
+        .. deprecated::
+            Use :meth:`ingest` instead. ``run`` will be removed in a future release.
+        """
+        warnings.warn(
+            "CSVConnector.run() is deprecated; use CSVConnector.ingest() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.ingest(include_nodes=include_nodes, include_relationships=include_relationships)
