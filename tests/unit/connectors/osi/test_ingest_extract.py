@@ -10,8 +10,8 @@ from neocarta.connectors.osi.ingest.extract import OsiSpecExtractor
 
 def test_extract_from_path_object(tpcds_yaml_path: Path):
     """A pathlib.Path source loads and parses to a dict with semantic_model."""
-    extractor = OsiSpecExtractor(tpcds_yaml_path)
-    spec = extractor.extract()
+    extractor = OsiSpecExtractor()
+    spec = extractor.extract(tpcds_yaml_path)
 
     assert isinstance(spec, dict)
     assert "semantic_model" in spec
@@ -21,18 +21,18 @@ def test_extract_from_path_object(tpcds_yaml_path: Path):
 
 def test_extract_from_string_path(tpcds_yaml_path: Path):
     """A string filesystem path (no http scheme) loads from disk."""
-    extractor = OsiSpecExtractor(str(tpcds_yaml_path))
-    spec = extractor.extract()
+    extractor = OsiSpecExtractor()
+    spec = extractor.extract(str(tpcds_yaml_path))
 
     assert spec["semantic_model"][0]["name"] == "tpcds_retail_model"
 
 
 def test_extract_caches_result_on_instance(tpcds_yaml_path: Path):
     """extract() caches the parsed spec on the instance as ``spec``."""
-    extractor = OsiSpecExtractor(tpcds_yaml_path)
+    extractor = OsiSpecExtractor()
     assert extractor.spec is None
 
-    spec = extractor.extract()
+    spec = extractor.extract(tpcds_yaml_path)
     assert extractor.spec is spec
 
 
@@ -51,8 +51,8 @@ semantic_model:
     with patch(
         "neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response
     ) as mock_get:
-        extractor = OsiSpecExtractor("https://example.com/spec.yaml", http_timeout=5.0)
-        spec = extractor.extract()
+        extractor = OsiSpecExtractor(http_timeout=5.0)
+        spec = extractor.extract("https://example.com/spec.yaml")
 
     mock_get.assert_called_once()
     args, kwargs = mock_get.call_args
@@ -68,7 +68,7 @@ def test_extract_http_url_also_routed_to_httpx():
     mock_response.raise_for_status = MagicMock()
 
     with patch("neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response):
-        spec = OsiSpecExtractor("http://example.com/spec.yaml").extract()
+        spec = OsiSpecExtractor().extract("http://example.com/spec.yaml")
 
     assert spec["semantic_model"] == []
 
@@ -79,13 +79,13 @@ def test_extract_non_mapping_yaml_raises(tmp_path: Path):
     bad.write_text("- just\n- a\n- list\n", encoding="utf-8")
 
     with pytest.raises(TypeError, match="did not parse to a mapping"):
-        OsiSpecExtractor(bad).extract()
+        OsiSpecExtractor().extract(bad)
 
 
 def test_extract_missing_file_raises(tmp_path: Path):
     """Missing local file raises FileNotFoundError from the underlying read."""
     with pytest.raises(FileNotFoundError):
-        OsiSpecExtractor(tmp_path / "does_not_exist.yaml").extract()
+        OsiSpecExtractor().extract(tmp_path / "does_not_exist.yaml")
 
 
 def test_extract_empty_yaml_raises(tmp_path: Path):
@@ -94,7 +94,7 @@ def test_extract_empty_yaml_raises(tmp_path: Path):
     empty.write_text("", encoding="utf-8")
 
     with pytest.raises(TypeError, match="did not parse to a mapping"):
-        OsiSpecExtractor(empty).extract()
+        OsiSpecExtractor().extract(empty)
 
 
 def test_extract_url_http_error_propagates():
@@ -108,4 +108,4 @@ def test_extract_url_http_error_propagates():
 
     with patch("neocarta.connectors.osi.ingest.extract.httpx.get", return_value=mock_response):
         with pytest.raises(httpx.HTTPStatusError):
-            OsiSpecExtractor("https://example.com/missing.yaml").extract()
+            OsiSpecExtractor().extract("https://example.com/missing.yaml")

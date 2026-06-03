@@ -131,7 +131,7 @@ def csv_ingest(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run()
+            connector.ingest()
 
             if embeddings:
                 stderr.print("[dim]Generating embeddings...[/dim]")

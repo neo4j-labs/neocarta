@@ -14,32 +14,36 @@ class OsiSpecExtractor:
 
     Parameters
     ----------
-    spec_source : str | Path
-        Either a filesystem path or a URL beginning with ``http://`` / ``https://``.
     http_timeout : float, default 30.0
         Timeout in seconds for URL fetches.
     """
 
-    def __init__(self, spec_source: str | Path, http_timeout: float = 30.0) -> None:
-        """Initialize the extractor with a local path/URL and an HTTP timeout."""
-        self.spec_source = spec_source
+    def __init__(self, http_timeout: float = 30.0) -> None:
+        """Initialize the extractor with an HTTP timeout."""
         self.http_timeout = http_timeout
         self.spec: dict[str, Any] | None = None
 
-    def extract(self) -> dict[str, Any]:
+    def extract(self, spec_source: str | Path) -> dict[str, Any]:
         """
         Read the OSI spec from ``spec_source`` and parse it as YAML.
+
+        Parameters
+        ----------
+        spec_source : str | Path
+            A filesystem path or an ``http(s)://`` URL pointing to the OSI YAML.
 
         Returns:
         -------
         dict[str, Any]
-            The parsed YAML document as a Python dict. Cached on the instance as ``self.spec``.
+            The parsed YAML document as a Python dict. Cached on the instance as
+            ``self.spec``; replaces any prior cached value.
         """
-        raw = self._read_raw(self.spec_source)
+        raw = self._read_raw(spec_source)
         parsed = yaml.safe_load(raw)
         if not isinstance(parsed, dict):
             raise TypeError(
-                f"OSI spec at {self.spec_source!r} did not parse to a mapping; got {type(parsed).__name__}"
+                f"OSI spec at {spec_source!r} did not parse to a mapping; "
+                f"got {type(parsed).__name__}"
             )
         self.spec = parsed
         return parsed

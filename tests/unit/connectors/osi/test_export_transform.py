@@ -229,7 +229,7 @@ def test_to_yaml_writes_parseable_yaml(tmp_path: Path):
     transformer.transform(_minimal_snapshot())
 
     out = tmp_path / "spec.yaml"
-    transformer.to_yaml(out)
+    transformer._to_yaml(out)
 
     reloaded = yaml.safe_load(out.read_text(encoding="utf-8"))
     assert reloaded == transformer.spec
@@ -238,7 +238,7 @@ def test_to_yaml_writes_parseable_yaml(tmp_path: Path):
 def test_to_yaml_before_transform_raises(tmp_path: Path):
     """Calling to_yaml without transform first raises a RuntimeError."""
     with pytest.raises(RuntimeError, match="transform must be called"):
-        OsiExportTransformer().to_yaml(tmp_path / "x.yaml")
+        OsiExportTransformer()._to_yaml(tmp_path / "x.yaml")
 
 
 def test_simple_string_lists_render_in_flow_style(tmp_path: Path):
@@ -247,7 +247,7 @@ def test_simple_string_lists_render_in_flow_style(tmp_path: Path):
     transformer.transform(_minimal_snapshot())
 
     out = tmp_path / "spec.yaml"
-    transformer.to_yaml(out)
+    transformer._to_yaml(out)
     text = out.read_text(encoding="utf-8")
 
     # primary_key is flow
@@ -268,7 +268,7 @@ def test_ai_context_renders_as_native_yaml_structure(tmp_path: Path):
     transformer.transform(_minimal_snapshot())
 
     out = tmp_path / "spec.yaml"
-    transformer.to_yaml(out)
+    transformer._to_yaml(out)
     text = out.read_text(encoding="utf-8")
 
     # SM-level ai_context (dict) emitted as native YAML, not a quoted JSON string.
@@ -285,7 +285,7 @@ def test_custom_extension_data_renders_as_literal_block(tmp_path: Path):
     transformer.transform(_minimal_snapshot())
 
     out = tmp_path / "spec.yaml"
-    transformer.to_yaml(out)
+    transformer._to_yaml(out)
     text = out.read_text(encoding="utf-8")
 
     # ``data: |`` (clip style, no minus) followed by indented multi-line JSON.

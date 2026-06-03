@@ -141,11 +141,10 @@ def bigquery_schema(
             connector = BigQuerySchemaConnector(
                 client=bq_client.Client(project=project_id),
                 project_id=project_id,
-                dataset_id=dataset_id,
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run()
+            connector.ingest(dataset_id=dataset_id)
 
             if embeddings:
                 stderr.print("[dim]Generating embeddings...[/dim]")
@@ -302,7 +301,7 @@ def bigquery_logs(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run(
+            connector.ingest(
                 dataset_id=dataset_id,
                 region=region,
                 start_timestamp=start_timestamp,

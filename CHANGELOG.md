@@ -5,9 +5,24 @@
 
 ### Fixed
 
+- Connector lifecycle state-tracking. `extract()` on every connector now resets the downstream `_extracted` / `_transformed` flags so a stale prior `transform()` can't be inadvertently `load()`ed after a second `extract()`. `load()` now checks `_transformed` (not `_extracted`), enforcing the lifecycle rule from `docs/connector-refactor-guidance.md` §9 instead of accepting any extract-followed-by-load sequence.
+
 ### Changed
 
+- **Breaking:** Connector public API standardized. All connectors now expose `extract()` / `transform()` / `load()` as public stages (renamed from `extract_metadata` / `transform_metadata` / `load_metadata`) plus an `ingest()` orchestrator. Format connectors additionally expose `export()` as the sole public method for the export direction; its internal stages (graph read, source-format build, file write) are private. The legacy `run()` entrypoint is preserved on every connector as a thin wrapper emitting a `DeprecationWarning`; it will be removed after approximately three releases.
+- **Breaking:** `DataplexConnector` split into two purpose-scoped sub-connectors: `DataplexSchemaConnector` (BigQuery catalog metadata) and `DataplexGlossaryConnector` (business glossary + catalog↔glossary entry links that back TAGGED_WITH edges). The combined class with `include_schema` / `include_glossary` flags is removed. Schema must be ingested before glossary so TAGGED_WITH edges find their target Column / Table nodes.
+- **Breaking:** Connector `__init__.py` exports trimmed to the connector class plus connector-specific warnings/errors only. Internal `Extractor` / `Transformer` / `Loader` classes are no longer re-exported from connector package roots; import them via their full module paths (e.g. `from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor`).
+- Passing `dataset_id` to `BigQuerySchemaConnector.__init__` is deprecated and emits a `DeprecationWarning`; pass it to `.ingest(dataset_id=...)` / `.extract(dataset_id=...)` instead. The constructor still accepts it as a fallback for callers that have not yet migrated.
+- BigQuery `bigquery/schema/` and `bigquery/query_log/` subpackages now match the source-connector layout from the new connector standard (sub-folders by data type).
+
 ### Added
+
+- `OsiConnector.extract()` / `.transform()` / `.load()` as public ingest-stage methods, matching the source-connector contract. `OsiSpecExtractor` now takes `spec_source` on `.extract(spec_source)` instead of `__init__`, so the connector can pre-instantiate the extractor in its constructor.
+- `DataplexSchemaConnector` and `DataplexGlossaryConnector` with `extract` / `transform` / `load` / `ingest` stages. The glossary connector's `extract(include_entry_links=...)` lets callers skip the REST-API round-trips when the catalog is not present in the same Neo4j instance.
+- `StateError` is now raised by `transform()` / `load()` when called out of order on any connector.
+- `neocarta.connectors._base` defining `SourceConnectorProtocol` and `FormatConnectorProtocol`. Both are `runtime_checkable`, codifying the prose spec into executable contracts that conformance tests assert against.
+- Per-connector conformance test suite (`tests/unit/connectors/*/test_conformance.py`) covering: protocol conformance, public stage methods, `run()` DeprecationWarning, `README.md` presence, `__init__.py` export minimality, `StateError` on out-of-order calls, and BigQuery-schema-specific `dataset_id`-in-`__init__` deprecation warning.
+- Spec §5 narrow exception for bespoke flags that can't be expressed via `include_nodes` / `include_relationships` (e.g. extra REST round trips, optional connector-specific phases). Used by `DataplexGlossaryConnector.extract(include_entry_links=...)`.
 
 ## v0.6.0
 
