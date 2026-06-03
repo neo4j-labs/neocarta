@@ -65,6 +65,7 @@ class DataplexGlossaryConnector:
         self.transformer = DataplexGlossaryTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
         self._include_entry_links = True
 
     def extract(self, include_entry_links: bool = True) -> None:
@@ -78,6 +79,8 @@ class DataplexGlossaryConnector:
             False if the catalog isn't in this Neo4j instance, or to skip the
             REST-API round trips when you only want glossary content.
         """
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract(include_entry_links=include_entry_links)
         self._extracted = True
         self._include_entry_links = include_entry_links
@@ -96,6 +99,7 @@ class DataplexGlossaryConnector:
                 "DataplexGlossaryConnector.transform() called before extract().",
                 suggestion="Call connector.extract() before connector.transform().",
             )
+        self._transformed = False
         e = self.extractor
         t = self.transformer
 
@@ -109,6 +113,7 @@ class DataplexGlossaryConnector:
         if self._include_entry_links:
             t.transform_to_column_tagged_with_relationships(e.column_term_info)
             t.transform_to_table_tagged_with_relationships(e.table_term_info)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -119,9 +124,10 @@ class DataplexGlossaryConnector:
         StateError
             If called before :meth:`transform`.
         """
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "DataplexGlossaryConnector.load() called before extract()/transform().",
+                "DataplexGlossaryConnector.load() called before transform(); "
+                "call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
         t = self.transformer

@@ -28,6 +28,7 @@ class QueryLogConnector:
         self.transformer = QueryLogTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
 
     def extract(self, query_log_file: str, source: str = "bigquery") -> None:
         """
@@ -40,6 +41,8 @@ class QueryLogConnector:
         source : str, default "bigquery"
             The source of the query log file.
         """
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_info_from_query_log_json(query_log_file, source)
         self._extracted = True
 
@@ -58,6 +61,7 @@ class QueryLogConnector:
                 "call .extract(query_log_file) first.",
                 suggestion="Call connector.extract(query_log_file) before connector.transform().",
             )
+        self._transformed = False
 
         # transform nodes
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
@@ -77,6 +81,7 @@ class QueryLogConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -87,9 +92,9 @@ class QueryLogConnector:
         StateError
             If called before :meth:`transform`.
         """
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "QueryLogConnector.load() called before extract()/transform().",
+                "QueryLogConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 

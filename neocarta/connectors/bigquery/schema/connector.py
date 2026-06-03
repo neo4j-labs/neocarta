@@ -66,6 +66,7 @@ class BigQuerySchemaConnector:
         self.transformer = BigQuerySchemaTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
 
     def extract(self, dataset_id: str | None = None) -> None:
         """
@@ -78,6 +79,8 @@ class BigQuerySchemaConnector:
             constructor-provided ``dataset_id``.
         """
         target_dataset = dataset_id if dataset_id is not None else self.dataset_id
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_database_info(cache=True)
         self.extractor.extract_schema_info(dataset_id=target_dataset)
         self.extractor.extract_table_info(dataset_id=target_dataset)
@@ -100,6 +103,7 @@ class BigQuerySchemaConnector:
                 "BigQuerySchemaConnector.transform() called before extract().",
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
+        self._transformed = False
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
         self.transformer.transform_to_schema_nodes(self.extractor.schema_info)
         self.transformer.transform_to_table_nodes(self.extractor.table_info)
@@ -113,6 +117,7 @@ class BigQuerySchemaConnector:
             self.extractor.column_references_info
         )
         self.transformer.transform_to_has_value_relationships(self.extractor.column_unique_values)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -123,9 +128,10 @@ class BigQuerySchemaConnector:
         StateError
             If called before :meth:`transform`.
         """
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "BigQuerySchemaConnector.load() called before extract()/transform().",
+                "BigQuerySchemaConnector.load() called before transform(); "
+                "call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
         print(self.loader.load_database_nodes(self.transformer.database_nodes))

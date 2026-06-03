@@ -52,6 +52,7 @@ class BigQueryLogsConnector:
         self.transformer = QueryLogTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
 
     def extract(
         self,
@@ -80,6 +81,8 @@ class BigQueryLogsConnector:
         drop_failed_queries : bool, default True
             Whether to exclude failed queries.
         """
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_query_logs(
             dataset_id=dataset_id,
             region=region,
@@ -105,6 +108,7 @@ class BigQueryLogsConnector:
                 "BigQueryLogsConnector.transform() called before extract().",
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
+        self._transformed = False
 
         # Transform nodes
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
@@ -124,6 +128,7 @@ class BigQueryLogsConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -134,9 +139,9 @@ class BigQueryLogsConnector:
         StateError
             If called before :meth:`transform`.
         """
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "BigQueryLogsConnector.load() called before extract()/transform().",
+                "BigQueryLogsConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 

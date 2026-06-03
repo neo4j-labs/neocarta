@@ -74,6 +74,7 @@ class OsiConnector:
         # like independent runs.
         self.extractor = OsiSpecExtractor(http_timeout=http_timeout)
         self.transformer = OsiIngestTransformer()
+        self._extracted = False
         self._transformed = False
 
     # ------------------------------------------------------------------ #
@@ -103,8 +104,13 @@ class OsiConnector:
             )
 
         print(f"Extracting OSI spec from {spec_source}...")
+        # Reset downstream lifecycle: any prior transform/load no longer
+        # corresponds to the new source.
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract(spec_source)
         self._check_spec_version(self.extractor.spec, version)
+        self._extracted = True
 
     def transform(self) -> None:
         """
@@ -115,7 +121,7 @@ class OsiConnector:
         StateError
             If called before a successful :meth:`extract`.
         """
-        if self.extractor.spec is None:
+        if not self._extracted:
             raise StateError(
                 "OsiConnector.transform() called before extract(); "
                 "call .extract(spec_source) first.",
@@ -187,7 +193,7 @@ class OsiConnector:
         graph_transformer.transform(snapshot)
 
         print(f"Writing OSI YAML to {output_path}...")
-        graph_transformer.to_yaml(output_path)
+        graph_transformer._to_yaml(output_path)
         print("OSI export completed successfully!")
 
     # ------------------------------------------------------------------ #

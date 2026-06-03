@@ -49,6 +49,7 @@ class CSVConnector:
         self.transformer = CSVTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
 
     def extract(
         self,
@@ -66,6 +67,10 @@ class CSVConnector:
         include_relationships : list[RelationshipType], optional
             Relationship types to extract. If None, all relationship CSVs are read.
         """
+        # Reset downstream lifecycle: any prior transform/load no longer
+        # corresponds to the new source.
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_all(include_nodes, include_relationships)
         self._extracted = True
 
@@ -86,6 +91,7 @@ class CSVConnector:
 
         e = self.extractor
         t = self.transformer
+        self._transformed = False  # cleared until this transform completes
 
         t.transform_to_database_nodes(e.database_info)
         t.transform_to_schema_nodes(e.schema_info)
@@ -108,6 +114,7 @@ class CSVConnector:
         t.transform_to_uses_column_relationships(e.query_column_info)
         t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
         t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -121,9 +128,9 @@ class CSVConnector:
             If called before :meth:`transform`.
         """
         t = self.transformer
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "CSVConnector.load() called before extract()/transform().",
+                "CSVConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 

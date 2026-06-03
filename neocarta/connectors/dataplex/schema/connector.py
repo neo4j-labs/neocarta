@@ -58,6 +58,7 @@ class DataplexSchemaConnector:
         self.transformer = DataplexSchemaTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
+        self._transformed = False
 
     def extract(self, dataset_id: str) -> None:
         """
@@ -68,6 +69,8 @@ class DataplexSchemaConnector:
         dataset_id : str
             The BigQuery dataset ID to extract.
         """
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract(dataset_id=dataset_id)
         self._extracted = True
 
@@ -85,6 +88,7 @@ class DataplexSchemaConnector:
                 "DataplexSchemaConnector.transform() called before extract().",
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
+        self._transformed = False
         e = self.extractor
         t = self.transformer
 
@@ -96,6 +100,7 @@ class DataplexSchemaConnector:
         t.transform_to_has_schema_relationships(e.schema_info)
         t.transform_to_has_table_relationships(e.table_info)
         t.transform_to_has_column_relationships(e.column_info)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -106,9 +111,10 @@ class DataplexSchemaConnector:
         StateError
             If called before :meth:`transform`.
         """
-        if not self._extracted:
+        if not self._transformed:
             raise StateError(
-                "DataplexSchemaConnector.load() called before extract()/transform().",
+                "DataplexSchemaConnector.load() called before transform(); "
+                "call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
         t = self.transformer
