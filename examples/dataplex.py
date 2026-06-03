@@ -39,13 +39,13 @@ def main(
     if include_glossary:
         node_labels += [NodeLabel.BUSINESS_TERM]
 
-    common_kwargs = dict(
-        project_id=os.getenv("GCP_PROJECT_ID"),
-        project_number=os.getenv("GCP_PROJECT_NUMBER"),
-        dataplex_location=os.getenv("DATAPLEX_LOCATION"),
-        neo4j_driver=neo4j_driver,
-        database_name=neo4j_database,
-    )
+    common_kwargs = {
+        "project_id": os.getenv("GCP_PROJECT_ID"),
+        "project_number": os.getenv("GCP_PROJECT_NUMBER"),
+        "dataplex_location": os.getenv("DATAPLEX_LOCATION"),
+        "neo4j_driver": neo4j_driver,
+        "database_name": neo4j_database,
+    }
 
     # Schema must run before glossary so that TAGGED_WITH edges from the
     # glossary connector can attach to Column / Table nodes that already exist.
