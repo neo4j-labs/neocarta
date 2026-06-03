@@ -78,4 +78,5 @@ def _patch_extractor(spec: dict):
 
     extractor = MagicMock()
     extractor.extract.return_value = spec
+    extractor.spec = spec
     return patch("neocarta.connectors.osi.connector.OsiSpecExtractor", return_value=extractor)
