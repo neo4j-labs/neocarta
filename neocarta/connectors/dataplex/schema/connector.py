@@ -75,7 +75,7 @@ class DataplexSchemaConnector:
         """
         Transform cached metadata into Database/Schema/Table/Column nodes + HAS_* edges.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -101,7 +101,7 @@ class DataplexSchemaConnector:
         """
         Load transformed nodes and relationships into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.

@@ -1,4 +1,4 @@
-from neocarta.connectors.query_log import QueryLogExtractor
+from neocarta.connectors.query_log.extract import QueryLogExtractor
 
 
 def test_extract_info_from_query_log_json_bigquery(query_log_extractor: QueryLogExtractor):

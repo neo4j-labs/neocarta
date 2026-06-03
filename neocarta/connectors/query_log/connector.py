@@ -47,7 +47,7 @@ class QueryLogConnector:
         """
         Convert extracted metadata into graph data model objects.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -82,7 +82,7 @@ class QueryLogConnector:
         """
         Load the transformed metadata into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.

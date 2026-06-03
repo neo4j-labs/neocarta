@@ -3,10 +3,8 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from neocarta.connectors.bigquery.schema import (
-    BigQuerySchemaExtractor,
-    BigQuerySchemaTransformer,
-)
+from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor
+from neocarta.connectors.bigquery.schema.transform import BigQuerySchemaTransformer
 from neocarta.data_model.rdbms import (
     Column,
     Database,

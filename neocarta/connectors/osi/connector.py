@@ -111,7 +111,7 @@ class OsiConnector:
         """
         Transform the cached OSI spec into graph data model objects.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before a successful :meth:`extract`.
@@ -130,15 +130,14 @@ class OsiConnector:
         """
         Load the most recent transform into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before a successful :meth:`transform`.
         """
         if self.transformer is None:
             raise StateError(
-                "OsiConnector.load() called before transform(); "
-                "call .transform() first.",
+                "OsiConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.transform() before connector.load().",
             )
         print("Loading OSI semantic model into Neo4j...")
@@ -200,7 +199,7 @@ class OsiConnector:
         output_path : str | Path
             Destination path for the OSI YAML output.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before a successful :meth:`export`.

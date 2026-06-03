@@ -90,7 +90,7 @@ class BigQuerySchemaConnector:
         """
         Transform cached metadata into graph data model objects.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -118,7 +118,7 @@ class BigQuerySchemaConnector:
         """
         Load transformed metadata into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.

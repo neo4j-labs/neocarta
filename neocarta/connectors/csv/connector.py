@@ -73,7 +73,7 @@ class CSVConnector:
         """
         Convert extracted DataFrames into data model objects.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -115,7 +115,7 @@ class CSVConnector:
 
         Nodes are always loaded before relationships.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.

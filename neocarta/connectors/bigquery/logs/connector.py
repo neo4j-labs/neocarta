@@ -95,7 +95,7 @@ class BigQueryLogsConnector:
         """
         Transform cached query log metadata into graph data model objects.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -129,7 +129,7 @@ class BigQueryLogsConnector:
         """
         Load transformed query log metadata into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.

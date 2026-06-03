@@ -86,7 +86,7 @@ class DataplexGlossaryConnector:
         """
         Transform cached glossary data into nodes/edges.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract`.
@@ -114,7 +114,7 @@ class DataplexGlossaryConnector:
         """
         Load transformed glossary data into Neo4j.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`transform`.
@@ -146,9 +146,7 @@ class DataplexGlossaryConnector:
         )
 
         print(self.loader.load_has_category_relationships(t.has_category_relationships))
-        print(
-            self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
-        )
+        print(self.loader.load_has_business_term_relationships(t.has_business_term_relationships))
 
         if self._include_entry_links:
             print(

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, Mock
 import pandas as pd
 import pytest
 
-from neocarta.connectors.bigquery.logs import BigQueryLogsExtractor
+from neocarta.connectors.bigquery.logs.extract import BigQueryLogsExtractor
 
 
 @pytest.fixture

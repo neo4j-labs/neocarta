@@ -214,15 +214,13 @@ class DataplexGlossaryExtractor:
             One row per (entity, term) pair. Columns: ``entity_id``,
             ``entity_type``, ``term_id``.
 
-        Raises
+        Raises:
         ------
         StateError
             If called before :meth:`extract_glossary_info`.
         """
         if self._glossary_info.empty:
-            raise StateError(
-                "extract_glossary_info() must be called before extract_entry_links()."
-            )
+            raise StateError("extract_glossary_info() must be called before extract_entry_links().")
 
         creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         session = google.auth.transport.requests.AuthorizedSession(creds)
