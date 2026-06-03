@@ -25,9 +25,9 @@ class OsiConnector:
       an OSI YAML spec.
 
     Ingest is decomposed into three public stages — :meth:`extract`, :meth:`transform`,
-    :meth:`load` — that :meth:`ingest` runs in order. Export is exposed as the
-    :meth:`export` orchestrator plus :meth:`write`, which re-serializes the most
-    recent successful :meth:`export` transform to a different path.
+    :meth:`load` — that :meth:`ingest` runs in order. Export is exposed as a single
+    public :meth:`export` orchestrator; its internal stages are not part of the
+    public surface.
 
     Version handling
     ----------------
@@ -69,12 +69,12 @@ class OsiConnector:
         self.http_timeout = http_timeout
         self.loader = OsiNeo4jLoader(neo4j_driver, database_name)
 
-        # Ingest-stage cache. Populated by extract() / transform().
-        self.extractor: OsiSpecExtractor | None = None
-        self.transformer: OsiIngestTransformer | None = None
-
-        # Export-stage cache. Populated by export(); consumed by write().
-        self._export_transformer: OsiExportTransformer | None = None
+        # Ingest-direction stages. Their caches are reset on each .extract() /
+        # .transform() call so repeat ingests against the same instance behave
+        # like independent runs.
+        self.extractor = OsiSpecExtractor(http_timeout=http_timeout)
+        self.transformer = OsiIngestTransformer()
+        self._transformed = False
 
     # ------------------------------------------------------------------ #
     # Ingest direction
@@ -103,8 +103,7 @@ class OsiConnector:
             )
 
         print(f"Extracting OSI spec from {spec_source}...")
-        self.extractor = OsiSpecExtractor(spec_source, http_timeout=self.http_timeout)
-        self.extractor.extract()
+        self.extractor.extract(spec_source)
         self._check_spec_version(self.extractor.spec, version)
 
     def transform(self) -> None:
@@ -116,15 +115,18 @@ class OsiConnector:
         StateError
             If called before a successful :meth:`extract`.
         """
-        if self.extractor is None or self.extractor.spec is None:
+        if self.extractor.spec is None:
             raise StateError(
                 "OsiConnector.transform() called before extract(); "
                 "call .extract(spec_source) first.",
                 suggestion="Call connector.extract(spec_source) before connector.transform().",
             )
         print("Transforming OSI spec...")
+        # OsiIngestTransformer accumulates state across .transform() calls; replace
+        # the instance so repeat transforms behave like independent runs.
         self.transformer = OsiIngestTransformer()
         self.transformer.transform(self.extractor.spec)
+        self._transformed = True
 
     def load(self) -> None:
         """
@@ -135,7 +137,7 @@ class OsiConnector:
         StateError
             If called before a successful :meth:`transform`.
         """
-        if self.transformer is None:
+        if not self._transformed:
             raise StateError(
                 "OsiConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.transform() before connector.load().",
@@ -169,9 +171,6 @@ class OsiConnector:
         """
         Read an OSI semantic model from Neo4j and emit an OSI YAML spec.
 
-        Caches the transformed spec on the connector so :meth:`write` can re-emit
-        it to a different path without re-running extract+transform.
-
         Parameters
         ----------
         semantic_model_name : str
@@ -180,38 +179,16 @@ class OsiConnector:
             Destination path for the OSI YAML output.
         """
         print(f"Extracting OSI semantic model '{semantic_model_name}' from Neo4j...")
-        extractor = OsiGraphExtractor(self.neo4j_driver, self.database_name)
-        snapshot = extractor.extract(semantic_model_name)
+        graph_extractor = OsiGraphExtractor(self.neo4j_driver, self.database_name)
+        snapshot = graph_extractor.extract(semantic_model_name)
 
         print("Transforming graph snapshot to OSI spec...")
-        self._export_transformer = OsiExportTransformer()
-        self._export_transformer.transform(snapshot)
+        graph_transformer = OsiExportTransformer()
+        graph_transformer.transform(snapshot)
 
-        self.write(output_path)
-        print("OSI export completed successfully!")
-
-    def write(self, output_path: str | Path) -> None:
-        """
-        Serialize the most recent :meth:`export` transform to disk as OSI YAML.
-
-        Parameters
-        ----------
-        output_path : str | Path
-            Destination path for the OSI YAML output.
-
-        Raises:
-        ------
-        StateError
-            If called before a successful :meth:`export`.
-        """
-        if self._export_transformer is None or self._export_transformer.spec is None:
-            raise StateError(
-                "OsiConnector.write() called before export(); "
-                "call .export(semantic_model_name, output_path) first.",
-                suggestion="Call connector.export(...) before connector.write(...).",
-            )
         print(f"Writing OSI YAML to {output_path}...")
-        self._export_transformer.to_yaml(output_path)
+        graph_transformer.to_yaml(output_path)
+        print("OSI export completed successfully!")
 
     # ------------------------------------------------------------------ #
     # Deprecated entrypoint
