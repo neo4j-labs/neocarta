@@ -9,39 +9,29 @@ def test_root_imports():
 
 
 def test_bigquery_connector_imports():
-    from neocarta.connectors.bigquery import (
-        BigQueryLogsConnector,
-        BigQueryLogsExtractor,
-        BigQuerySchemaConnector,
-        BigQuerySchemaExtractor,
-        BigQuerySchemaTransformer,
-    )
+    from neocarta.connectors.bigquery import BigQueryLogsConnector, BigQuerySchemaConnector
 
     assert BigQueryLogsConnector
-    assert BigQueryLogsExtractor
     assert BigQuerySchemaConnector
-    assert BigQuerySchemaExtractor
-    assert BigQuerySchemaTransformer
 
 
 def test_csv_connector_imports():
-    from neocarta.connectors.csv import CSVConnector, CSVExtractor, CSVTransformer
+    from neocarta.connectors.csv import CSVConnector
 
     assert CSVConnector
-    assert CSVExtractor
-    assert CSVTransformer
 
 
 def test_query_log_connector_imports():
-    from neocarta.connectors.query_log import (
-        QueryLogConnector,
-        QueryLogExtractor,
-        QueryLogTransformer,
-    )
+    from neocarta.connectors.query_log import QueryLogConnector
 
     assert QueryLogConnector
-    assert QueryLogExtractor
-    assert QueryLogTransformer
+
+
+def test_dataplex_connector_imports():
+    from neocarta.connectors.dataplex import DataplexGlossaryConnector, DataplexSchemaConnector
+
+    assert DataplexGlossaryConnector
+    assert DataplexSchemaConnector
 
 
 def test_rdbms_data_model_imports():
@@ -105,17 +95,9 @@ def test_ingest_imports():
 
 def test_osi_connector_imports():
     from neocarta.connectors.osi import OsiConnector, UnsupportedOsiVersionWarning
-    from neocarta.connectors.osi.export import OsiExportTransformer, OsiGraphExtractor
-    from neocarta.connectors.osi.ingest import OsiIngestTransformer, OsiSpecExtractor
-    from neocarta.connectors.osi.load import OsiNeo4jLoader
 
     assert OsiConnector
     assert UnsupportedOsiVersionWarning
-    assert OsiSpecExtractor
-    assert OsiIngestTransformer
-    assert OsiGraphExtractor
-    assert OsiExportTransformer
-    assert OsiNeo4jLoader
 
 
 def test_warnings_module_imports():

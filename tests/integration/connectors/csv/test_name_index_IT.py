@@ -22,7 +22,7 @@ def test_connector_run_creates_schema_name_range_index(
     """A connector run creates a RANGE index on Schema.name backing MCP name lookups."""
     CSVConnector(
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
-    ).run(include_nodes=[NodeLabel.DATABASE, NodeLabel.SCHEMA])
+    ).ingest(include_nodes=[NodeLabel.DATABASE, NodeLabel.SCHEMA])
 
     indexes = _range_indexes(neo4j_driver)
 
