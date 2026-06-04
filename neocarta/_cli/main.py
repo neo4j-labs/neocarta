@@ -13,6 +13,7 @@ from .agent_context import agent_context
 from .commands.bigquery import bigquery
 from .commands.csv import csv
 from .commands.dataplex import dataplex
+from .commands.query_log import query_log
 from .output import make_consoles
 
 
@@ -53,6 +54,7 @@ def cli(ctx: click.Context, *, as_json: bool, debug: bool, no_color: bool) -> No
 cli.add_command(bigquery)
 cli.add_command(csv)
 cli.add_command(dataplex)
+cli.add_command(query_log)
 cli.add_command(agent_context)
 
 
