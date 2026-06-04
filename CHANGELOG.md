@@ -14,6 +14,7 @@
 - **Breaking:** Connector `__init__.py` exports trimmed to the connector class plus connector-specific warnings/errors only. Internal `Extractor` / `Transformer` / `Loader` classes are no longer re-exported from connector package roots; import them via their full module paths (e.g. `from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor`).
 - Passing `dataset_id` to `BigQuerySchemaConnector.__init__` is deprecated and emits a `DeprecationWarning`; pass it to `.ingest(dataset_id=...)` / `.extract(dataset_id=...)` instead. The constructor still accepts it as a fallback for callers that have not yet migrated.
 - BigQuery `bigquery/schema/` and `bigquery/query_log/` subpackages now match the source-connector layout from the new connector standard (sub-folders by data type).
+- The shared CLI embedder helper `_build_embedder` now generates embeddings via `LiteLLMEmbeddingsConnector` instead of `OpenAIEmbeddingsConnector`, so the `bigquery`, `csv`, and `dataplex` CLI commands all embed through LiteLLM. Provider auth is read from environment variables based on the `embedding_model` (e.g. `OPENAI_API_KEY`, `GEMINI_API_KEY`) and the vector dimension is auto-detected, so `OPENAI_API_KEY` is no longer hard-required and the `--embedding-dimensions` flag is now inert (removal tracked as a follow-up).
 
 ### Added
 
@@ -23,6 +24,7 @@
 - `neocarta.connectors._base` defining `SourceConnectorProtocol` and `FormatConnectorProtocol`. Both are `runtime_checkable`, codifying the prose spec into executable contracts that conformance tests assert against.
 - Per-connector conformance test suite (`tests/unit/connectors/*/test_conformance.py`) covering: protocol conformance, public stage methods, `run()` DeprecationWarning, `README.md` presence, `__init__.py` export minimality, `StateError` on out-of-order calls, and BigQuery-schema-specific `dataset_id`-in-`__init__` deprecation warning.
 - Spec §5 narrow exception for bespoke flags that can't be expressed via `include_nodes` / `include_relationships` (e.g. extra REST round trips, optional connector-specific phases). Used by `DataplexGlossaryConnector.extract(include_entry_links=...)`.
+* Add `neocarta dataplex schema` and `neocarta dataplex glossary` CLI commands, wrapping `DataplexSchemaConnector` and `DataplexGlossaryConnector` (the noun is the source, the verb is the subgraph component, matching `bigquery schema` / `bigquery logs`). `dataplex schema` loads BigQuery catalog metadata (`Database`, `Schema`, `Table`, `Column`) and takes `--dataset-id`; `dataplex glossary` loads the business glossary (`Glossary`, `Category`, `BusinessTerm`) and, with `--entry-links` (default on), the `TAGGED_WITH` catalog entry links — run `dataplex schema` first so those edges find their target nodes. Project ID, project number, and location come from `--project-id` / `--project-number` / `--dataplex-location` or the `GCP_PROJECT_ID` / `GCP_PROJECT_NUMBER` / `DATAPLEX_LOCATION` env vars. Both support `--dry-run` and `--json`; embeddings are opt-in via `--embeddings` (default off) and generated through LiteLLM.
 
 ## v0.6.0
 

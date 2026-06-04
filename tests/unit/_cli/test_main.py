@@ -14,6 +14,7 @@ def test_help_lists_commands():
     assert result.exit_code == 0
     assert "bigquery" in result.output
     assert "csv" in result.output
+    assert "dataplex" in result.output
     assert "agent-context" in result.output
     # Top-level help must document at least one concrete invocation pattern.
     assert "neocarta bigquery" in result.output
@@ -48,6 +49,14 @@ def test_csv_group_help_lists_verbs():
     assert "ingest" in result.output
 
 
+def test_dataplex_group_help_lists_verbs():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["dataplex", "--help"])
+    assert result.exit_code == 0
+    assert "schema" in result.output
+    assert "glossary" in result.output
+
+
 def test_agent_context_emits_valid_json():
     runner = CliRunner()
     result = runner.invoke(cli, ["agent-context"])
@@ -60,6 +69,9 @@ def test_agent_context_emits_valid_json():
     assert "logs" in payload["commands"]["bigquery"]["subcommands"]
     assert "csv" in payload["commands"]
     assert "ingest" in payload["commands"]["csv"]["subcommands"]
+    assert "dataplex" in payload["commands"]
+    assert "schema" in payload["commands"]["dataplex"]["subcommands"]
+    assert "glossary" in payload["commands"]["dataplex"]["subcommands"]
     # The exit-code map is part of the public contract; spot-check a known entry.
     assert payload["exit_codes"]["success"]["code"] == 0
     assert payload["exit_codes"]["usage_error"]["code"] == 2
