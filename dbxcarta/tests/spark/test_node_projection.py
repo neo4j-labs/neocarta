@@ -45,6 +45,8 @@ _TYPES = {
     "last_altered": "string",
     "type": "string",
     "nullable": "boolean",
+    "is_primary_key": "boolean",
+    "is_foreign_key": "boolean",
     "ordinal_position": "int",
     "value": "string",
     "count": "long",
@@ -66,7 +68,7 @@ def _value_for(column: str) -> object:
         return [0.1, 0.2]
     if column == "last_run":
         return datetime(2026, 5, 17, tzinfo=UTC)
-    if column == "nullable":
+    if column in {"nullable", "is_primary_key", "is_foreign_key"}:
         return True
     if column in {"count", "ordinal_position"}:
         return 1

@@ -55,6 +55,56 @@ class ExtractResult:
         self.columns_df.unpersist()
 
 
+def _extract_constraints(
+    spark: SparkSession,
+    catalogs: list[str],
+    schema_list: list[str],
+) -> DataFrame:
+    """Per-column DECLARED key-constraint flags from information_schema.
+
+    Joins `key_column_usage` to `table_constraints` per catalog and aggregates
+    to one row per column with `is_primary_key` / `is_foreign_key` booleans
+    (declared PRIMARY KEY / FOREIGN KEY participation). Columns with no
+    declared constraint simply do not appear; `build_column_nodes` left-joins
+    and coalesces their flags to false. Matches neocarta core's declared-only
+    semantics — inferred FK edges (discovered later) never set these flags.
+
+    Native Spark join + aggregate, no driver collect: the constraint tables are
+    catalog-scale, so the flags ride a broadcastable left join into the column
+    build rather than being resolved on the driver.
+    """
+    from functools import reduce
+
+    from pyspark.sql.functions import col
+    from pyspark.sql.functions import max as col_max
+
+    def _union(frames: list[DataFrame]) -> DataFrame:
+        return reduce(lambda a, b: a.unionByName(b), frames)
+
+    raw = _union(
+        [
+            spark.sql(
+                f"SELECT kcu.table_catalog, kcu.table_schema, kcu.table_name,"
+                f"       kcu.column_name, tc.constraint_type"
+                f" FROM `{catalog}`.information_schema.key_column_usage kcu"
+                f" JOIN `{catalog}`.information_schema.table_constraints tc"
+                f"   ON tc.constraint_catalog = kcu.constraint_catalog"
+                f"  AND tc.constraint_schema  = kcu.constraint_schema"
+                f"  AND tc.constraint_name    = kcu.constraint_name"
+            )
+            for catalog in catalogs
+        ]
+    ).filter(col("table_schema") != "information_schema")
+    if schema_list:
+        raw = raw.filter(col("table_schema").isin(schema_list))
+
+    keys = ["table_catalog", "table_schema", "table_name", "column_name"]
+    return raw.groupBy(*keys).agg(
+        col_max(col("constraint_type") == "PRIMARY KEY").alias("is_primary_key"),
+        col_max(col("constraint_type") == "FOREIGN KEY").alias("is_foreign_key"),
+    )
+
+
 def extract(
     spark: SparkSession,
     settings: SparkIngestSettings,
@@ -133,7 +183,8 @@ def extract(
     database_df = sg.build_database_nodes(spark, catalogs, settings.dbxcarta_platform or None)
     schema_node_df = sg.build_schema_nodes(schemata_df)
     table_node_df = sg.build_table_nodes(tables_df, settings.layer_map())
-    column_node_df = sg.build_column_nodes(columns_df)
+    constraints_df = _extract_constraints(spark, catalogs, schema_list)
+    column_node_df = sg.build_column_nodes(columns_df, constraints_df)
     has_schema_df = sg.build_has_schema_rel(schemata_df)
     has_table_df = sg.build_has_table_rel(tables_df)
     has_column_df = sg.build_has_column_rel(columns_df)

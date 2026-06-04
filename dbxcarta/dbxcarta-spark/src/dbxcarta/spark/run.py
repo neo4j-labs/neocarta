@@ -626,6 +626,8 @@ def _load(
             RelType.REFERENCES,
             NodeLabel.COLUMN,
             NodeLabel.COLUMN,
+            source_col="source_column_id",
+            target_col="target_column_id",
             properties=REFERENCES_PROPERTIES,
         )
 
@@ -640,6 +642,8 @@ def _load(
             RelType.REFERENCES,
             NodeLabel.COLUMN,
             NodeLabel.COLUMN,
+            source_col="source_column_id",
+            target_col="target_column_id",
             properties=REFERENCES_PROPERTIES,
         )
 

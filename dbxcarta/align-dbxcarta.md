@@ -49,37 +49,56 @@ it as Pydantic models. The work is to make the property names and shapes match.
 
 ### Sub-phases (implement and test each before the next)
 
-Phase 1 is split into independently testable sub-phases by risk tier:
+Phase 1 is split into independently testable sub-phases by risk tier.
 
-- **1a — Node property renames.** `comment` → `description`, `data_type` →
-  `type`, `is_nullable` → `nullable`. Mechanical but wide. **Scoping insight:**
-  the `information_schema` columns are literally named `comment`/`data_type`/
+**Status (CONTRACT_VERSION now `1.7`):** 1a ✅ done · 1b ✅ done · 1c ✅ done ·
+1d ✅ done. **Phase 1 complete.** Each landed green against `make test`,
+`ruff check`/`format`, and `make typecheck`.
+
+- **1a — Node property renames. ✅ DONE.** `comment` → `description`,
+  `data_type` → `type`, `is_nullable` → `nullable`. **Scoping insight:** the
+  `information_schema` columns are literally named `comment`/`data_type`/
   `is_nullable`, and the FK inference reads those same extracted frames, so we
-  rename **only at the node-builder `.select()` boundary** (alias there) and
-  leave the extract and FK internals on the Unity Catalog names. That confines
-  the change to the contract property lists + embedding-text exprs, the node
-  builders, the `data_type` index in `neo4j_io.py`, the verify checks, the
-  client read layer (retriever / graph_retriever / schema_dump), tests, and
-  `docs/schema/SCHEMA.md`.
-- **1b — Database descriptive fields.** Add `platform`, `service`,
-  `description` to the Database node and contract. `service = "DATABRICKS"`,
-  `platform` from config where known (else null), `description` null unless
-  sourced. Small and additive.
-- **1c — Column `is_primary_key` / `is_foreign_key`.** The hard one. Note the
-  **ordering problem:** node writes happen at `run.py` *before* `run_fk_discovery`,
-  so `is_foreign_key` cannot be set during the node-write pass without either
-  reordering the pipeline (run FK discovery before column-node writes) or adding
-  a second-pass property update. PK has no node-facing source today (only the FK
-  layer's driver-collected `ConstraintRow`); marking nodes wants a
-  `key_column_usage` join instead. Own design decision, own tests.
-- **1d — REFERENCES endpoint rename.** `source_id` / `target_id` →
-  `source_column_id` / `target_column_id`. **Finding:** these are transient
-  DataFrame join columns the Neo4j Spark connector uses to match start/end nodes
-  (`relationship.source.node.keys`); they are never stored as edge properties,
-  so the ingested REFERENCES edge is already aligned and this rename has no
-  graph effect. Done anyway for naming consistency with the neocarta field
-  names. Pure rename across the FK subpackage, `writer.py` defaults, and tests;
-  isolated and easy to test.
+  renamed **only at the node-builder `.select()` boundary** (alias there) and
+  left the extract and FK internals on the Unity Catalog names. That confined
+  the change to the contract property lists, the node builders, the `data_type`
+  index in `neo4j_io.py`, the verify checks, the client read layer (Cypher
+  RETURN aliases only — client dataclasses unchanged), tests, and
+  `docs/schema/SCHEMA.md`. Embedding-text exprs untouched (they read the raw UC
+  names still in scope before the select).
+- **1b — Database descriptive fields. ✅ DONE.** Added `platform`, `service`,
+  `description` to the Database node and contract. `service` = the constant
+  `"DATABRICKS"` (not configurable); `platform` from the new optional
+  `DBXCARTA_PLATFORM` config, upper-cased, null when unset; `description` null
+  (UC exposes no catalog comment in the extract). The builder uses an explicit
+  `StructType` so the all-null `platform`/`description` columns type as STRING.
+- **1c — Column `is_primary_key` / `is_foreign_key`. ✅ DONE.** **The
+  "ordering problem" dissolved:** rather than depend on `run_fk_discovery`
+  (which runs after node writes), both flags are derived at **extract time**
+  from the catalog's **declared** constraints — a native
+  `key_column_usage ⋈ table_constraints` join (`_extract_constraints`),
+  aggregated to one boolean row per column and left-joined into
+  `build_column_nodes` (coalesced to false). This matches neocarta core's
+  BigQuery connector exactly (declared-only). An **inferred** FK edge never
+  sets `is_foreign_key`: the boolean means "the catalog declares this," the
+  `REFERENCES` edge means "we believe this relationship exists." No pipeline
+  reorder, no second pass.
+- **1d — REFERENCES endpoint rename. ✅ DONE.** `source_id` /
+  `target_id` → `source_column_id` / `target_column_id`. **Finding:** these are
+  transient DataFrame join columns the Neo4j Spark connector uses to match
+  start/end nodes (`relationship.source.node.keys`); they are never stored as
+  edge properties, so the ingested REFERENCES edge is already aligned and this
+  rename has no graph effect. Done anyway for naming consistency with the
+  neocarta field names. **Scope correction:** `source_id`/`target_id` is the
+  *generic* transient join-column convention shared by every relationship
+  (structural HAS_* builders, HAS_VALUE, and the shared `write_relationship`
+  default), and `source_column_id` is only semantically correct for REFERENCES
+  (column→column). So the rename is confined to the FK/REFERENCES path
+  (`FKEdge`, `DeclaredPair`, `references_schema`, `build_references_rel`, the
+  `inference.py` FK columns) plus a forwarded `source_col`/`target_col` on the
+  `write_rel` helper used by the two REFERENCES write call sites. The
+  `write_relationship` default and the structural/HAS_VALUE builders stay on
+  `source_id`/`target_id`.
 
 ### Property name mismatches (the biggest, most mechanical change)
 
@@ -188,8 +207,11 @@ of truth for what "valid" means.
   recipe (lowercase, spaces/hyphens to underscores, dot-joined segments; Value
   = `column_id.{md5 hex}`). Only task: confirm the Spark `id_expr` matches
   neocarta's `_normalize` byte-for-byte, ideally by sharing one helper.
-- **PK/FK flags — derive from Unity Catalog.** `is_primary_key` from declared
-  PK constraints; `is_foreign_key` from REFERENCES-source columns.
+- **PK/FK flags — derive from Unity Catalog DECLARED constraints.** Both
+  `is_primary_key` and `is_foreign_key` come from the catalog's declared
+  PRIMARY KEY / FOREIGN KEY constraints (`table_constraints` + `key_column_usage`),
+  resolved at extract time. Declared-only, matching neocarta core: an inferred
+  FK edge does not set `is_foreign_key`.
 - **Database `platform` / `service` — set per dbxcarta.** `service =
   "DATABRICKS"`; `platform` = the workspace cloud where known (else null);
   `description` null unless sourced. No global neocarta convention exists; each

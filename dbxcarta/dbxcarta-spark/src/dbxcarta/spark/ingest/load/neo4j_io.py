@@ -147,6 +147,8 @@ def write_rel(
     source_label: NodeLabel,
     target_label: NodeLabel,
     *,
+    source_col: str = "source_id",
+    target_col: str = "target_id",
     properties: tuple[str, ...] = (),
 ) -> None:
     write_relationship(
@@ -155,6 +157,8 @@ def write_rel(
         rel_type.value,
         source_label.value,
         target_label.value,
+        source_col=source_col,
+        target_col=target_col,
         properties=properties,
     )
 

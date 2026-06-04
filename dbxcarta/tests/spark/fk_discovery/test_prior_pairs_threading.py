@@ -1,7 +1,7 @@
 """Prior-edge suppression threaded as DataFrames across the strategies.
 
 Metadata anti-joins the declared-only edge frame. The prior is a
-`(source_id, target_id)` DataFrame, never collected.
+`(source_column_id, target_column_id)` DataFrame, never collected.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def test_metadata_skips_declared_prior_pair(local_spark) -> None:
     declared-only prior frame suppresses exactly that edge."""
     cf = build_columns_frame(_columns(local_spark))
     pk_gate, composite = build_pk_gate(cf, _constraints(local_spark))
-    prior = local_spark.createDataFrame([_EDGE], schema=["source_id", "target_id"])
+    prior = local_spark.createDataFrame([_EDGE], schema=["source_column_id", "target_column_id"])
     edges_df, _counts, _c = infer_metadata_edges(
         local_spark,
         cf,
@@ -93,7 +93,7 @@ def test_metadata_skips_declared_prior_pair(local_spark) -> None:
         prior,
         composite_pk_count=composite,
     )
-    emitted = {(r["source_id"], r["target_id"]) for r in edges_df.collect()}
+    emitted = {(r["source_column_id"], r["target_column_id"]) for r in edges_df.collect()}
     assert _EDGE not in emitted
 
 
@@ -102,8 +102,8 @@ def test_fk_result_releases_cached_inferred_edges(local_spark) -> None:
 
     edge_schema = StructType(
         [
-            StructField("source_id", StringType(), False),
-            StructField("target_id", StringType(), False),
+            StructField("source_column_id", StringType(), False),
+            StructField("target_column_id", StringType(), False),
             StructField("confidence", DoubleType(), False),
             StructField("source", StringType(), False),
             StructField("criteria", StringType(), True),

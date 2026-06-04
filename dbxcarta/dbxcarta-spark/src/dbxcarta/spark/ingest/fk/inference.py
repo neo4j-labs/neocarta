@@ -291,7 +291,7 @@ def _select_as(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
     rename map as data (not a hand-written `.alias()` list duplicated per
     call site) removes the duplicated magic strings and the asymmetry traps:
     the source side keeps `lk`/`kind` bare while the target side prefixes
-    them, and `col_id` becomes `source_id`/`target_id` rather than a blind
+    them, and `col_id` becomes `source_column_id`/`target_column_id` rather than a blind
     prefix — a uniform "prefix every column" helper would silently break the
     join. `mapping` is insertion-ordered so column order is preserved, and
     `F.col` accepts nested refs so struct fields like `_k.lk` are valid keys.
@@ -356,7 +356,7 @@ def infer_metadata_edges(
             "catalog": "s_catalog",
             "schema": "s_schema",
             "column": "s_column",
-            "col_id": "source_id",
+            "col_id": "source_column_id",
             "canon": "s_canon",
             "ctok": "s_ctok",
             "_k.lk": "lk",
@@ -410,7 +410,7 @@ def infer_metadata_edges(
             "catalog": "t_catalog",
             "schema": "t_schema",
             "column": "t_column",
-            "col_id": "target_id",
+            "col_id": "target_column_id",
             "canon": "t_canon",
             "ctok": "t_ctok",
             "_k.lk": "t_lk",
@@ -430,7 +430,7 @@ def infer_metadata_edges(
         & (F.col("s_schema") == F.col("t_schema"))
         & (F.col("lk") == F.col("t_lk"))
         & (F.col("kind") == F.col("t_kind"))
-        & (F.col("source_id") != F.col("target_id"))
+        & (F.col("source_column_id") != F.col("target_column_id"))
         & ~(
             (F.lower(F.col("s_column")) == F.lit("id"))
             & (F.lower(F.col("t_column")) == F.lit("id"))
@@ -438,10 +438,10 @@ def infer_metadata_edges(
         "inner",
     )
 
-    # One row per (source_id, target_id): a pair can match on several keys
+    # One row per (source_column_id, target_column_id): a pair can match on several keys
     # (exact + a stem, or several tgt table-forms). EXACT outranks SUFFIX.
     kind_rank = F.when(F.col("kind") == NameMatchKind.EXACT.value, F.lit(0)).otherwise(F.lit(1))
-    dedup_w = Window.partitionBy("source_id", "target_id").orderBy(kind_rank.asc())
+    dedup_w = Window.partitionBy("source_column_id", "target_column_id").orderBy(kind_rank.asc())
     deduped = (
         matched.withColumn("_rn", F.row_number().over(dedup_w))
         .filter(F.col("_rn") == 1)
@@ -454,7 +454,7 @@ def infer_metadata_edges(
     # PK-like target gate.
     gated = typed.join(
         pk_gate.select(F.col("col_id").alias("_pk_id"), F.col("pk_evidence")),
-        F.col("target_id") == F.col("_pk_id"),
+        F.col("target_column_id") == F.col("_pk_id"),
         "inner",
     ).drop("_pk_id")
 
@@ -471,9 +471,9 @@ def infer_metadata_edges(
     )
 
     # Window set = post name-dedup, type, PK, and score>=threshold. cnt over
-    # source_id reproduces Python's per_source candidate count.
+    # source_column_id reproduces Python's per_source candidate count.
     above = scored.filter(F.col("score") >= F.lit(threshold))
-    att_w = Window.partitionBy("source_id")
+    att_w = Window.partitionBy("source_column_id")
     attenuated = (
         above.withColumn("_cnt", F.count(F.lit(1)).over(att_w))
         .withColumn(
@@ -484,8 +484,8 @@ def infer_metadata_edges(
     )
 
     edges = attenuated.select(
-        F.col("source_id"),
-        F.col("target_id"),
+        F.col("source_column_id"),
+        F.col("target_column_id"),
         F.round(F.col("_att"), 4).alias("confidence"),
         F.lit(EdgeSource.INFERRED_METADATA.value).alias("source"),
         F.lit(None).cast("string").alias("criteria"),
@@ -493,12 +493,13 @@ def infer_metadata_edges(
 
     if declared_edges_df is not None:
         prior = declared_edges_df.select(
-            F.col("source_id").alias("_p_s"),
-            F.col("target_id").alias("_p_t"),
+            F.col("source_column_id").alias("_p_s"),
+            F.col("target_column_id").alias("_p_t"),
         )
         edges = edges.join(
             prior,
-            (F.col("source_id") == F.col("_p_s")) & (F.col("target_id") == F.col("_p_t")),
+            (F.col("source_column_id") == F.col("_p_s"))
+            & (F.col("target_column_id") == F.col("_p_t")),
             "left_anti",
         )
 

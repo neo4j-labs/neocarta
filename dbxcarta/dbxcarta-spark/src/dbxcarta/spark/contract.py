@@ -45,13 +45,18 @@ from enum import StrEnum
 # (`comment`/`data_type`/`is_nullable`) are unchanged in the extract and FK
 # internals. This is a breaking rename; there is no legacy graph to migrate
 # (every run is a clean rebuild).
-# 1.7 aligns the Database node with neocarta core (Database) by adding three
-# additive properties: `service` (always the constant "DATABRICKS" for this
-# connector), `platform` (the cloud tag — AWS/AZURE/GCP — sourced from the
-# optional DBXCARTA_PLATFORM config, null when unset), and `description`
-# (null; UC exposes no catalog comment in the extract today). Both `platform`
-# and `service` are stored upper-cased to match the core convention. Readers
-# of an older graph treat the missing properties as null.
+# 1.7 aligns the Database and Column nodes with neocarta core. Database gains
+# three additive properties: `service` (always the constant "DATABRICKS" for
+# this connector), `platform` (the cloud tag — AWS/AZURE/GCP — sourced from
+# the optional DBXCARTA_PLATFORM config, null when unset), and `description`
+# (null; UC exposes no catalog comment in the extract today); both `platform`
+# and `service` are stored upper-cased to match the core convention. Column
+# gains two additive booleans, `is_primary_key` and `is_foreign_key`, derived
+# at extract time from the catalog's DECLARED constraints
+# (information_schema.table_constraints + key_column_usage), matching core's
+# declared-only semantics. Inferred REFERENCES edges never set these flags: an
+# inferred edge is a relationship, not a declared constraint. Readers of an
+# older graph treat the missing properties as null/false.
 CONTRACT_VERSION = "1.7"
 
 DEFAULT_EMBEDDING_ENDPOINT = "databricks-gte-large-en"
@@ -149,6 +154,8 @@ NODE_PROPERTIES: dict[NodeLabel, tuple[str, ...]] = {
         "table",
         "type",
         "nullable",
+        "is_primary_key",
+        "is_foreign_key",
         "ordinal_position",
         "description",
         "contract_version",

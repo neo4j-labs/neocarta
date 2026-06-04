@@ -136,7 +136,10 @@ def build_table_nodes(
     )
 
 
-def build_column_nodes(columns_df: DataFrame) -> DataFrame:
+def build_column_nodes(
+    columns_df: DataFrame,
+    constraints_df: DataFrame | None = None,
+) -> DataFrame:
     """Build Column nodes from information_schema.columns rows.
 
     Converts Databricks YES/NO nullability strings into booleans while
@@ -147,13 +150,31 @@ def build_column_nodes(columns_df: DataFrame) -> DataFrame:
     transient `embedding_text` column. The qualifying columns are transform
     inputs and do not leave the builder; the fail-closed write boundary
     strips `embedding_text`.
+
+    `is_primary_key` / `is_foreign_key` come from `constraints_df` (one
+    boolean row per column, from the catalog's DECLARED PRIMARY KEY / FOREIGN
+    KEY constraints), left-joined on the four-part column identity and
+    coalesced to false for columns with no declared constraint. ``None`` means
+    "no declared constraints known" and yields all-false, matching the
+    neocarta core declared-only semantics. Inferred FK edges are a separate
+    enrichment and never set these flags.
     """
-    from pyspark.sql.functions import col, expr, lit, when
+    from pyspark.sql.functions import coalesce, col, expr, lit, when
+
+    keys = ["table_catalog", "table_schema", "table_name", "column_name"]
+    if constraints_df is None:
+        joined = columns_df.withColumn("is_primary_key", lit(False)).withColumn(
+            "is_foreign_key", lit(False)
+        )
+    else:
+        joined = (
+            columns_df.join(constraints_df, on=keys, how="left")
+            .withColumn("is_primary_key", coalesce(col("is_primary_key"), lit(False)))
+            .withColumn("is_foreign_key", coalesce(col("is_foreign_key"), lit(False)))
+        )
 
     return (
-        columns_df.withColumn(
-            "id", id_expr("table_catalog", "table_schema", "table_name", "column_name")
-        )
+        joined.withColumn("id", id_expr(*keys))
         .withColumn("name", col("column_name"))
         .withColumn("catalog", col("table_catalog"))
         .withColumn("schema", col("table_schema"))
@@ -172,6 +193,8 @@ def build_column_nodes(columns_df: DataFrame) -> DataFrame:
             "table",
             col("data_type").alias("type"),
             "nullable",
+            "is_primary_key",
+            "is_foreign_key",
             "ordinal_position",
             col("comment").alias("description"),
             "contract_version",
@@ -226,8 +249,8 @@ def references_schema() -> StructType:
 
     return StructType(
         [
-            StructField("source_id", StringType(), False),
-            StructField("target_id", StringType(), False),
+            StructField("source_column_id", StringType(), False),
+            StructField("target_column_id", StringType(), False),
             StructField("confidence", DoubleType(), False),
             StructField("source", StringType(), False),
             StructField("criteria", StringType(), True),
@@ -259,5 +282,8 @@ def build_references_rel(
     INFERRED_METADATA). The enum `.value` is serialized at this
     tuple boundary — no magic strings downstream.
     """
-    tuples = [(e.source_id, e.target_id, e.confidence, e.source.value, e.criteria) for e in edges]
+    tuples = [
+        (e.source_column_id, e.target_column_id, e.confidence, e.source.value, e.criteria)
+        for e in edges
+    ]
     return spark.createDataFrame(tuples, schema=references_schema())

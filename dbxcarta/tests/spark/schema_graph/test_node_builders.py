@@ -107,6 +107,19 @@ def _columns_df(local_spark):
     )
 
 
+def _constraints_df(local_spark):
+    """One declared-constraint flag row per column, as `_extract_constraints`
+    emits: bronze.id is a declared PRIMARY KEY; gold.id is both PK and FK."""
+    return local_spark.createDataFrame(
+        [
+            ("bronze", "sales", "orders", "id", True, False),
+            ("gold", "sales", "orders", "id", True, True),
+        ],
+        "table_catalog string, table_schema string, table_name string,"
+        " column_name string, is_primary_key boolean, is_foreign_key boolean",
+    )
+
+
 def _schemata_df(local_spark):
     return local_spark.createDataFrame(
         [("bronze", "sales", "sales schema"), ("gold", "sales", "sales schema")],
@@ -155,6 +168,25 @@ def test_build_column_nodes_emits_only_declared_plus_embedding_text(
         assert helper not in df.columns
     ids = {r["id"] for r in df.collect()}
     assert len(ids) == 2  # catalog-qualified, so no collision
+
+
+def test_build_column_nodes_declared_key_flags(local_spark) -> None:
+    """Declared PK/FK constraints land on the matching Column node."""
+    df = build_column_nodes(_columns_df(local_spark), _constraints_df(local_spark))
+    by_id = {r["id"]: r for r in df.collect()}
+    bronze = generate_id("bronze", "sales", "orders", "id")
+    gold = generate_id("gold", "sales", "orders", "id")
+    assert by_id[bronze]["is_primary_key"] is True
+    assert by_id[bronze]["is_foreign_key"] is False
+    assert by_id[gold]["is_primary_key"] is True
+    assert by_id[gold]["is_foreign_key"] is True
+
+
+def test_build_column_nodes_unconstrained_flags_false(local_spark) -> None:
+    """A column with no constraints frame coalesces both flags to false —
+    the neocarta-core declared-only semantic (undeclared => false)."""
+    df = build_column_nodes(_columns_df(local_spark))
+    assert all(r["is_primary_key"] is False and r["is_foreign_key"] is False for r in df.collect())
 
 
 def test_build_schema_nodes_emits_only_declared_plus_embedding_text(

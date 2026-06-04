@@ -49,7 +49,7 @@ One node per catalog ingested.
 | `platform`           | string  | yes      | cloud platform tag (e.g. `AWS`, `AZURE`, `GCP`); from `DBXCARTA_PLATFORM`, null when unset |
 | `service`            | string  | no       | always `"DATABRICKS"`               |
 | `description`        | string  | yes      | null today (no catalog comment in the extract) |
-| `contract_version`   | string  | no       | schema version, currently `"1.1"`   |
+| `contract_version`   | string  | no       | schema version, currently `"1.7"`   |
 | `embedding`          | float[] | yes      | 1024-dim cosine vector; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_DATABASES=true` |
 
 Neo4j constraint: `database_id` — `id IS UNIQUE`.
@@ -65,7 +65,7 @@ One node per Unity Catalog schema in scope.
 | `id`                 | string  | no       | `generate_id(catalog, schema)`; unique |
 | `name`               | string  | no       | schema name                          |
 | `description`        | string  | yes      | UC schema comment                    |
-| `contract_version`   | string  | no       | `"1.1"`                              |
+| `contract_version`   | string  | no       | `"1.7"`                              |
 | `embedding`          | float[] | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_SCHEMAS=true` |
 
 Neo4j constraint: `schema_id` — `id IS UNIQUE`.
@@ -85,7 +85,7 @@ One node per table or view in scope.
 | `description`        | string    | yes      | UC table comment                    |
 | `created`            | timestamp | yes      | UC creation timestamp               |
 | `last_altered`       | timestamp | yes      | UC last-altered timestamp           |
-| `contract_version`   | string    | no       | `"1.1"`                             |
+| `contract_version`   | string    | no       | `"1.7"`                             |
 | `embedding`          | float[]   | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_TABLES=true` |
 
 Neo4j constraint: `table_id` — `id IS UNIQUE`.
@@ -103,9 +103,11 @@ One node per column in scope.
 | `name`               | string  | no       | column name                         |
 | `type`               | string  | yes      | UC data type string (e.g. `STRING`, `BIGINT`, `ARRAY<STRING>`) |
 | `nullable`           | boolean | yes      | `true` / `false`; `null` when UC returns unexpected value |
+| `is_primary_key`     | boolean | no       | `true` when the column participates in a declared PRIMARY KEY constraint; declared-only (inferred FK edges never set this) |
+| `is_foreign_key`     | boolean | no       | `true` when the column participates in a declared FOREIGN KEY constraint; declared-only |
 | `ordinal_position`   | integer | yes      | 1-based column position             |
 | `description`        | string  | yes      | UC column comment                   |
-| `contract_version`   | string  | no       | `"1.1"`                             |
+| `contract_version`   | string  | no       | `"1.7"`                             |
 | `embedding`          | float[] | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_COLUMNS=true` |
 
 Neo4j constraint: `column_id` — `id IS UNIQUE`.
@@ -124,7 +126,7 @@ cardinality falls below the configured threshold.
 | `id`                 | string  | no       | `generate_value_id(column_id, value_str)`; unique |
 | `value`              | string  | yes      | the sampled value as a string       |
 | `count`              | long    | yes      | approximate row count for this value |
-| `contract_version`   | string  | no       | `"1.1"`                             |
+| `contract_version`   | string  | no       | `"1.7"`                             |
 | `embedding`          | float[] | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_VALUES=true` |
 
 Neo4j constraint: `value_id` — `id IS UNIQUE`.
@@ -223,7 +225,7 @@ corresponding nodes. Vector indexes for that label are not created.
 
 ## Versioning
 
-The current schema version is **`1.1`**, stored as `contract_version` on every
+The current schema version is **`1.7`**, stored as `contract_version` on every
 node. Adding a new property or relationship type increments the version.
 Removing or renaming a property is a breaking change. Clients should treat
 unknown properties as additive and not error on their presence.

@@ -47,7 +47,7 @@ _CON_FIELDS = (
     "ordinal_position",
     "constraint_name",
 )
-_EXPECTED_COLUMNS = ("source_id", "target_id", "confidence", "source", "criteria")
+_EXPECTED_COLUMNS = ("source_column_id", "target_column_id", "confidence", "source", "criteria")
 
 
 def _columns_schema():
@@ -110,7 +110,7 @@ def _run(spark, col_rows, con_rows, declared_df=None):
         composite_pk_count=composite_pk_count,
     )
     rows = edges_df.collect()
-    edges = {(r["source_id"], r["target_id"]): r["confidence"] for r in rows}
+    edges = {(r["source_column_id"], r["target_column_id"]): r["confidence"] for r in rows}
     return edges, counts, composite, edges_df
 
 
@@ -159,7 +159,7 @@ def test_declared_prior_pair_suppression(local_spark) -> None:
     """A declared-only prior frame removes exactly that edge from output."""
     prior = local_spark.createDataFrame(
         [(f"{_CAT}.{_SA}.orders.customer_id", f"{_CAT}.{_SA}.customers.id")],
-        schema=["source_id", "target_id"],
+        schema=["source_column_id", "target_column_id"],
     )
     edges, counts, _composite, _df = _run(
         local_spark,

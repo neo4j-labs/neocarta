@@ -124,24 +124,27 @@ def discover_declared(
 
     edges: list[FKEdge] = []
     for r in fk_pairs_df.collect():
-        source_id = generate_id(
+        source_column_id = generate_id(
             r["src_catalog"],
             r["src_schema"],
             r["src_table"],
             r["src_column"],
         )
-        target_id = generate_id(
+        target_column_id = generate_id(
             r["tgt_catalog"],
             r["tgt_schema"],
             r["tgt_table"],
             r["tgt_column"],
         )
-        if DeclaredPair(source_id=source_id, target_id=target_id) in prior_pairs:
+        if (
+            DeclaredPair(source_column_id=source_column_id, target_column_id=target_column_id)
+            in prior_pairs
+        ):
             continue
         edges.append(
             FKEdge(
-                source_id=source_id,
-                target_id=target_id,
+                source_column_id=source_column_id,
+                target_column_id=target_column_id,
                 confidence=1.0,
                 source=EdgeSource.DECLARED,
                 criteria=None,

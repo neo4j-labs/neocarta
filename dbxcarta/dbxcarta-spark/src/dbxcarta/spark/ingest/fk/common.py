@@ -100,8 +100,8 @@ class DeclaredPair:
     the suppression set.
     """
 
-    source_id: str
-    target_id: str
+    source_column_id: str
+    target_column_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,8 +113,8 @@ class FKEdge:
     serializes `.value` at the tuple boundary.
     """
 
-    source_id: str
-    target_id: str
+    source_column_id: str
+    target_column_id: str
     confidence: float
     source: EdgeSource
     criteria: str | None

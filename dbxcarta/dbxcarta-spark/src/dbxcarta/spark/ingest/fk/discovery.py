@@ -9,8 +9,8 @@ ready-to-write REFERENCES DataFrames tagged with
 
 Each strategy is suppressed against the edges earlier strategies already
 emitted. Declared receives nothing; metadata anti-joins declared-only. The
-prior set is threaded as a `(source_id, target_id)` DataFrame, never
-collected.
+prior set is threaded as a `(source_column_id, target_column_id)` DataFrame,
+never collected.
 """
 
 from __future__ import annotations
