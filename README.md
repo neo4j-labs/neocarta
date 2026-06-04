@@ -751,6 +751,8 @@ Today the CLI ships these connector commands:
 | `neocarta bigquery schema` | `BigQuerySchemaConnector` — load `Database`, `Schema`, `Table`, `Column` nodes |
 | `neocarta bigquery logs` | `BigQueryLogsConnector` — load `Query`, `CTE`, and reference relationships from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` |
 | `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
+| `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
+| `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
 
 Plus one introspection verb:
 
@@ -766,6 +768,8 @@ neocarta bigquery schema --project-id my-proj --dataset-id sales
 neocarta bigquery schema --no-embeddings
 neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.

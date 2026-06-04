@@ -24,6 +24,8 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `GCP_PROJECT_ID` | Yes for `bigquery *` | — | Google Cloud project ID |
 | `BIGQUERY_DATASET_ID` | Yes for `bigquery *` | — | Default BigQuery dataset ID |
 | `BIGQUERY_REGION` | No | `region-us` | BigQuery region for `INFORMATION_SCHEMA` queries |
+| `GCP_PROJECT_NUMBER` | Yes for `dataplex *` | — | Google Cloud project number |
+| `DATAPLEX_LOCATION` | Yes for `dataplex *` | — | Dataplex location, e.g. `us` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
 
@@ -105,6 +107,52 @@ Loads metadata from a directory of CSV files into the Neocarta graph using `CSVC
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta csv ingest --csv-directory ./datasets/csv --embeddings
 CSV_DIRECTORY=./datasets/csv neocarta csv ingest --dry-run --json
+```
+
+---
+
+### `neocarta dataplex schema`
+
+Loads BigQuery schema metadata (`Database`, `Schema`, `Table`, `Column`) plus their relationships from the Dataplex Universal Catalog using `DataplexSchemaConnector`. When `--embeddings` is enabled, `Table` and `Column` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
+  - `--project-number TEXT` — GCP project number. Overrides `GCP_PROJECT_NUMBER`.
+  - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
+  - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
+  - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading the physical schema of a BigQuery dataset that is catalogued in Dataplex.
+
+```bash
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales --embeddings
+neocarta dataplex schema --dataset-id sales --dry-run --json
+```
+
+---
+
+### `neocarta dataplex glossary`
+
+Loads the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) plus their relationships using `DataplexGlossaryConnector`. With `--entry-links` (the default), it also loads catalog↔glossary entry links as `(:Column|:Table)-[:TAGGED_WITH]->(:BusinessTerm)` edges; those attach to existing schema nodes, so run `neocarta dataplex schema` first for the tags to land. Dataset-independent (no `--dataset-id`). When `--embeddings` is enabled, `BusinessTerm` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
+  - `--project-number TEXT` — GCP project number. Overrides `GCP_PROJECT_NUMBER`.
+  - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
+  - `--entry-links / --no-entry-links` — Load `TAGGED_WITH` catalog entry links. Default: enabled. Use `--no-entry-links` to load glossary content only (skips the REST round-trips).
+  - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading curated business terminology from a Dataplex glossary and tagging the schema with it (run after `dataplex schema`).
+
+```bash
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us --embeddings
+neocarta dataplex glossary --no-entry-links --dry-run --json
 ```
 
 ---
