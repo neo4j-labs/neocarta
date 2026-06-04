@@ -1,0 +1,39 @@
+[project]
+name = "dbxcarta-spark"
+version = "1.1.0"
+description = "Databricks Spark semantic-layer builder for dbxcarta"
+authors = [
+    { name = "Ryan Knight" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "databricks-sdk>=0.40",
+    "dbxcarta-core>=1.1.0,<2",
+    "neo4j>=5.0",
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "pyspark>=3.5",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+dbxcarta = "dbxcarta.spark.cli:main"
+dbxcarta-ingest = "dbxcarta.spark.entrypoint:main"
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+# module-name is the whole ``dbxcarta`` namespace (not just ``dbxcarta.spark``)
+# with namespace packaging, so the cluster wheel can physically carry
+# ``dbxcarta/core`` alongside ``dbxcarta/spark``. The runner bootstrap installs
+# this single application wheel with ``--no-deps`` and has no slot for a
+# separate core wheel, so ``dbxcarta-submit publish-wheels`` copies the core
+# source in before building (see ``_core_bundled_into``). A normal build, with
+# no core copied in, produces exactly today's ``dbxcarta/spark`` contents.
+[tool.uv.build-backend]
+module-name = "dbxcarta"
+namespace = true

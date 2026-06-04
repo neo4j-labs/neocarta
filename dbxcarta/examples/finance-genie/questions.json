@@ -1,0 +1,74 @@
+[
+  {
+    "question_id": "fg_q01",
+    "question": "How many accounts are there?",
+    "notes": "single base table count",
+    "reference_sql": "SELECT COUNT(*) AS account_count FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.accounts"
+  },
+  {
+    "question_id": "fg_q02",
+    "question": "What account types exist?",
+    "notes": "single base table distinct",
+    "reference_sql": "SELECT DISTINCT account_type FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.accounts ORDER BY account_type"
+  },
+  {
+    "question_id": "fg_q03",
+    "question": "What merchant categories exist?",
+    "notes": "single base table distinct",
+    "reference_sql": "SELECT DISTINCT category FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.merchants ORDER BY category"
+  },
+  {
+    "question_id": "fg_q04",
+    "question": "What is the total transaction amount by merchant category?",
+    "notes": "base-table join: transactions to merchants",
+    "reference_sql": "SELECT m.category, SUM(t.amount) AS total_amount FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.transactions t JOIN `graph-enriched-finance-silver`.`graph-enriched-schema`.merchants m ON t.merchant_id = m.merchant_id GROUP BY m.category ORDER BY total_amount DESC"
+  },
+  {
+    "question_id": "fg_q05",
+    "question": "How many transactions has each account type made?",
+    "notes": "base-table join: transactions to accounts",
+    "reference_sql": "SELECT a.account_type, COUNT(t.txn_id) AS txn_count FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.transactions t JOIN `graph-enriched-finance-silver`.`graph-enriched-schema`.accounts a ON t.account_id = a.account_id GROUP BY a.account_type ORDER BY txn_count DESC"
+  },
+  {
+    "question_id": "fg_q06",
+    "question": "What is the total transfer amount sent out by account type?",
+    "notes": "base-table join: account_links to source accounts",
+    "reference_sql": "SELECT a.account_type, SUM(l.amount) AS total_transfer_amount FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.account_links l JOIN `graph-enriched-finance-silver`.`graph-enriched-schema`.accounts a ON l.src_account_id = a.account_id GROUP BY a.account_type ORDER BY total_transfer_amount DESC"
+  },
+  {
+    "question_id": "fg_q07",
+    "question": "How many accounts are confirmed fraud ring members?",
+    "notes": "base table label filter",
+    "reference_sql": "SELECT COUNT(*) AS fraud_account_count FROM `graph-enriched-finance-silver`.`graph-enriched-schema`.account_labels WHERE is_fraud = true"
+  },
+  {
+    "question_id": "fg_q08",
+    "question": "How many high-risk accounts are in the gold accounts table?",
+    "notes": "Gold table graph-derived feature filter",
+    "reference_sql": "SELECT COUNT(*) AS high_risk_account_count FROM `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_accounts WHERE fraud_risk_tier = 'high'"
+  },
+  {
+    "question_id": "fg_q09",
+    "question": "Which fraud ring communities are ring candidates?",
+    "notes": "Gold community table boolean filter",
+    "reference_sql": "SELECT community_id FROM `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_fraud_ring_communities WHERE is_ring_candidate = true"
+  },
+  {
+    "question_id": "fg_q10",
+    "question": "What is the average graph risk score by account region?",
+    "notes": "Gold account aggregation by dimension",
+    "reference_sql": "SELECT region, AVG(risk_score) AS avg_risk_score FROM `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_accounts GROUP BY region ORDER BY avg_risk_score DESC"
+  },
+  {
+    "question_id": "fg_q11",
+    "question": "Which account pairs have the highest merchant similarity scores?",
+    "notes": "Gold similarity pair ranking",
+    "reference_sql": "SELECT account_id_a, account_id_b, similarity_score FROM `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_account_similarity_pairs ORDER BY similarity_score DESC LIMIT 10"
+  },
+  {
+    "question_id": "fg_q12",
+    "question": "What share of accounts sits in ring candidate communities by region?",
+    "notes": "Gold account and community join",
+    "reference_sql": "SELECT a.region, COUNT_IF(c.is_ring_candidate) / COUNT(*) AS ring_candidate_share FROM `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_accounts a JOIN `graph-enriched-finance-gold`.`graph-enriched-schema`.gold_fraud_ring_communities c ON a.community_id = c.community_id GROUP BY a.region ORDER BY ring_candidate_share DESC"
+  }
+]

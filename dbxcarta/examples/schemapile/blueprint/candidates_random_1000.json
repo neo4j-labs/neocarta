@@ -1,0 +1,6591 @@
+{
+  "format_version": 2,
+  "source_slice": "/Users/ryanknight/projects/databricks/dbxcarta/examples/schemapile/.cache/slice_random_1000.json",
+  "selection_params": {
+    "candidate_min_tables": 3,
+    "candidate_max_tables": 20,
+    "candidate_min_fk_edges": 2,
+    "candidate_require_data": false,
+    "candidate_limit": 20
+  },
+  "schemas": [
+    {
+      "source_id": "492424_create-adventuresOverflow.sql",
+      "uc_schema": "sp_492424_create_adventuresoverflow",
+      "rationale": "tables=6 fk_density=1.83 data_tables=0",
+      "tables": [
+        {
+          "name": "sales.DimDate",
+          "columns": [
+            {
+              "name": "DateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "FullDateAlternateKey",
+              "type": "Date"
+            },
+            {
+              "name": "EnglishDayNameOfWeek",
+              "type": "Varchar"
+            },
+            {
+              "name": "EnglishMonthName",
+              "type": "Varchar"
+            },
+            {
+              "name": "FiscalQuarter",
+              "type": "SmallInt"
+            },
+            {
+              "name": "FiscalYear",
+              "type": "SmallInt"
+            },
+            {
+              "name": "FiscalSemester",
+              "type": "SmallInt"
+            }
+          ],
+          "primary_keys": [
+            "DateKey"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "sales.DimSalesTerritory",
+          "columns": [
+            {
+              "name": "SalesTerritoryKey",
+              "type": "Integer"
+            },
+            {
+              "name": "SalesTerritoryRegion",
+              "type": "Varchar"
+            },
+            {
+              "name": "SalesTerritoryCountry",
+              "type": "Varchar"
+            },
+            {
+              "name": "SalesTerritoryGroup",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "SalesTerritoryKey"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "sales.DimDateHoliday",
+          "columns": [
+            {
+              "name": "DateHolidayKey",
+              "type": "serial"
+            },
+            {
+              "name": "DateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "TerritoryCode",
+              "type": "Char"
+            },
+            {
+              "name": "HolidayFlag",
+              "type": "Boolean"
+            },
+            {
+              "name": "HolidayName",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "DateHolidayKey"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "DateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "sales.DimCustomer",
+          "columns": [
+            {
+              "name": "CustomerKey",
+              "type": "Integer"
+            },
+            {
+              "name": "GeographyKey",
+              "type": "Date"
+            },
+            {
+              "name": "FirstName",
+              "type": "Varchar"
+            },
+            {
+              "name": "LastName",
+              "type": "Varchar"
+            },
+            {
+              "name": "BirthDate",
+              "type": "Date"
+            },
+            {
+              "name": "MaritalStatus",
+              "type": "Char"
+            },
+            {
+              "name": "Gender",
+              "type": "Varchar"
+            },
+            {
+              "name": "EmailAddress",
+              "type": "Varchar"
+            },
+            {
+              "name": "YearlyIncome",
+              "type": "money"
+            },
+            {
+              "name": "EnglishEducation",
+              "type": "Varchar"
+            },
+            {
+              "name": "DateFirstPurchase",
+              "type": "Date"
+            },
+            {
+              "name": "SalesTerritoryKey",
+              "type": "Integer"
+            },
+            {
+              "name": "City",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "CustomerKey"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "SalesTerritoryKey"
+              ],
+              "foreign_table": "sales.DimSalesTerritory",
+              "referred_columns": [
+                "SalesTerritoryKey"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "sales.FactInternetSales",
+          "columns": [
+            {
+              "name": "OrderSalesNumber",
+              "type": "Integer"
+            },
+            {
+              "name": "ProductKey",
+              "type": "Integer"
+            },
+            {
+              "name": "OrderDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "DueDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "ShipDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "CustomerKey",
+              "type": "Integer"
+            },
+            {
+              "name": "SalesTerritoryKey",
+              "type": "Integer"
+            },
+            {
+              "name": "OrderQuantity",
+              "type": "SmallInt"
+            },
+            {
+              "name": "UnitPrice",
+              "type": "money"
+            },
+            {
+              "name": "DiscountAmount",
+              "type": "Decimal"
+            },
+            {
+              "name": "SalesAmount",
+              "type": "money"
+            },
+            {
+              "name": "OrderDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "DueDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "ShipDate",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "OrderSalesNumber"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "OrderDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "DueDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "ShipDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "CustomerKey"
+              ],
+              "foreign_table": "sales.DimCustomer",
+              "referred_columns": [
+                "CustomerKey"
+              ]
+            },
+            {
+              "columns": [
+                "SalesTerritoryKey"
+              ],
+              "foreign_table": "sales.DimSalesTerritory",
+              "referred_columns": [
+                "SalesTerritoryKey"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "sales.FactPosts",
+          "columns": [
+            {
+              "name": "PostKey",
+              "type": "Integer"
+            },
+            {
+              "name": "AnswerCount",
+              "type": "Integer"
+            },
+            {
+              "name": "Body",
+              "type": "Varchar"
+            },
+            {
+              "name": "ClosedDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "CommentCount",
+              "type": "Integer"
+            },
+            {
+              "name": "CreationDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "FavoriteCount",
+              "type": "Integer"
+            },
+            {
+              "name": "LastActivityDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "LastEditDate",
+              "type": "Timestamp"
+            },
+            {
+              "name": "Score",
+              "type": "Integer"
+            },
+            {
+              "name": "Title",
+              "type": "Varchar"
+            },
+            {
+              "name": "ViewCount",
+              "type": "Integer"
+            },
+            {
+              "name": "ClosedDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "CreationDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "LastActivityDateKey",
+              "type": "Integer"
+            },
+            {
+              "name": "LastEditDateKey",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "PostKey"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "ClosedDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "CreationDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "LastActivityDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            },
+            {
+              "columns": [
+                "LastEditDateKey"
+              ],
+              "foreign_table": "sales.DimDate",
+              "referred_columns": [
+                "DateKey"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "310630_schema.sql",
+      "uc_schema": "sp_310630_schema",
+      "rationale": "tables=6 fk_density=1.67 data_tables=0",
+      "tables": [
+        {
+          "name": "users",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Integer"
+            },
+            {
+              "name": "login",
+              "type": "Text"
+            },
+            {
+              "name": "country_code",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "projects",
+              "referred_columns": [
+                "owner_id"
+              ]
+            },
+            {
+              "columns": [
+                "login"
+              ],
+              "foreign_table": "to_query_projects",
+              "referred_columns": [
+                "login"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "projects",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Integer"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "owner_id",
+              "type": "Integer"
+            },
+            {
+              "name": "forked_from",
+              "type": "Integer"
+            },
+            {
+              "name": "deleted",
+              "type": "TYNYINT"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "name"
+              ],
+              "foreign_table": "to_query_projects",
+              "referred_columns": [
+                "name"
+              ]
+            },
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "projects",
+              "referred_columns": [
+                "forked_from"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "to_query_projects",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Integer"
+            },
+            {
+              "name": "login",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "status",
+              "type": "TYNYINT"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "login"
+              ],
+              "foreign_table": "result_files",
+              "referred_columns": [
+                "login"
+              ]
+            },
+            {
+              "columns": [
+                "name"
+              ],
+              "foreign_table": "result_files",
+              "referred_columns": [
+                "name"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "result_files",
+          "columns": [
+            {
+              "name": "login",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "link_file",
+              "type": "Text"
+            },
+            {
+              "name": "path_file",
+              "type": "Text"
+            },
+            {
+              "name": "path_copy_file",
+              "type": "Text"
+            },
+            {
+              "name": "n_authors",
+              "type": "Integer"
+            },
+            {
+              "name": "n_revs",
+              "type": "Integer"
+            },
+            {
+              "name": "age_months",
+              "type": "Integer"
+            },
+            {
+              "name": "duplicate",
+              "type": "Integer"
+            },
+            {
+              "name": "is_xml",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "path_file"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "path_file"
+              ],
+              "foreign_table": "result_xml_original",
+              "referred_columns": [
+                "path_file"
+              ]
+            },
+            {
+              "columns": [
+                "path_copy_file"
+              ],
+              "foreign_table": "result_xml_original",
+              "referred_columns": [
+                "path_copy_file"
+              ]
+            },
+            {
+              "columns": [
+                "login"
+              ],
+              "foreign_table": "result_projects",
+              "referred_columns": [
+                "login"
+              ]
+            },
+            {
+              "columns": [
+                "name"
+              ],
+              "foreign_table": "result_projects",
+              "referred_columns": [
+                "name"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "result_projects",
+          "columns": [
+            {
+              "name": "login",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "language",
+              "type": "Text"
+            },
+            {
+              "name": "created_at",
+              "type": "Text"
+            },
+            {
+              "name": "last_commit_at",
+              "type": "Text"
+            },
+            {
+              "name": "n_commits",
+              "type": "Integer"
+            },
+            {
+              "name": "location_country",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "login",
+            "name"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "result_xml_original",
+          "columns": [
+            {
+              "name": "path_file",
+              "type": "Text"
+            },
+            {
+              "name": "path_copy_file",
+              "type": "Text"
+            },
+            {
+              "name": "has_copy",
+              "type": "Integer"
+            },
+            {
+              "name": "n_xml_elements",
+              "type": "Integer"
+            },
+            {
+              "name": "valid",
+              "type": "Integer"
+            },
+            {
+              "name": "valid_after_repairing",
+              "type": "Integer"
+            },
+            {
+              "name": "constraints_list",
+              "type": "Text"
+            },
+            {
+              "name": "constraints_list_after_repairing",
+              "type": "Text"
+            },
+            {
+              "name": "BPMNDiagram",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "path_file"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "266628_tables.sql",
+      "uc_schema": "sp_266628_tables",
+      "rationale": "tables=8 fk_density=1.62 data_tables=0",
+      "tables": [
+        {
+          "name": "users",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "firstName",
+              "type": "Varchar"
+            },
+            {
+              "name": "lastName",
+              "type": "Varchar"
+            },
+            {
+              "name": "birthDate",
+              "type": "Date"
+            },
+            {
+              "name": "registery_date",
+              "type": "Datetime"
+            },
+            {
+              "name": "bio",
+              "type": "Varchar"
+            },
+            {
+              "name": "followers",
+              "type": "Int"
+            },
+            {
+              "name": "following",
+              "type": "Int"
+            },
+            {
+              "name": "password",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "username"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tweet",
+          "columns": [
+            {
+              "name": "tweetid",
+              "type": "Int"
+            },
+            {
+              "name": "type",
+              "type": "Char"
+            },
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "tweet_content",
+              "type": "Varchar"
+            },
+            {
+              "name": "ref_id",
+              "type": "Int"
+            },
+            {
+              "name": "timestamp_t",
+              "type": "Timestamp"
+            },
+            {
+              "name": "likes",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "tweetid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "ref_id"
+              ],
+              "foreign_table": "tweet",
+              "referred_columns": [
+                "tweetid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "message",
+          "columns": [
+            {
+              "name": "mess_id",
+              "type": "Int"
+            },
+            {
+              "name": "type",
+              "type": "Char"
+            },
+            {
+              "name": "s_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "r_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "content",
+              "type": "Varchar"
+            },
+            {
+              "name": "ref_id",
+              "type": "Int"
+            },
+            {
+              "name": "timestamp_t",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "mess_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "s_id"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "r_id"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "ref_id"
+              ],
+              "foreign_table": "tweet",
+              "referred_columns": [
+                "tweetid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "login_record",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "timestamp_t",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "username",
+            "timestamp_t"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "follow",
+          "columns": [
+            {
+              "name": "follower",
+              "type": "Varchar"
+            },
+            {
+              "name": "following",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "follower",
+            "following"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "follower"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "following"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "hashtag",
+          "columns": [
+            {
+              "name": "hashtag",
+              "type": "Char"
+            },
+            {
+              "name": "tweetid",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "hashtag",
+            "tweetid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "tweetid"
+              ],
+              "foreign_table": "tweet",
+              "referred_columns": [
+                "tweetid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "likes",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "tweetid",
+              "type": "Int"
+            },
+            {
+              "name": "timeStamp_l",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "tweetid",
+            "username"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "tweetid"
+              ],
+              "foreign_table": "tweet",
+              "referred_columns": [
+                "tweetid"
+              ]
+            },
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "block",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "blocked_user",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "username",
+            "blocked_user"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "blocked_user"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "535132_zhuanglang.sql",
+      "uc_schema": "sp_535132_zhuanglang",
+      "rationale": "tables=5 fk_density=1.40 data_tables=5",
+      "tables": [
+        {
+          "name": "teacher",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Char"
+            },
+            {
+              "name": "pwd",
+              "type": "Varchar"
+            },
+            {
+              "name": "salt",
+              "type": "Varchar"
+            },
+            {
+              "name": "nkuorzhuanglang",
+              "type": "Enum"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "person_no",
+              "type": "Varchar"
+            },
+            {
+              "name": "mail",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "username"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              "<PERSON>",
+              "7c403719af397878d6d48c385a3607f9",
+              "qQT06+5F7zymT7CcJPnhYQ==",
+              "NKU",
+              "\u5415",
+              null,
+              "<EMAIL_ADDRESS>"
+            ]
+          ]
+        },
+        {
+          "name": "book",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Char"
+            },
+            {
+              "name": "upload",
+              "type": "Char"
+            },
+            {
+              "name": "discipline",
+              "type": "Enum"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "upload"
+              ],
+              "foreign_table": "teacher",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "\u516b\u5e74\u7ea7\u4e0a",
+              "<PERSON>",
+              "IT"
+            ],
+            [
+              null,
+              "\u516b\u5e74\u7ea7\u4e0b",
+              "<PERSON>",
+              "IT"
+            ]
+          ]
+        },
+        {
+          "name": "section",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "number",
+              "type": "Int"
+            },
+            {
+              "name": "upload",
+              "type": "Char"
+            },
+            {
+              "name": "note",
+              "type": "Char"
+            },
+            {
+              "name": "belong",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "upload"
+              ],
+              "foreign_table": "teacher",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "belong"
+              ],
+              "foreign_table": "book",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              1,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              3,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              2,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              2,
+              "<PERSON>",
+              "Test",
+              2
+            ],
+            [
+              null,
+              3,
+              "<PERSON>",
+              "Test",
+              2
+            ]
+          ]
+        },
+        {
+          "name": "class",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "number",
+              "type": "Int"
+            },
+            {
+              "name": "upload",
+              "type": "Char"
+            },
+            {
+              "name": "note",
+              "type": "Char"
+            },
+            {
+              "name": "belong",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "upload"
+              ],
+              "foreign_table": "teacher",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "belong"
+              ],
+              "foreign_table": "section",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              1,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              3,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              2,
+              "<PERSON>",
+              "Test",
+              1
+            ],
+            [
+              null,
+              1,
+              "<PERSON>",
+              "Test",
+              2
+            ],
+            [
+              null,
+              2,
+              "<PERSON>",
+              "Test",
+              2
+            ]
+          ]
+        },
+        {
+          "name": "resources",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "md5",
+              "type": "Char"
+            },
+            {
+              "name": "name",
+              "type": "Char"
+            },
+            {
+              "name": "path",
+              "type": "Char"
+            },
+            {
+              "name": "upload",
+              "type": "Char"
+            },
+            {
+              "name": "videoorslide",
+              "type": "Enum"
+            },
+            {
+              "name": "bilibili",
+              "type": "Char"
+            },
+            {
+              "name": "note",
+              "type": "Char"
+            },
+            {
+              "name": "belong",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "upload"
+              ],
+              "foreign_table": "teacher",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "belong"
+              ],
+              "foreign_table": "class",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              null,
+              "1.pdf",
+              "IT/1/1/1/1.pdf",
+              "<PERSON>",
+              "SLIDE",
+              null,
+              "Test",
+              1
+            ],
+            [
+              null,
+              null,
+              "1.mp4",
+              "IT/1/1/1/1.mp4",
+              "<PERSON>",
+              "VIDEO",
+              null,
+              "Test",
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "300813_erzeuge_zielzustand.sql",
+      "uc_schema": "sp_300813_erzeuge_zielzustand",
+      "rationale": "tables=14 fk_density=1.36 data_tables=0",
+      "tables": [
+        {
+          "name": "tab_a",
+          "columns": [
+            {
+              "name": "tab_a_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "tab_a_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_b",
+          "columns": [
+            {
+              "name": "tab_b_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "tab_b_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_c",
+          "columns": [
+            {
+              "name": "tab_c_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "tab_c_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_d",
+          "columns": [
+            {
+              "name": "tab d id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "tab d id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_del_cas",
+          "columns": [
+            {
+              "name": "tab_a_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_b_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_c_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_d_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "tab_a_id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_b_id"
+              ],
+              "foreign_table": "tab_b",
+              "referred_columns": [
+                "tab_b_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_c_id"
+              ],
+              "foreign_table": "tab_c",
+              "referred_columns": [
+                "tab_c_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_d_id"
+              ],
+              "foreign_table": "tab_d",
+              "referred_columns": [
+                "tab d id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_no_action",
+          "columns": [
+            {
+              "name": "tab_a_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_b_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_c_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_d_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "tab_a_id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_b_id"
+              ],
+              "foreign_table": "tab_b",
+              "referred_columns": [
+                "tab_b_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_c_id"
+              ],
+              "foreign_table": "tab_c",
+              "referred_columns": [
+                "tab_c_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_d_id"
+              ],
+              "foreign_table": "tab_d",
+              "referred_columns": [
+                "tab d id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_set_null",
+          "columns": [
+            {
+              "name": "tab_a_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_b_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_c_id",
+              "type": "number"
+            },
+            {
+              "name": "tab_d_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "tab_a_id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_b_id"
+              ],
+              "foreign_table": "tab_b",
+              "referred_columns": [
+                "tab_b_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_c_id"
+              ],
+              "foreign_table": "tab_c",
+              "referred_columns": [
+                "tab_c_id"
+              ]
+            },
+            {
+              "columns": [
+                "tab_d_id"
+              ],
+              "foreign_table": "tab_d",
+              "referred_columns": [
+                "tab d id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_2_column_pk",
+          "columns": [
+            {
+              "name": "id1",
+              "type": "number"
+            },
+            {
+              "name": "id2",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "id1",
+            "id2"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_wrong_fk_name",
+          "columns": [
+            {
+              "name": "id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_wrong_fk_column",
+          "columns": [
+            {
+              "name": "id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "tab_b",
+              "referred_columns": [
+                "tab_b_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_wrong_fk_column_order",
+          "columns": [
+            {
+              "name": "id1",
+              "type": "number"
+            },
+            {
+              "name": "id2",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id1",
+                "id2"
+              ],
+              "foreign_table": "tab_2_column_pk",
+              "referred_columns": [
+                "id1",
+                "id2"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_mixed_name_1",
+          "columns": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "id_1",
+              "type": "number"
+            },
+            {
+              "name": "id_2",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            },
+            {
+              "columns": [
+                "id_1"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            },
+            {
+              "columns": [
+                "id_2"
+              ],
+              "foreign_table": "tab_b",
+              "referred_columns": [
+                "tab_b_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_mixed_name_2",
+          "columns": [
+            {
+              "name": "id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id"
+              ],
+              "foreign_table": "tab_a",
+              "referred_columns": [
+                "tab_a_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tab_index_test",
+          "columns": [
+            {
+              "name": "tab_index_test_id",
+              "type": "number"
+            }
+          ],
+          "primary_keys": [
+            "tab_index_test_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "002489_project.sql",
+      "uc_schema": "sp_002489_project",
+      "rationale": "tables=8 fk_density=1.25 data_tables=0",
+      "tables": [
+        {
+          "name": "projects",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "description",
+              "type": "Varchar"
+            },
+            {
+              "name": "process",
+              "type": "Varchar"
+            },
+            {
+              "name": "current_iteration",
+              "type": "Int"
+            },
+            {
+              "name": "start_date",
+              "type": "Date"
+            },
+            {
+              "name": "end_date",
+              "type": "Date"
+            },
+            {
+              "name": "version",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "current_iteration"
+              ],
+              "foreign_table": "iterations",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "members",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "project_members",
+          "columns": [
+            {
+              "name": "project",
+              "type": "Int"
+            },
+            {
+              "name": "member",
+              "type": "Int"
+            },
+            {
+              "name": "role",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "project"
+              ],
+              "foreign_table": "projects",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "member"
+              ],
+              "foreign_table": "members",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "iterations",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "project",
+              "type": "Int"
+            },
+            {
+              "name": "iteration",
+              "type": "Varchar"
+            },
+            {
+              "name": "number",
+              "type": "Int"
+            },
+            {
+              "name": "start_date",
+              "type": "Date"
+            },
+            {
+              "name": "end_date",
+              "type": "Date"
+            },
+            {
+              "name": "current_activity",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "project"
+              ],
+              "foreign_table": "projects",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "current_activity"
+              ],
+              "foreign_table": "activities",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "activities",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "iteration",
+              "type": "Int"
+            },
+            {
+              "name": "current_task",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "iteration"
+              ],
+              "foreign_table": "iterations",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "current_task"
+              ],
+              "foreign_table": "tasks",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "tasks",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "task",
+              "type": "Varchar"
+            },
+            {
+              "name": "member",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "member"
+              ],
+              "foreign_table": "members",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "artifacts",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "artifact",
+              "type": "Varchar"
+            },
+            {
+              "name": "filename",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "task_artifacts",
+          "columns": [
+            {
+              "name": "task",
+              "type": "Int"
+            },
+            {
+              "name": "artifact",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "task"
+              ],
+              "foreign_table": "tasks",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "artifact"
+              ],
+              "foreign_table": "artifacts",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "594700_takeout.sql",
+      "uc_schema": "sp_594700_takeout",
+      "rationale": "tables=8 fk_density=1.25 data_tables=0",
+      "tables": [
+        {
+          "name": "location",
+          "columns": [
+            {
+              "name": "uuid",
+              "type": "Varchar"
+            },
+            {
+              "name": "order_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "x",
+              "type": "Float"
+            },
+            {
+              "name": "y",
+              "type": "Float"
+            },
+            {
+              "name": "time",
+              "type": "Datetime"
+            }
+          ],
+          "primary_keys": [
+            "uuid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "order_id"
+              ],
+              "foreign_table": "orders",
+              "referred_columns": [
+                "order_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "order_include",
+          "columns": [
+            {
+              "name": "dish_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "order_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "amount",
+              "type": "Int"
+            },
+            {
+              "name": "attribute",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "dish_id",
+            "order_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "order_id"
+              ],
+              "foreign_table": "orders",
+              "referred_columns": [
+                "order_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "orders",
+          "columns": [
+            {
+              "name": "order_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "username",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "order_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "score",
+          "columns": [
+            {
+              "name": "use_username",
+              "type": "Varchar"
+            },
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "score",
+              "type": "Numeric"
+            },
+            {
+              "name": "comment",
+              "type": "Text"
+            },
+            {
+              "name": "img",
+              "type": "longblob"
+            },
+            {
+              "name": "type",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "use_username",
+            "username"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "use_username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "score_dish",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "dish_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "grade",
+              "type": "Decimal"
+            },
+            {
+              "name": "comment",
+              "type": "Text"
+            },
+            {
+              "name": "img",
+              "type": "longblob"
+            }
+          ],
+          "primary_keys": [
+            "username",
+            "dish_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "store",
+          "columns": [
+            {
+              "name": "store_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "address",
+              "type": "Varchar"
+            },
+            {
+              "name": "s_phone",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "store_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "user",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "store_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "use_username",
+              "type": "Varchar"
+            },
+            {
+              "name": "role",
+              "type": "Varchar"
+            },
+            {
+              "name": "phone",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "username"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "store_id"
+              ],
+              "foreign_table": "store",
+              "referred_columns": [
+                "store_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "user_orders",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Varchar"
+            },
+            {
+              "name": "order_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "state",
+              "type": "Varchar"
+            },
+            {
+              "name": "reciever",
+              "type": "Varchar"
+            },
+            {
+              "name": "recieve_address",
+              "type": "Varchar"
+            },
+            {
+              "name": "r_phone",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "username",
+            "order_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "username"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "username"
+              ]
+            },
+            {
+              "columns": [
+                "order_id"
+              ],
+              "foreign_table": "orders",
+              "referred_columns": [
+                "order_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "178181_V4.026__create_unified_user.sql",
+      "uc_schema": "sp_178181_v4_026__create_unified_user",
+      "rationale": "tables=13 fk_density=1.23 data_tables=0",
+      "tables": [
+        {
+          "name": "scopes",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "source",
+              "type": "generic_string"
+            },
+            {
+              "name": "parent_id",
+              "type": "Integer"
+            },
+            {
+              "name": "parent_path",
+              "type": "exts"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "parent_id"
+              ],
+              "foreign_table": "scopes",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "organizations",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "kind",
+              "type": "generic_string"
+            },
+            {
+              "name": "parent_id",
+              "type": "Integer"
+            },
+            {
+              "name": "scope_id",
+              "type": "Integer"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "parent_id"
+              ],
+              "foreign_table": "organizations",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "scope_id"
+              ],
+              "foreign_table": "scopes",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "scope_domains",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "scope_id",
+              "type": "Integer"
+            },
+            {
+              "name": "domain",
+              "type": "generic_string"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "scope_id"
+              ],
+              "foreign_table": "scopes",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "systems",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "name",
+              "type": "generic_string"
+            },
+            {
+              "name": "description",
+              "type": "generic_string"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "resources",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "name",
+              "type": "generic_string"
+            },
+            {
+              "name": "system_id",
+              "type": "Integer"
+            },
+            {
+              "name": "description",
+              "type": "Text"
+            },
+            {
+              "name": "actions",
+              "type": "Array"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "system_id"
+              ],
+              "foreign_table": "systems",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "permissions",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "scope_id",
+              "type": "Integer"
+            },
+            {
+              "name": "resource_id",
+              "type": "Integer"
+            },
+            {
+              "name": "actions",
+              "type": "Array"
+            },
+            {
+              "name": "frn",
+              "type": "generic_string"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "resource_id"
+              ],
+              "foreign_table": "resources",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "scope_id"
+              ],
+              "foreign_table": "scopes",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "roles",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "scope_id",
+              "type": "Integer"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "scope_id"
+              ],
+              "foreign_table": "scopes",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "role_permissions",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "role_id",
+              "type": "Integer"
+            },
+            {
+              "name": "permission_id",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "role_id"
+              ],
+              "foreign_table": "roles",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "permission_id"
+              ],
+              "foreign_table": "permissions",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "accounts",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "ratchet",
+              "type": "Integer"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "account_roles",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "account_id",
+              "type": "Integer"
+            },
+            {
+              "name": "role_id",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "account_id"
+              ],
+              "foreign_table": "accounts",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "role_id"
+              ],
+              "foreign_table": "roles",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "account_access_methods",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "account_id",
+              "type": "Integer"
+            },
+            {
+              "name": "name",
+              "type": "generic_string"
+            },
+            {
+              "name": "hashed_password",
+              "type": "generic_string"
+            },
+            {
+              "name": "algorithm",
+              "type": "Int"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "generic_timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "account_id"
+              ],
+              "foreign_table": "accounts",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "account_organizations",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "account_id",
+              "type": "Integer"
+            },
+            {
+              "name": "organization_id",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "account_id"
+              ],
+              "foreign_table": "accounts",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "organization_id"
+              ],
+              "foreign_table": "organizations",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "users",
+          "columns": [
+            {
+              "name": "id",
+              "type": "serial"
+            },
+            {
+              "name": "account_id",
+              "type": "Integer"
+            },
+            {
+              "name": "email",
+              "type": "email"
+            },
+            {
+              "name": "is_disabled",
+              "type": "Boolean"
+            },
+            {
+              "name": "disabled_by",
+              "type": "Integer"
+            },
+            {
+              "name": "is_blacklisted",
+              "type": "Boolean"
+            },
+            {
+              "name": "blacklisted_by",
+              "type": "Integer"
+            },
+            {
+              "name": "name",
+              "type": "generic_string"
+            },
+            {
+              "name": "phone_number",
+              "type": "phone_number"
+            },
+            {
+              "name": "created_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "generic_timestamp"
+            },
+            {
+              "name": "deleted_at",
+              "type": "Timestamp"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "account_id"
+              ],
+              "foreign_table": "accounts",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "169810_init.sql",
+      "uc_schema": "sp_169810_init",
+      "rationale": "tables=6 fk_density=1.17 data_tables=1",
+      "tables": [
+        {
+          "name": "Customer",
+          "columns": [
+            {
+              "name": "uid",
+              "type": "SERIAL"
+            },
+            {
+              "name": "username",
+              "type": "Text"
+            },
+            {
+              "name": "password",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "uid"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Shoe",
+          "columns": [
+            {
+              "name": "sid",
+              "type": "SERIAL"
+            },
+            {
+              "name": "stock",
+              "type": "Integer"
+            },
+            {
+              "name": "price",
+              "type": "Float"
+            },
+            {
+              "name": "size",
+              "type": "Integer"
+            },
+            {
+              "name": "colour",
+              "type": "Text"
+            },
+            {
+              "name": "image_url",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "description",
+              "type": "Text"
+            },
+            {
+              "name": "brand",
+              "type": "Text"
+            },
+            {
+              "name": "style",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "sid"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              13,
+              39.89,
+              6,
+              "White",
+              "www.google.com",
+              "Josmo 8190 Plain Infant Walking Shoes Navy - Wide - Size 7. 5",
+              "Some descriptions",
+              "Josmo",
+              "Boat shoe"
+            ],
+            [
+              null,
+              11,
+              51.99,
+              10,
+              "<PERSON>",
+              "www.google.com",
+              "Josmo 8190 Plain Infant Walking Shoes Navy - Wide - Size 7. 5",
+              "Some descriptions",
+              "Josmo",
+              "Cantabrian albarcas"
+            ],
+            [
+              null,
+              8,
+              40.02,
+              8,
+              "Black",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "Boat shoe"
+            ],
+            [
+              null,
+              4,
+              50.31,
+              12,
+              "Black",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "Blucher shoe"
+            ],
+            [
+              null,
+              13,
+              46.26,
+              6,
+              "Multi-Colour",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "<PERSON>"
+            ],
+            [
+              null,
+              13,
+              55.99,
+              6,
+              "BlackBlue",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "Cantabrian albarcas"
+            ],
+            [
+              null,
+              4,
+              41.12,
+              10,
+              "Beige",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "Blucher shoe"
+            ],
+            [
+              null,
+              8,
+              46.19,
+              9,
+              "White",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "<PERSON>"
+            ],
+            [
+              null,
+              9,
+              21.4,
+              7,
+              "Brown",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "Brogue shoe"
+            ],
+            [
+              null,
+              15,
+              45.23,
+              10,
+              "Yellow",
+              "www.google.com",
+              "Servus By Honeywell Shoe Studs Zsr101blmlg",
+              "Some descriptions",
+              "SERVUS BY HONEYWELL",
+              "<PERSON>"
+            ],
+            [
+              null,
+              11,
+              45,
+              9,
+              "Brown",
+              "www.google.com",
+              "Native Miller Men Us 10 Gray Loafer Uk 9 Eu 43",
+              "Some descriptions",
+              "NATIVE",
+              "Boat shoe"
+            ],
+            [
+              null,
+              1,
+              7.99,
+              6,
+              "Brown",
+              "www.google.com",
+              "Native Miller Men Us 10 Gray Loafer Uk 9 Eu 43",
+              "Some descriptions",
+              "NATIVE",
+              "Boat shoe"
+            ],
+            [
+              null,
+              3,
+              9.99,
+              7,
+              "Black",
+              "www.google.com",
+              "Native Miller Men Us 10 Gray Loafer Uk 9 Eu 43",
+              "Some descriptions",
+              "NATIVE",
+              "Bucks"
+            ],
+            [
+              null,
+              14,
+              9.99,
+              8,
+              "<PERSON>",
+              "www.google.com",
+              "<PERSON>",
+              "Some descriptions",
+              "MAUI AND SONS",
+              "Climbing shoe"
+            ],
+            [
+              null,
+              1,
+              19.99,
+              10,
+              "Red",
+              "www.google.com",
+              "<PERSON>",
+              "Some descriptions",
+              "MAUI AND SONS",
+              "Climbing shoe"
+            ],
+            [
+              null,
+              4,
+              25,
+              11,
+              "Multi-Colour",
+              "www.google.com",
+              "<PERSON>",
+              "Some descriptions",
+              "MAUI AND SONS",
+              "Blucher shoe"
+            ],
+            [
+              null,
+              13,
+              15.99,
+              7,
+              "Beige",
+              "www.google.com",
+              "<PERSON>",
+              "Some descriptions",
+              "MAUI AND SONS",
+              "Climbing shoe"
+            ],
+            [
+              null,
+              2,
+              9.99,
+              8,
+              "Brown",
+              "www.google.com",
+              "<PERSON>",
+              "Some descriptions",
+              "MAUI AND SONS",
+              "Cantabrian albarcas"
+            ],
+            [
+              null,
+              2,
+              37.99,
+              13,
+              "Black",
+              "www.google.com",
+              "Men's Faux Leather Business Handbag Messenger Shoulder Briefcase Laptop Bag",
+              "Some descriptions",
+              "<PERSON>",
+              "<PERSON>"
+            ],
+            [
+              null,
+              12,
+              299.99,
+              10,
+              "Beige",
+              "www.google.com",
+              "Twisted X Western Boots Mens Buckaroo Spur Ridge Crazy Horse Mbkl012",
+              "Some descriptions",
+              "<PERSON>",
+              "<PERSON>"
+            ]
+          ]
+        },
+        {
+          "name": "Review",
+          "columns": [
+            {
+              "name": "uid",
+              "type": "Integer"
+            },
+            {
+              "name": "sid",
+              "type": "Integer"
+            },
+            {
+              "name": "rating",
+              "type": "Integer"
+            },
+            {
+              "name": "comment",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "uid",
+            "sid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "Customer",
+              "referred_columns": [
+                "uid"
+              ]
+            },
+            {
+              "columns": [
+                "sid"
+              ],
+              "foreign_table": "Shoe",
+              "referred_columns": [
+                "sid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "PaymentMethod",
+          "columns": [
+            {
+              "name": "uid",
+              "type": "Integer"
+            },
+            {
+              "name": "cardNumber",
+              "type": "Varchar"
+            },
+            {
+              "name": "type",
+              "type": "card"
+            },
+            {
+              "name": "isDefault",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "uid",
+            "cardNumber"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "Customer",
+              "referred_columns": [
+                "uid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Transaction",
+          "columns": [
+            {
+              "name": "tid",
+              "type": "SERIAL"
+            },
+            {
+              "name": "uid",
+              "type": "Integer"
+            },
+            {
+              "name": "sid",
+              "type": "Integer"
+            },
+            {
+              "name": "datetime",
+              "type": "Timestamp"
+            },
+            {
+              "name": "quantity",
+              "type": "Integer"
+            },
+            {
+              "name": "address",
+              "type": "Text"
+            },
+            {
+              "name": "cardNumber",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "tid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "Customer",
+              "referred_columns": [
+                "uid"
+              ]
+            },
+            {
+              "columns": [
+                "sid"
+              ],
+              "foreign_table": "Shoe",
+              "referred_columns": [
+                "sid"
+              ]
+            },
+            {
+              "columns": [
+                "uid",
+                "cardNumber"
+              ],
+              "foreign_table": "PaymentMethod",
+              "referred_columns": [
+                "uid",
+                "cardNumber"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "AddressBook",
+          "columns": [
+            {
+              "name": "uid",
+              "type": "Integer"
+            },
+            {
+              "name": "address",
+              "type": "Text"
+            },
+            {
+              "name": "isDefault",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "uid",
+            "address"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "Customer",
+              "referred_columns": [
+                "uid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "352545_capstone.sql",
+      "uc_schema": "sp_352545_capstone",
+      "rationale": "tables=18 fk_density=1.17 data_tables=6",
+      "tables": [
+        {
+          "name": "user_role",
+          "columns": [
+            {
+              "name": "role_id",
+              "type": "Int"
+            },
+            {
+              "name": "role",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "role_id"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              3,
+              "Student"
+            ]
+          ]
+        },
+        {
+          "name": "user",
+          "columns": [
+            {
+              "name": "user_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "role_id",
+              "type": "Int"
+            },
+            {
+              "name": "password",
+              "type": "Varchar"
+            },
+            {
+              "name": "status",
+              "type": "Int"
+            },
+            {
+              "name": "fname",
+              "type": "Varchar"
+            },
+            {
+              "name": "mname",
+              "type": "Varchar"
+            },
+            {
+              "name": "lname",
+              "type": "Varchar"
+            },
+            {
+              "name": "birthdate",
+              "type": "Date"
+            },
+            {
+              "name": "contact_no",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "user_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "role_id"
+              ],
+              "foreign_table": "user_role",
+              "referred_columns": [
+                "role_id"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              "1122343",
+              2,
+              "20001231",
+              null,
+              "David",
+              null,
+              "<PERSON>",
+              null,
+              null
+            ]
+          ]
+        },
+        {
+          "name": "course",
+          "columns": [
+            {
+              "name": "course_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "course_name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "course_id"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              "bscs",
+              "Bachelor of Science in Computer Science"
+            ]
+          ]
+        },
+        {
+          "name": "student",
+          "columns": [
+            {
+              "name": "student_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "course_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "year_level",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "student_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "student_id"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "user_id"
+              ]
+            },
+            {
+              "columns": [
+                "course_id"
+              ],
+              "foreign_table": "course",
+              "referred_columns": [
+                "course_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "instructor",
+          "columns": [
+            {
+              "name": "instructor_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "position",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "instructor_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "instructor_id"
+              ],
+              "foreign_table": "user",
+              "referred_columns": [
+                "user_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "room_type",
+          "columns": [
+            {
+              "name": "room_type_id",
+              "type": "Int"
+            },
+            {
+              "name": "room_type",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "room_type_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "room",
+          "columns": [
+            {
+              "name": "room_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "room_type",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "room_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "room_type"
+              ],
+              "foreign_table": "room_type",
+              "referred_columns": [
+                "room_type_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "subject",
+          "columns": [
+            {
+              "name": "subject_code",
+              "type": "Varchar"
+            },
+            {
+              "name": "subject_title",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "subject_code"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              "ict136",
+              "Database 2"
+            ]
+          ]
+        },
+        {
+          "name": "academic_year",
+          "columns": [
+            {
+              "name": "academic_year_id",
+              "type": "Int"
+            },
+            {
+              "name": "academic_year",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "academic_year_id"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "2015-2016"
+            ]
+          ]
+        },
+        {
+          "name": "semester",
+          "columns": [
+            {
+              "name": "semester_id",
+              "type": "Int"
+            },
+            {
+              "name": "semester",
+              "type": "Varchar"
+            },
+            {
+              "name": "academic_year_id",
+              "type": "Int"
+            },
+            {
+              "name": "start_date",
+              "type": "Date"
+            },
+            {
+              "name": "end_date",
+              "type": "Date"
+            }
+          ],
+          "primary_keys": [
+            "semester_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "academic_year_id"
+              ],
+              "foreign_table": "academic_year",
+              "referred_columns": [
+                "academic_year_id"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "First Semester",
+              1,
+              "2015-06-01",
+              "2015-10-30"
+            ]
+          ]
+        },
+        {
+          "name": "seat_plan",
+          "columns": [
+            {
+              "name": "seat_id",
+              "type": "Int"
+            },
+            {
+              "name": "row",
+              "type": "Int"
+            },
+            {
+              "name": "column",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "seat_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "class",
+          "columns": [
+            {
+              "name": "class_id",
+              "type": "Int"
+            },
+            {
+              "name": "subject_code",
+              "type": "Varchar"
+            },
+            {
+              "name": "room_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "semester_id",
+              "type": "Int"
+            },
+            {
+              "name": "start_time",
+              "type": "Time"
+            },
+            {
+              "name": "end_time",
+              "type": "Time"
+            },
+            {
+              "name": "days",
+              "type": "Varchar"
+            },
+            {
+              "name": "instructor_id",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "class_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "semester_id"
+              ],
+              "foreign_table": "semester",
+              "referred_columns": [
+                "semester_id"
+              ]
+            },
+            {
+              "columns": [
+                "subject_code"
+              ],
+              "foreign_table": "subject",
+              "referred_columns": [
+                "subject_code"
+              ]
+            },
+            {
+              "columns": [
+                "room_id"
+              ],
+              "foreign_table": "room",
+              "referred_columns": [
+                "room_id"
+              ]
+            },
+            {
+              "columns": [
+                "instructor_id"
+              ],
+              "foreign_table": "instructor",
+              "referred_columns": [
+                "instructor_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "class_member",
+          "columns": [
+            {
+              "name": "student_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "class_id",
+              "type": "Int"
+            },
+            {
+              "name": "status",
+              "type": "Varchar"
+            },
+            {
+              "name": "seat_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "student_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "student_id"
+              ],
+              "foreign_table": "student",
+              "referred_columns": [
+                "student_id"
+              ]
+            },
+            {
+              "columns": [
+                "class_id"
+              ],
+              "foreign_table": "class",
+              "referred_columns": [
+                "class_id"
+              ]
+            },
+            {
+              "columns": [
+                "seat_id"
+              ],
+              "foreign_table": "seat_plan",
+              "referred_columns": [
+                "seat_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "attendance_status",
+          "columns": [
+            {
+              "name": "attendance_status",
+              "type": "Int"
+            },
+            {
+              "name": "definition",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "attendance_status"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "attendance",
+          "columns": [
+            {
+              "name": "attendance_id",
+              "type": "Int"
+            },
+            {
+              "name": "class_id",
+              "type": "Int"
+            },
+            {
+              "name": "student_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "attendance_datetime",
+              "type": "Datetime"
+            },
+            {
+              "name": "attendance_status",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "attendance_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "attendance_status"
+              ],
+              "foreign_table": "attendance_status",
+              "referred_columns": [
+                "attendance_status"
+              ]
+            },
+            {
+              "columns": [
+                "class_id"
+              ],
+              "foreign_table": "class_member",
+              "referred_columns": [
+                "class_id"
+              ]
+            },
+            {
+              "columns": [
+                "student_id"
+              ],
+              "foreign_table": "class_member",
+              "referred_columns": [
+                "student_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "class_calendar",
+          "columns": [
+            {
+              "name": "class_calendar_id",
+              "type": "Int"
+            },
+            {
+              "name": "class_id",
+              "type": "Int"
+            },
+            {
+              "name": "event_date",
+              "type": "Datetime"
+            },
+            {
+              "name": "event",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "class_calendar_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "class_id"
+              ],
+              "foreign_table": "class",
+              "referred_columns": [
+                "class_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "consultation",
+          "columns": [
+            {
+              "name": "consultation_id",
+              "type": "Int"
+            },
+            {
+              "name": "instructor_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "class_id",
+              "type": "Int"
+            },
+            {
+              "name": "datetime_scheduled",
+              "type": "Datetime"
+            },
+            {
+              "name": "start_time",
+              "type": "Time"
+            },
+            {
+              "name": "end_time",
+              "type": "Time"
+            },
+            {
+              "name": "issue_topic",
+              "type": "Text"
+            },
+            {
+              "name": "remarks",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "consultation_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "instructor_id"
+              ],
+              "foreign_table": "instructor",
+              "referred_columns": [
+                "instructor_id"
+              ]
+            },
+            {
+              "columns": [
+                "class_id"
+              ],
+              "foreign_table": "class",
+              "referred_columns": [
+                "class_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "consultee",
+          "columns": [
+            {
+              "name": "consultation_id",
+              "type": "Int"
+            },
+            {
+              "name": "student_id",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "consultation_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "consultation_id"
+              ],
+              "foreign_table": "consultation",
+              "referred_columns": [
+                "consultation_id"
+              ]
+            },
+            {
+              "columns": [
+                "student_id"
+              ],
+              "foreign_table": "class_member",
+              "referred_columns": [
+                "student_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "365427_schema.sql",
+      "uc_schema": "sp_365427_schema",
+      "rationale": "tables=4 fk_density=1.00 data_tables=0",
+      "tables": [
+        {
+          "name": "Contact",
+          "columns": [
+            {
+              "name": "contant_id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "phone_number",
+              "type": "Varchar"
+            },
+            {
+              "name": "e_mail",
+              "type": "Varchar"
+            },
+            {
+              "name": "pat_id",
+              "type": "Int"
+            },
+            {
+              "name": "doc_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "contant_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "doc_id"
+              ],
+              "foreign_table": "Doctor",
+              "referred_columns": [
+                "doctor_id"
+              ]
+            },
+            {
+              "columns": [
+                "pat_id"
+              ],
+              "foreign_table": "Patient",
+              "referred_columns": [
+                "patient_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Appointments",
+          "columns": [
+            {
+              "name": "appoi_id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "day",
+              "type": "Varchar"
+            },
+            {
+              "name": "time_from",
+              "type": "Varchar"
+            },
+            {
+              "name": "time_to",
+              "type": "Varchar"
+            },
+            {
+              "name": "pat_id",
+              "type": "Int"
+            },
+            {
+              "name": "doc_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "appoi_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "doc_id"
+              ],
+              "foreign_table": "Doctor",
+              "referred_columns": [
+                "doctor_id"
+              ]
+            },
+            {
+              "columns": [
+                "pat_id"
+              ],
+              "foreign_table": "Patient",
+              "referred_columns": [
+                "patient_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Patient",
+          "columns": [
+            {
+              "name": "patient_id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "patient_first_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "patient_last_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "gender",
+              "type": "Varchar"
+            },
+            {
+              "name": "date_of_birth",
+              "type": "Varchar"
+            },
+            {
+              "name": "patient_image",
+              "type": "Varchar"
+            },
+            {
+              "name": "patient_password",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "patient_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Doctor",
+          "columns": [
+            {
+              "name": "doctor_id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "doctor_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "doctor_speciailty",
+              "type": "Varchar"
+            },
+            {
+              "name": "doc_location",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "doctor_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "435873_db.sql",
+      "uc_schema": "sp_435873_db",
+      "rationale": "tables=7 fk_density=0.86 data_tables=0",
+      "tables": [
+        {
+          "name": "users",
+          "columns": [
+            {
+              "name": "id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "email",
+              "type": "Text"
+            },
+            {
+              "name": "password",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "role",
+              "type": "user_role"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "categories",
+          "columns": [
+            {
+              "name": "id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "items",
+          "columns": [
+            {
+              "name": "id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "price_usd",
+              "type": "Numeric"
+            },
+            {
+              "name": "description",
+              "type": "Text"
+            },
+            {
+              "name": "category_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "category_id"
+              ],
+              "foreign_table": "categories",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "orders",
+          "columns": [
+            {
+              "name": "id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "status",
+              "type": "order_status"
+            },
+            {
+              "name": "created_at",
+              "type": "Timestamp"
+            },
+            {
+              "name": "delivered_at",
+              "type": "Timestamp"
+            },
+            {
+              "name": "cacelled_at",
+              "type": "Timestamp"
+            },
+            {
+              "name": "opened_at",
+              "type": "Timestamp"
+            },
+            {
+              "name": "accepted_at",
+              "type": "Timestamp"
+            },
+            {
+              "name": "user_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "user_id"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "orders_items",
+          "columns": [
+            {
+              "name": "order_id",
+              "type": "Int"
+            },
+            {
+              "name": "item_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "order_id",
+            "item_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "order_id"
+              ],
+              "foreign_table": "orders",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "item_id"
+              ],
+              "foreign_table": "items",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "spots",
+          "columns": [
+            {
+              "name": "id",
+              "type": "SERIAL"
+            },
+            {
+              "name": "label",
+              "type": "Text"
+            },
+            {
+              "name": "is_free",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "spots_users",
+          "columns": [
+            {
+              "name": "spot_id",
+              "type": "Int"
+            },
+            {
+              "name": "user_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "spot_id",
+            "user_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "spot_id"
+              ],
+              "foreign_table": "spots",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "user_id"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "596038_DDL_Proyecto.sql",
+      "uc_schema": "sp_596038_ddl_proyecto",
+      "rationale": "tables=7 fk_density=0.86 data_tables=1",
+      "tables": [
+        {
+          "name": "Perfil",
+          "columns": [
+            {
+              "name": "Id_perfil",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Nombre",
+              "type": "VARCHAR2"
+            }
+          ],
+          "primary_keys": [
+            "Id_perfil"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "Due\u00f1o"
+            ]
+          ]
+        },
+        {
+          "name": "Persona",
+          "columns": [
+            {
+              "name": "Id_persona",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Nombre",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Apellido1",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Apellido2",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Fecha_alta",
+              "type": "Date"
+            },
+            {
+              "name": "Usuario",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Contrasenna",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Email",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Id_perfil",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "Id_persona"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "Id_perfil"
+              ],
+              "foreign_table": "Perfil",
+              "referred_columns": [
+                "Id_perfil"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Equipo",
+          "columns": [
+            {
+              "name": "Id_equipo",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Nombre",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Fecha_creacion",
+              "type": "Date"
+            },
+            {
+              "name": "Comentario",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Lugar",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Id_persona",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "Id_equipo"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "Id_persona"
+              ],
+              "foreign_table": "Persona",
+              "referred_columns": [
+                "Id_persona"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Jugador",
+          "columns": [
+            {
+              "name": "Id_jugador",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Dni",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Nombre",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Apellido1",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Apellido2",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Nickname",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Sueldo",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Fecha_alta",
+              "type": "Date"
+            },
+            {
+              "name": "Comentario",
+              "type": "VARCHAR2"
+            },
+            {
+              "name": "Id_equipo",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "Id_jugador"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "Id_equipo"
+              ],
+              "foreign_table": "Equipo",
+              "referred_columns": [
+                "Id_equipo"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Jornada",
+          "columns": [
+            {
+              "name": "Id_jornada",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Fecha_inicio",
+              "type": "Date"
+            },
+            {
+              "name": "Fecha_fin",
+              "type": "Date"
+            }
+          ],
+          "primary_keys": [
+            "Id_jornada"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Partido",
+          "columns": [
+            {
+              "name": "Id_partido",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Fecha",
+              "type": "Timestamp"
+            },
+            {
+              "name": "Id_jornada",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "Id_partido"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "Id_jornada"
+              ],
+              "foreign_table": "Jornada",
+              "referred_columns": [
+                "Id_jornada"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "Marcador",
+          "columns": [
+            {
+              "name": "Id_marcador",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Puntuacion",
+              "type": "Integer"
+            },
+            {
+              "name": "Visitante",
+              "type": "NUMBER"
+            },
+            {
+              "name": "Id_partido",
+              "type": "Integer"
+            },
+            {
+              "name": "Id_equipo",
+              "type": "Integer"
+            }
+          ],
+          "primary_keys": [
+            "Id_marcador"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "Id_partido"
+              ],
+              "foreign_table": "Partido",
+              "referred_columns": [
+                "Id_partido"
+              ]
+            },
+            {
+              "columns": [
+                "Id_equipo"
+              ],
+              "foreign_table": "Equipo",
+              "referred_columns": [
+                "Id_equipo"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "008582_auth-services-schema-mysql.sql",
+      "uc_schema": "sp_008582_auth_services_schema_mysql",
+      "rationale": "tables=6 fk_density=0.83 data_tables=0",
+      "tables": [
+        {
+          "name": "user_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "uid",
+              "type": "Varchar"
+            },
+            {
+              "name": "active",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "role_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "role_name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "authority_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "uid",
+              "type": "Varchar"
+            },
+            {
+              "name": "authority",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "user_table",
+              "referred_columns": [
+                "uid"
+              ]
+            },
+            {
+              "columns": [
+                "authority"
+              ],
+              "foreign_table": "role_table",
+              "referred_columns": [
+                "role_name"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "username_password_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "user_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "password",
+              "type": "Varchar"
+            },
+            {
+              "name": "uid",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "user_table",
+              "referred_columns": [
+                "uid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "client_id_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "uid",
+              "type": "Varchar"
+            },
+            {
+              "name": "client_id",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "uid"
+              ],
+              "foreign_table": "user_table",
+              "referred_columns": [
+                "uid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "api_key_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "BigInt"
+            },
+            {
+              "name": "client_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "api_key",
+              "type": "Varchar"
+            },
+            {
+              "name": "api_key_desc",
+              "type": "Varchar"
+            },
+            {
+              "name": "active",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "client_id"
+              ],
+              "foreign_table": "client_id_table",
+              "referred_columns": [
+                "client_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "289361_schema.sql",
+      "uc_schema": "sp_289361_schema",
+      "rationale": "tables=6 fk_density=0.83 data_tables=0",
+      "tables": [
+        {
+          "name": "users",
+          "columns": [
+            {
+              "name": "username",
+              "type": "Text"
+            },
+            {
+              "name": "email",
+              "type": "Text"
+            },
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "surname",
+              "type": "Text"
+            },
+            {
+              "name": "biografy",
+              "type": "Text"
+            },
+            {
+              "name": "imageprofile",
+              "type": "Text"
+            },
+            {
+              "name": "password",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "username"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "advertiser",
+          "columns": [
+            {
+              "name": "advertiserid",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "advertiserid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "advertiserid"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "reader",
+          "columns": [
+            {
+              "name": "readerid",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [
+            {
+              "columns": [
+                "readerid"
+              ],
+              "foreign_table": "users",
+              "referred_columns": [
+                "username"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "category",
+          "columns": [
+            {
+              "name": "name",
+              "type": "Text"
+            },
+            {
+              "name": "description",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "name"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "articles",
+          "columns": [
+            {
+              "name": "articlesid",
+              "type": "Integer"
+            },
+            {
+              "name": "advertiserid",
+              "type": "Text"
+            },
+            {
+              "name": "categoryid",
+              "type": "Text"
+            },
+            {
+              "name": "title",
+              "type": "Text"
+            },
+            {
+              "name": "description",
+              "type": "Text"
+            },
+            {
+              "name": "markdown",
+              "type": "Text"
+            },
+            {
+              "name": "imagearticle",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "articlesid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "advertiserid"
+              ],
+              "foreign_table": "advertiser",
+              "referred_columns": [
+                "advertiserid"
+              ]
+            },
+            {
+              "columns": [
+                "categoryid"
+              ],
+              "foreign_table": "category",
+              "referred_columns": [
+                "name"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "material",
+          "columns": [
+            {
+              "name": "materialid",
+              "type": "Integer"
+            },
+            {
+              "name": "articlesid",
+              "type": "Integer"
+            },
+            {
+              "name": "filepath",
+              "type": "Text"
+            },
+            {
+              "name": "virustotalurl",
+              "type": "Text"
+            }
+          ],
+          "primary_keys": [
+            "materialid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "articlesid"
+              ],
+              "foreign_table": "articles",
+              "referred_columns": [
+                "articlesid"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "413175_01.TableDesign_Exam21Oct2018.sql",
+      "uc_schema": "sp_413175_01_tabledesign_exam21oct2018",
+      "rationale": "tables=6 fk_density=0.83 data_tables=0",
+      "tables": [
+        {
+          "name": "planets",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "spaceports",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "planet_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "planet_id"
+              ],
+              "foreign_table": "planets",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "spaceships",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "manufacturer",
+              "type": "Varchar"
+            },
+            {
+              "name": "light_speed_rate",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "colonists",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "first_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "last_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "ucn",
+              "type": "Char"
+            },
+            {
+              "name": "birth_date",
+              "type": "Date"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "journeys",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "journey_start",
+              "type": "Datetime"
+            },
+            {
+              "name": "journey_end",
+              "type": "Datetime"
+            },
+            {
+              "name": "purpose",
+              "type": "Enum"
+            },
+            {
+              "name": "destination_spaceport_id",
+              "type": "Int"
+            },
+            {
+              "name": "spaceship_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "destination_spaceport_id"
+              ],
+              "foreign_table": "spaceports",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "spaceship_id"
+              ],
+              "foreign_table": "spaceships",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "travel_cards",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Int"
+            },
+            {
+              "name": "card_number",
+              "type": "Char"
+            },
+            {
+              "name": "job_during_journey",
+              "type": "Enum"
+            },
+            {
+              "name": "colonist_id",
+              "type": "Int"
+            },
+            {
+              "name": "journey_id",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "colonist_id"
+              ],
+              "foreign_table": "colonists",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "journey_id"
+              ],
+              "foreign_table": "journeys",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "422245_tableschemata.sql",
+      "uc_schema": "sp_422245_tableschemata",
+      "rationale": "tables=6 fk_density=0.83 data_tables=0",
+      "tables": [
+        {
+          "name": "titles",
+          "columns": [
+            {
+              "name": "title_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "title",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "title_id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "employees",
+          "columns": [
+            {
+              "name": "emp_no",
+              "type": "Int"
+            },
+            {
+              "name": "emp_title_id",
+              "type": "Varchar"
+            },
+            {
+              "name": "birth_date",
+              "type": "Date"
+            },
+            {
+              "name": "first_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "last_name",
+              "type": "Varchar"
+            },
+            {
+              "name": "sex",
+              "type": "Varchar"
+            },
+            {
+              "name": "hire_date",
+              "type": "Date"
+            }
+          ],
+          "primary_keys": [
+            "emp_no"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "emp_title_id"
+              ],
+              "foreign_table": "titles",
+              "referred_columns": [
+                "title_id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "departments",
+          "columns": [
+            {
+              "name": "dept_no",
+              "type": "Varchar"
+            },
+            {
+              "name": "dept_name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "dept_no"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "dept_manager",
+          "columns": [
+            {
+              "name": "dept_no",
+              "type": "Varchar"
+            },
+            {
+              "name": "emp_no",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "dept_no",
+            "emp_no"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "emp_no"
+              ],
+              "foreign_table": "employees",
+              "referred_columns": [
+                "emp_no"
+              ]
+            },
+            {
+              "columns": [
+                "dept_no"
+              ],
+              "foreign_table": "departments",
+              "referred_columns": [
+                "dept_no"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "salaries",
+          "columns": [
+            {
+              "name": "emp_no",
+              "type": "Int"
+            },
+            {
+              "name": "salary",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "emp_no"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "dept_emp",
+          "columns": [
+            {
+              "name": "emp_no",
+              "type": "Int"
+            },
+            {
+              "name": "dept_no",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "dept_no",
+            "emp_no"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "emp_no"
+              ],
+              "foreign_table": "employees",
+              "referred_columns": [
+                "emp_no"
+              ]
+            },
+            {
+              "columns": [
+                "dept_no"
+              ],
+              "foreign_table": "departments",
+              "referred_columns": [
+                "dept_no"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "020891_V01__impl_usuario.sql",
+      "uc_schema": "sp_020891_v01__impl_usuario",
+      "rationale": "tables=5 fk_density=0.80 data_tables=5",
+      "tables": [
+        {
+          "name": "tb_grupo",
+          "columns": [
+            {
+              "name": "id_grupo",
+              "type": "serial"
+            },
+            {
+              "name": "ds_nome",
+              "type": "Varchar"
+            },
+            {
+              "name": "ds_descricao",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id_grupo"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "BACKOFFICE",
+              "Backoffice - Cadastros"
+            ]
+          ]
+        },
+        {
+          "name": "tb_permissao",
+          "columns": [
+            {
+              "name": "id_permissao",
+              "type": "serial"
+            },
+            {
+              "name": "ds_permissao",
+              "type": "Varchar"
+            },
+            {
+              "name": "ds_descricao",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id_permissao"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "ROLE_ADMIN",
+              "ADMINISTRA\u00c7\u00c2O COMPLETA"
+            ]
+          ]
+        },
+        {
+          "name": "tb_usuario",
+          "columns": [
+            {
+              "name": "id_usuario",
+              "type": "SERIAL"
+            },
+            {
+              "name": "ds_nome",
+              "type": "Varchar"
+            },
+            {
+              "name": "ds_login",
+              "type": "Varchar"
+            },
+            {
+              "name": "ds_senha",
+              "type": "Varchar"
+            },
+            {
+              "name": "fl_ativo",
+              "type": "Boolean"
+            }
+          ],
+          "primary_keys": [
+            "id_usuario"
+          ],
+          "foreign_keys": [],
+          "has_values": true,
+          "rows": [
+            [
+              null,
+              "<PERSON>",
+              "eudes",
+              "$2a$10$YYe9VtFGZoWvrNSZNV/AeuVSTOMQLxcGia4IQEl/yVaxrfAnPDcuO",
+              true
+            ]
+          ]
+        },
+        {
+          "name": "tb_usuario_x_grupo",
+          "columns": [
+            {
+              "name": "id_usuario",
+              "type": "Int"
+            },
+            {
+              "name": "id_grupo",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id_usuario",
+            "id_grupo"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id_usuario"
+              ],
+              "foreign_table": "tb_usuario",
+              "referred_columns": [
+                "id_usuario"
+              ]
+            },
+            {
+              "columns": [
+                "id_grupo"
+              ],
+              "foreign_table": "tb_grupo",
+              "referred_columns": [
+                "id_grupo"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "tb_permissao_x_grupo",
+          "columns": [
+            {
+              "name": "id_permissao",
+              "type": "Int"
+            },
+            {
+              "name": "id_grupo",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "id_permissao",
+            "id_grupo"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "id_permissao"
+              ],
+              "foreign_table": "tb_permissao",
+              "referred_columns": [
+                "id_permissao"
+              ]
+            },
+            {
+              "columns": [
+                "id_grupo"
+              ],
+              "foreign_table": "tb_grupo",
+              "referred_columns": [
+                "id_grupo"
+              ]
+            }
+          ],
+          "has_values": true,
+          "rows": [
+            [
+              3,
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "359146_formasnormais.sql",
+      "uc_schema": "sp_359146_formasnormais",
+      "rationale": "tables=5 fk_density=0.80 data_tables=0",
+      "tables": [
+        {
+          "name": "PACIENTE",
+          "columns": [
+            {
+              "name": "IDPACIENTE",
+              "type": "Int"
+            },
+            {
+              "name": "NOME",
+              "type": "Varchar"
+            },
+            {
+              "name": "SEXO",
+              "type": "Char"
+            },
+            {
+              "name": "EMAIL",
+              "type": "Varchar"
+            },
+            {
+              "name": "NASCIMENTO",
+              "type": "Date"
+            }
+          ],
+          "primary_keys": [
+            "IDPACIENTE"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "MEDICO",
+          "columns": [
+            {
+              "name": "IDMEDICO",
+              "type": "Int"
+            },
+            {
+              "name": "NOME",
+              "type": "Varchar"
+            },
+            {
+              "name": "SEXO",
+              "type": "Char"
+            },
+            {
+              "name": "ESPECIALIDADE",
+              "type": "Varchar"
+            },
+            {
+              "name": "FUNCIONARIO",
+              "type": "Enum"
+            }
+          ],
+          "primary_keys": [
+            "IDMEDICO"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "HOSPITAL",
+          "columns": [
+            {
+              "name": "IDHOSPITAL",
+              "type": "Int"
+            },
+            {
+              "name": "NOME",
+              "type": "Varchar"
+            },
+            {
+              "name": "BAIRRO",
+              "type": "Varchar"
+            },
+            {
+              "name": "CIDADE",
+              "type": "Varchar"
+            },
+            {
+              "name": "ESTADO",
+              "type": "Char"
+            }
+          ],
+          "primary_keys": [
+            "IDHOSPITAL"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "CONSULTA",
+          "columns": [
+            {
+              "name": "IDCONSULTA",
+              "type": "Int"
+            },
+            {
+              "name": "ID_PACIENTE",
+              "type": "Int"
+            },
+            {
+              "name": "ID_MEDICO",
+              "type": "Int"
+            },
+            {
+              "name": "ID_HOSPITAL",
+              "type": "Int"
+            },
+            {
+              "name": "DATA",
+              "type": "Datetime"
+            },
+            {
+              "name": "DIAGNOSTIVO",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "IDCONSULTA"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "ID_PACIENTE"
+              ],
+              "foreign_table": "PACIENTE",
+              "referred_columns": [
+                "IDPACIENTE"
+              ]
+            },
+            {
+              "columns": [
+                "ID_MEDICO"
+              ],
+              "foreign_table": "MEDICO",
+              "referred_columns": [
+                "IDMEDICO"
+              ]
+            },
+            {
+              "columns": [
+                "ID_HOSPITAL"
+              ],
+              "foreign_table": "HOSPITAL",
+              "referred_columns": [
+                "IDHOSPITAL"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "INTERNACAO",
+          "columns": [
+            {
+              "name": "IDINTERNACAO",
+              "type": "Int"
+            },
+            {
+              "name": "ENTRADA",
+              "type": "Datetime"
+            },
+            {
+              "name": "QUARTO",
+              "type": "Int"
+            },
+            {
+              "name": "SAIDA",
+              "type": "Datetime"
+            },
+            {
+              "name": "OBSERVACOES",
+              "type": "Varchar"
+            },
+            {
+              "name": "ID_CONSULTA",
+              "type": "Int"
+            }
+          ],
+          "primary_keys": [
+            "IDINTERNACAO"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "ID_CONSULTA"
+              ],
+              "foreign_table": "CONSULTA",
+              "referred_columns": [
+                "IDCONSULTA"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "source_id": "033815_schema.sql",
+      "uc_schema": "sp_033815_schema",
+      "rationale": "tables=8 fk_density=0.75 data_tables=0",
+      "tables": [
+        {
+          "name": "lesson_types",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "teacher_positions",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "groups_table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "students_number",
+              "type": "UnsignedInt"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "subjects",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "hours_number",
+              "type": "UnsignedInt"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "students",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "course",
+              "type": "UnsignedTinyInt"
+            },
+            {
+              "name": "phone_number",
+              "type": "Varchar"
+            },
+            {
+              "name": "email",
+              "type": "Varchar"
+            },
+            {
+              "name": "group_id",
+              "type": "UnsignedInt"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "group_id"
+              ],
+              "foreign_table": "groups_table",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "teachers",
+          "columns": [
+            {
+              "name": "id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "name",
+              "type": "Varchar"
+            },
+            {
+              "name": "phone_number",
+              "type": "Varchar"
+            },
+            {
+              "name": "position",
+              "type": "UnsignedInt"
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "position"
+              ],
+              "foreign_table": "teacher_positions",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "lessons",
+          "columns": [
+            {
+              "name": "uuid",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "subject_id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "teacher_id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "lesson_type",
+              "type": "UnsignedInt"
+            }
+          ],
+          "primary_keys": [
+            "uuid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "subject_id"
+              ],
+              "foreign_table": "subjects",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "teacher_id"
+              ],
+              "foreign_table": "teachers",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "lesson_type"
+              ],
+              "foreign_table": "lesson_types",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        },
+        {
+          "name": "progress",
+          "columns": [
+            {
+              "name": "uuid",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "student_id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "subject_id",
+              "type": "UnsignedInt"
+            },
+            {
+              "name": "grade",
+              "type": "UnsignedTinyInt"
+            }
+          ],
+          "primary_keys": [
+            "uuid"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "subject_id"
+              ],
+              "foreign_table": "subjects",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "has_values": false,
+          "rows": []
+        }
+      ]
+    }
+  ]
+}

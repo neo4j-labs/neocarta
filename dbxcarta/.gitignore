@@ -1,0 +1,37 @@
+# Scoped ignore rules for the dbxcarta subtree. These mirror dbxcarta's
+# original repo-root rules so no secret can be committed after the move.
+# The committed, secret-free `dbxcarta-overlay.env` files are intentionally
+# NOT matched here and stay tracked.
+
+# Environments / secrets
+.env
+.env.enrichment
+.env.*
+!.env.sample
+!.env.example
+# Locally generated, secret-free CLI overlays (derived from a preset).
+# Committed overlays use the bare `dbxcarta-overlay.env` name; any
+# `*.local.env` / `*-overlay.local.env` is a transient generated artifact.
+*.local.env
+**/dbxcarta-overlay.local.env
+
+secrets.json
+secrets.yaml
+secrets.yml
+*_secret*
+!setup_secrets.sh
+# Negate legitimate test files swallowed by *_secret* (e.g. test_databricks_secret.py).
+!**/test_*secret*.py
+
+# Build / tooling artifacts
+build/
+dist/
+outputs/
+.cache/
+.venv/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

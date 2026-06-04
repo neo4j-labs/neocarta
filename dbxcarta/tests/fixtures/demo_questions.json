@@ -1,0 +1,38 @@
+[
+  {
+    "question_id": "demo_q1",
+    "question": "Which customers have placed the most orders this quarter, and what is their total spend?",
+    "notes": "Exercises sales self-join: customers -> orders -> payments. Tests column embedding for 'customer', 'order', 'total_amt'.",
+    "reference_sql": null
+  },
+  {
+    "question_id": "demo_q2",
+    "question": "What is the total revenue by top-level product category for the last 30 days?",
+    "notes": "Exercises cross-schema join: order_items -> inventory.products -> inventory.categories. Tests REFERENCES edge traversal from sales to inventory.",
+    "reference_sql": null
+  },
+  {
+    "question_id": "demo_q3",
+    "question": "Which account managers (employees) handled the highest-value orders, and in which departments do they work?",
+    "notes": "Exercises cross-schema join: orders.employee_id -> hr.employees -> hr.departments. Tests REFERENCES edge traversal from sales to HR.",
+    "reference_sql": null
+  },
+  {
+    "question_id": "demo_q4",
+    "question": "Which products are below reorder point at any warehouse, and who is their primary supplier?",
+    "notes": "Exercises multi-hop inventory join: products -> inventory_levels -> warehouses, and products -> product_suppliers -> suppliers. Tests composite FK traversal.",
+    "reference_sql": null
+  },
+  {
+    "question_id": "demo_q5",
+    "question": "What is the conversion rate and average session duration for each A/B experiment variant?",
+    "notes": "Exercises events schema: ab_experiments -> user_profiles, user_sessions. Tests intra-schema traversal without cross-schema hops.",
+    "reference_sql": null
+  },
+  {
+    "question_id": "demo_q6",
+    "question": "Which suppliers provide the most products and what is their average lead time?",
+    "notes": "Exercises the composite FK path: product_suppliers -> suppliers and product_suppliers -> products. Tests that the composite PK is correctly resolved into two REFERENCES edges.",
+    "reference_sql": null
+  }
+]

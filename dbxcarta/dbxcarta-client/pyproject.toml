@@ -1,0 +1,40 @@
+[project]
+name = "dbxcarta-client"
+version = "1.1.0"
+description = "dbxcarta retrieval runtime and Text2SQL evaluation harness"
+authors = [
+    { name = "Ryan Knight" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "databricks-sdk>=0.40",
+    "dbxcarta-core",
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "requests",
+]
+
+[project.optional-dependencies]
+# Graph retrieval and the Neo4j schema dump. The base install covers question
+# loading, SQL parsing, and result-set comparison and does not need Neo4j.
+graph = ["neo4j>=5.0"]
+test = ["pytest"]
+
+[project.scripts]
+dbxcarta-client = "dbxcarta.client.eval.entrypoint:main"
+dbxcarta-embed-probe = "dbxcarta.client.embed_probe:main"
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+# module-name is the whole ``dbxcarta`` namespace (not just ``dbxcarta.client``)
+# with namespace packaging, so the cluster wheel can physically carry
+# ``dbxcarta/core`` alongside ``dbxcarta/client``. The runner bootstrap installs
+# this single application wheel with ``--no-deps`` and has no slot for a
+# separate core wheel, so ``dbxcarta-submit publish-wheels`` copies the core
+# source in before building (see ``_core_bundled_into``). A normal build, with
+# no core copied in, produces exactly today's ``dbxcarta/client`` contents.
+[tool.uv.build-backend]
+module-name = "dbxcarta"
+namespace = true

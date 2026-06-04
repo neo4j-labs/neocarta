@@ -1,0 +1,26 @@
+[project]
+name = "dbxcarta-core"
+version = "1.1.0"
+description = "Shared, Spark-free helpers for the dbxcarta layers (identifiers, catalogs, workspace, executor, presets, env)"
+authors = [
+    { name = "Ryan Knight" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "databricks-sdk>=0.40",
+    # core/env.py loads .env overlays via python-dotenv (lazy import in
+    # load_env_files). Declared here so every consumer — notably a standalone
+    # dbxcarta-submit install, which no longer gets it transitively via
+    # dbxcarta-spark — has it. Tiny and pure-Python, so core stays lightweight.
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "dbxcarta.core"

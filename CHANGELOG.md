@@ -9,6 +9,8 @@
 
 ### Added
 
+- Add the `dbxcarta/` subtree: the Databricks semantic-layer capability that builds the neocarta graph from Unity Catalog with Spark. It ships as a `uv` workspace with the `dbxcarta-core` and `dbxcarta-spark` packages (published as the `neocarta[dbxcarta-core]` and `neocarta[dbxcarta-spark]` extras), plus the `dbxcarta-client`, `dbxcarta-submit`, and `dbxcarta-materialize` workspace packages. The `dbxcarta` dependency group installs the full toolchain, and `make dbxcarta-test`, `make dbxcarta-typecheck`, and the `e2e-*` targets delegate into the subtree. The dbxcarta extras require Python >=3.12, so the shared workspace lock and dev/CI now resolve at 3.12+; the published `neocarta` wheel still supports 3.10.
+
 ## v0.6.0
 
 ### Fixed
