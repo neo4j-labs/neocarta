@@ -21,7 +21,7 @@ Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING
 
 Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
-Node("Node<br/>id: STRING | KEY<br/>label: STRING<br/>additionalLabels: LIST&lt;STRING&gt;<br/>description: STRING<br/>embedding: VECTOR")
+Node("Node<br/>id: STRING | KEY<br/>label: STRING<br/>additional_labels: LIST&lt;STRING&gt;<br/>description: STRING<br/>embedding: VECTOR")
 
 Relationship("Relationship<br/>id: STRING | KEY<br/>type: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
@@ -47,7 +47,7 @@ Nodes
 * `Node`
     * Represents a node label in the LPG
     * Contains information about nodes with this label in the graph database
-    * Properties: id, label, additionalLabels, description, embedding
+    * Properties: id, label, additional_labels, description, embedding
 * `Relationship`
     * Represents a relationship type in the LPG
     * Contains information about relationships of this type in the graph database
@@ -88,7 +88,7 @@ Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING
 
 Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
-Node("Node<br/>id: STRING | KEY<br/>label: STRING<br/>additionalLabels: LIST&lt;STRING&gt;<br/>description: STRING<br/>embedding: VECTOR")
+Node("Node<br/>id: STRING | KEY<br/>label: STRING<br/>additional_labels: LIST&lt;STRING&gt;<br/>description: STRING<br/>embedding: VECTOR")
 
 Relationship("Relationship<br/>id: STRING | KEY<br/>type: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
