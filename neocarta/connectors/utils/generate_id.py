@@ -9,6 +9,35 @@ def _normalize(s: str) -> str:
     return s.lower().replace(" ", "_").replace("-", "_")
 
 
+def compose_id(*parts: str) -> str:
+    """
+    Compose a normalized, dot-joined identifier from raw segments.
+
+    Each segment is normalized (lowercase; spaces and hyphens → underscores)
+    and the segments are joined with dots — the canonical recipe shared by every
+    hierarchical id helper here. Use this when the segment arity is dynamic (e.g.
+    the Databricks Spark connector builds ids from a variable number of parts).
+
+    Examples:
+    --------
+    >>> compose_id("my-project", "sales", "orders")
+    'my_project.sales.orders'
+    """
+    return ".".join(_normalize(p) for p in parts)
+
+
+def hash_value_suffix(value: Any) -> str:
+    """
+    Return the value-hash suffix used in Value node ids (first 32 md5 hex chars).
+
+    Examples:
+    --------
+    >>> hash_value_suffix("completed")
+    '9cdfb439c7876e703e307864c9167a15'
+    """
+    return hashlib.md5(str(value).encode(), usedforsecurity=False).hexdigest()[:32]
+
+
 def generate_database_id(database: str) -> str:
     """
     Generate a database ID.
@@ -138,9 +167,7 @@ def generate_value_id(database: str, schema: str, table: str, column: str, value
     >>> generate_value_id("my-project", "sales", "orders", "status", "completed")
     'my_project.sales.orders.status.9cdfb439c7876e703e307864c9167a15'
     """
-    # Generate a short hash of the value (first 32 characters of MD5)
-    value_hash = hashlib.md5(str(value).encode(), usedforsecurity=False).hexdigest()[:32]
-    return f"{_normalize(database)}.{_normalize(schema)}.{_normalize(table)}.{_normalize(column)}.{value_hash}"
+    return f"{compose_id(database, schema, table, column)}.{hash_value_suffix(value)}"
 
 
 def generate_glossary_id(glossary: str) -> str:

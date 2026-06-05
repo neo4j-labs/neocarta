@@ -38,6 +38,11 @@ dependencies = [
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
     "google-cloud-bigquery-storage>=2.36.2",
+    # Lightweight Databricks SDK — used by the Databricks connector's platform
+    # helpers (workspace/secret access, identifier parsing). Pure-Python and
+    # small, so it lives in the base install; the heavy Spark dependency is
+    # behind the `databricks-spark` extra.
+    "databricks-sdk>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -56,16 +61,14 @@ cli = [
     "rich>=13.0.0",
     "pydantic-settings>=2.12.0",
 ]
-# Databricks semantic-layer capability, published one-to-one with the dbxcarta
-# distributions. `dbxcarta-core` is the light, Spark-free shared base;
-# `dbxcarta-spark` is the full builder and pulls core in transitively. Both
-# require Python >=3.12, so they only resolve on a 3.12+ interpreter even though
-# the base `neocarta` wheel still supports 3.10.
-dbxcarta-core = [
-    "dbxcarta-core",
-]
-dbxcarta-spark = [
-    "dbxcarta-spark",
+# Spark dependencies for the Databricks connector. The connector ingests Unity
+# Catalog schema via a Spark job; pyspark is the heavy dependency, so it is
+# optional and only needed to actually run the connector (locally / on a
+# cluster). `databricks-sdk` is already a base dependency. pydantic-settings
+# backs the connector's env-driven SparkIngestSettings.
+databricks-spark = [
+    "pyspark>=3.5",
+    "pydantic-settings>=2.12.0",
 ]
 
 [project.scripts]
@@ -95,47 +98,14 @@ eval = [
     "mcp>=1.26.0",
     "tiktoken>=0.12.0",
 ]
-# Dev/test/type tooling for the dbxcarta subtree. Installs every dbxcarta
-# workspace package (so the suite can import core, spark, client, submit,
-# materialize, and the example presets) plus the test/type tooling. pyspark and
-# neo4j arrive transitively via dbxcarta-spark / dbxcarta-client[graph], so they
-# land only in this group and never in a base `uv sync`. Run with
-# `uv run --group dbxcarta ...` (see the dbxcarta-* Make targets).
-dbxcarta = [
-    "dbxcarta-core",
-    "dbxcarta-spark",
-    "dbxcarta-client[graph]",
-    "dbxcarta-submit",
-    "dbxcarta-materialize",
-    "dbxcarta-dense-schema-example",
-    "dbxcarta-finance-genie-example",
-    "dbxcarta-schemapile-example",
+# Spark tooling for developing/testing the Databricks connector. pyspark and
+# pydantic-settings arrive via the `databricks-spark` extra; pytest runs the
+# connector's local (no-cluster) Spark tests. Run with
+# `uv run --group databricks ...` (see the `test-databricks` Make target).
+databricks = [
+    "neocarta[databricks-spark]",
     "pytest",
-    "mypy",
-    "types-requests",
 ]
-
-[tool.uv.workspace]
-members = [
-    "dbxcarta/dbxcarta-client",
-    "dbxcarta/dbxcarta-core",
-    "dbxcarta/dbxcarta-materialize",
-    "dbxcarta/dbxcarta-spark",
-    "dbxcarta/dbxcarta-submit",
-    "dbxcarta/examples/dense-schema",
-    "dbxcarta/examples/finance-genie",
-    "dbxcarta/examples/schemapile",
-]
-
-[tool.uv.sources]
-dbxcarta-client = { workspace = true }
-dbxcarta-core = { workspace = true }
-dbxcarta-materialize = { workspace = true }
-dbxcarta-spark = { workspace = true }
-dbxcarta-submit = { workspace = true }
-dbxcarta-dense-schema-example = { workspace = true }
-dbxcarta-finance-genie-example = { workspace = true }
-dbxcarta-schemapile-example = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -155,9 +125,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 # Lint target stays inferred from neocarta's requires-python (3.10) so neocarta's
-# own 3.10-compatibility rules (e.g. UP017) keep firing. The dbxcarta subtree
-# needs 3.12 parsing (PEP 695 type parameters); it gets that from a nested
-# `dbxcarta/ruff.toml` that extends this config and only overrides target-version.
+# own 3.10-compatibility rules (e.g. UP017) keep firing. The ported Databricks
+# connector code is 3.10-compatible (PEP 695 type-parameter syntax was removed
+# during the migration), so a single lint target covers the whole tree.
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -224,15 +194,16 @@ ignore = [
 "eval/retrievers/bigquery_schema_retriever.py" = [
     "PLC0415", # Lazy import to avoid circular dependency with eval package
 ]
-# dbxcarta subtree. Missing-docstring presence rules (D1xx) and the PySpark
-# `functions as F` alias (N812) are ignored only for dbxcarta source, examples,
-# scripts, and tests. dbxcarta source predates neocarta's docstring gate;
-# backfilling docstrings is tracked separately, not part of the migration.
-# Scoping these per-path keeps neocarta's own docstring/naming enforcement intact.
-# N804 is ignored because dbxcarta's model_validators run mode="after" (instance
-# methods taking `self`), but neocarta's repo-wide classmethod-decorators lists
-# model_validator (it uses before-mode), so ruff would otherwise demand `cls`.
-"dbxcarta/**/src/**/*.py" = [
+# Ported Databricks connector + FK-enrichment source. Missing-docstring
+# presence rules (D1xx) and the PySpark `functions as F` alias (N812) are
+# ignored for this code, which predates neocarta's docstring gate; backfilling
+# docstrings is tracked separately, not part of the migration. Scoping these
+# per-path keeps neocarta's own docstring/naming enforcement intact. N804 is
+# ignored because the Spark settings' model_validators run mode="after"
+# (instance methods taking `self`), but neocarta's repo-wide
+# classmethod-decorators lists model_validator, so ruff would otherwise demand
+# `cls`. PLC0415 allows the deliberate lazy imports of the optional Spark deps.
+"neocarta/connectors/databricks/**/*.py" = [
     "D100",    # Missing docstring in public module
     "D101",    # Missing docstring in public class
     "D102",    # Missing docstring in public method
@@ -243,21 +214,7 @@ ignore = [
     "N812",    # `functions as F` is the canonical PySpark import alias
     "PLC0415", # Lazy imports are intentional for optional Spark deps
 ]
-"dbxcarta/examples/**/*.py" = [
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D105",
-    "D107",
-    "N804",
-    "N812",
-    "PLC0415",
-    "B007",    # Unused loop control variables are intentional in example walks
-    "S311",    # random is used for sampling/demo data, not for crypto
-    "S603",    # subprocess calls run trusted, fixed example commands
-]
-"dbxcarta/scripts/**/*.py" = [
+"neocarta/enrichment/foreign_keys/**/*.py" = [
     "D100",
     "D101",
     "D102",
@@ -266,12 +223,8 @@ ignore = [
     "D107",
     "N812",
     "PLC0415",
-    "ANN",     # Type hints optional in developer/CI scripts
-    "S603",    # subprocess calls run trusted, fixed dev/CI commands
-    "S607",    # Partial executable paths are fine for dev/CI tooling
-    "PLW1510", # subprocess.run without check= is intentional (returncode inspected)
 ]
-"dbxcarta/tests/**/*.py" = [
+"tests/unit/connectors/databricks/**/*.py" = [
     "S101",    # assert is idiomatic in pytest
     "ANN",     # Type hints optional in tests
     "D",       # Docstrings optional in tests
@@ -285,8 +238,6 @@ ignore = [
     "S105",    # Hardcoded "secret" strings are test fixtures, not real secrets
     "S106",    # Hardcoded password-like kwargs are test fixtures
     "S108",    # Hardcoded /tmp paths are test fixtures
-    "S603",    # subprocess calls in tests run trusted, fixed commands
-    "S607",    # invoking trusted CLI tools (uv) by name is fine in tests
     "N802",    # Test helper naming follows fixture/test conventions
     "DTZ001",  # Naive datetimes are deliberate in deterministic test fixtures
     "ERA001",  # Commented-out code in tests is illustrative
@@ -302,18 +253,3 @@ classmethod-decorators = ["field_validator", "model_validator"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 ignore-var-parameters = true  # ignore missing documentation for *args and **kwargs parameters
-
-# Strict mypy settings carried over from dbxcarta. Enforcement is scoped to the
-# dbxcarta packages via the `dbxcarta-typecheck` Make target
-# (`mypy -p dbxcarta.core -p dbxcarta.spark -p dbxcarta.client -p dbxcarta.submit
-# -p dbxcarta.materialize`); neocarta's own packages opt in later, package by package.
-[tool.mypy]
-python_version = "3.12"
-plugins = ["pydantic.mypy"]
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-warn_return_any = true
-no_implicit_optional = true
-check_untyped_defs = true
-warn_unused_ignores = true
-strict_equality = true

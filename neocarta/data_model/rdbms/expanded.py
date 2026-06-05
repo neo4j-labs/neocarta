@@ -1,11 +1,12 @@
 """Expanded RDBMS data model nodes and relationships (glossary, queries, values, OSI)."""
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pandas import isna
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .core import Column, Table
+from .core import Column, Database, References, Schema, Table
 
 
 class Value(BaseModel):
@@ -414,3 +415,81 @@ class HasTargetTable(BaseModel):
 
     join_id: str = Field(..., description="The unique identifier for the join")
     table_id: str = Field(..., description="The unique identifier for the target table")
+
+
+# --- Databricks connector models -------------------------------------------
+# The Databricks Spark connector emits the canonical core shape plus a few
+# additive properties (structural identity, medallion layer, FK provenance,
+# contract-version marker). These subclasses make that relationship explicit
+# and are the single source of truth for the connector's graph contract: the
+# connector derives its per-label property lists from ``model_fields`` (see
+# ``neocarta.connectors.databricks.contract``). They are a schema *spec* — the
+# Spark pipeline builds DataFrames with matching column names and never
+# instantiates these per row. Kept here (not in core) so the core models are
+# untouched. `schema_` is aliased to `schema` to avoid shadowing a BaseModel
+# attribute while still naming the graph property `schema`.
+
+
+class DatabricksDatabase(Database):
+    """Database node emitted by the Databricks connector."""
+
+    contract_version: str = Field(..., description="Graph contract version marker")
+
+
+class DatabricksSchema(Schema):
+    """Schema node emitted by the Databricks connector."""
+
+    contract_version: str = Field(..., description="Graph contract version marker")
+
+
+class DatabricksTable(Table):
+    """Table node emitted by the Databricks connector (core + additive)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    catalog: str = Field(..., description="Unity Catalog catalog containing the table")
+    schema_: str = Field(..., alias="schema", description="Schema containing the table")
+    layer: str | None = Field(default=None, description="Medallion layer (bronze/silver/gold)")
+    table_type: str | None = Field(default=None, description="MANAGED / EXTERNAL / VIEW")
+    created: datetime | None = Field(default=None, description="Catalog creation timestamp")
+    last_altered: datetime | None = Field(default=None, description="Catalog last-altered timestamp")
+    contract_version: str = Field(..., description="Graph contract version marker")
+
+
+class DatabricksColumn(Column):
+    """Column node emitted by the Databricks connector (core + additive)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    catalog: str = Field(..., description="Unity Catalog catalog containing the column")
+    schema_: str = Field(..., alias="schema", description="Schema containing the column")
+    table: str = Field(..., description="Table containing the column")
+    ordinal_position: int | None = Field(default=None, description="1-based column position")
+    contract_version: str = Field(..., description="Graph contract version marker")
+
+
+class DatabricksValue(Value):
+    """Value node emitted by the Databricks connector (expanded Value + additive)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    count: int | None = Field(default=None, description="Occurrences of the sampled value")
+    catalog: str | None = Field(default=None, description="Catalog of the owning column")
+    schema_: str | None = Field(default=None, alias="schema", description="Schema of the owning column")
+    last_run: datetime | None = Field(default=None, description="Run-start stamp for scoped cleanup")
+    contract_version: str = Field(..., description="Graph contract version marker")
+    embedding: list[float] | None = Field(default=None, description="Value embedding (added by enrichment)")
+
+
+class DatabricksReferences(References):
+    """REFERENCES edge emitted by the Databricks connector (core + provenance).
+
+    ``source_column_id`` / ``target_column_id`` are inherited from the core
+    model but are transient join keys, NOT stored edge properties; the
+    connector's contract derivation excludes them.
+    """
+
+    confidence: float | None = Field(default=None, description="FK confidence score")
+    source: str | None = Field(
+        default=None, description="FK provenance: 'declared' | 'inferred_metadata'"
+    )

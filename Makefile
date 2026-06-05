@@ -1,5 +1,4 @@
-.PHONY: help agent create-graph create-graph-no-embeddings clean \
-	dbxcarta-test dbxcarta-test-it dbxcarta-test-slow dbxcarta-test-wheel dbxcarta-typecheck
+.PHONY: help agent create-graph create-graph-no-embeddings clean test-databricks
 
 help:
 	@echo "Available commands:"
@@ -88,30 +87,13 @@ test-smoke:
 test-all:
 	uv run pytest tests/ -v
 
-# --- dbxcarta subtree -------------------------------------------------------
-# The Databricks capability lives under dbxcarta/ with its own Make targets.
-# These delegate via `make -C dbxcarta`, which runs with the dbxcarta subtree as
-# the working directory (what the submit tooling expects) while still using the
-# single workspace env at the repo root.
-dbxcarta-test:
-	$(MAKE) -C dbxcarta test
-
-dbxcarta-test-it:
-	$(MAKE) -C dbxcarta test-it
-
-dbxcarta-test-slow:
-	$(MAKE) -C dbxcarta test-slow
-
-dbxcarta-test-wheel:
-	$(MAKE) -C dbxcarta test-wheel
-
-dbxcarta-typecheck:
-	$(MAKE) -C dbxcarta typecheck
-
-# e2e pipeline targets (e.g. `make e2e-finance-genie-ingest`) delegate to the
-# dbxcarta subtree, which holds the overlays, scripts, and .env they need.
-e2e-%:
-	$(MAKE) -C dbxcarta e2e-$*
+# --- Databricks connector ---------------------------------------------------
+# The Databricks connector lives under neocarta/connectors/databricks/ and its
+# Spark-agnostic FK inference under neocarta/enrichment/foreign_keys/. Its local
+# (no-cluster) Spark tests run with the `databricks` group, which pulls pyspark
+# via the `databricks-spark` extra.
+test-databricks:
+	uv run --group databricks pytest tests/unit/connectors/databricks tests/unit/enrichment/foreign_keys -v
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

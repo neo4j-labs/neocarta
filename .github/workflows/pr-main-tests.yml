@@ -15,10 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        # The shared workspace lock resolves at >=3.12 (the intersection with the
-        # dbxcarta packages), so dev/CI runs on 3.12 and 3.13. The published
-        # `neocarta` wheel still declares >=3.10; only the dbxcarta extras need 3.12.
-        python-version: ['3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - name: Checkout code
@@ -54,3 +51,6 @@ jobs:
       
       - name: Run smoke tests
         run: make test-smoke
+
+      - name: Run Databricks connector tests
+        run: make test-databricks
