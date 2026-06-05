@@ -77,8 +77,6 @@ if TYPE_CHECKING:
 # older graph treat the missing properties as null/false.
 CONTRACT_VERSION = "1.7"
 
-DEFAULT_EMBEDDING_ENDPOINT = "databricks-gte-large-en"
-
 # The Database node `service` value. Constant for this connector: every
 # catalog this connector ingests lives in Databricks Unity Catalog. Upper-cased to
 # match the neocarta core convention (Database.service examples=["BIGQUERY"]).
@@ -135,7 +133,9 @@ _LABEL_MODEL: dict[NodeLabel, type[BaseModel]] = {
 _REFERENCES_ENDPOINTS = frozenset({"source_column_id", "target_column_id"})
 
 
-def _graph_properties(model: type[BaseModel], *, exclude: frozenset[str] = frozenset()) -> tuple[str, ...]:
+def _graph_properties(
+    model: type[BaseModel], *, exclude: frozenset[str] = frozenset()
+) -> tuple[str, ...]:
     """Graph property names declared by a model.
 
     Uses each field's alias (the wire/graph name) when set, else the field

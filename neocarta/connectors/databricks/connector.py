@@ -96,7 +96,7 @@ class DatabricksSparkSchemaConnector:
         try:
             import pyspark.sql  # noqa: F401 — presence probe for the optional extra
 
-            from neocarta.connectors.databricks.ingest.load.writer import Neo4jConfig
+            from neocarta.connectors.databricks.ingest.load.neo4j_io import Neo4jConfig
             from neocarta.connectors.databricks.run import run_ingest
             from neocarta.connectors.databricks.settings import SparkIngestSettings
         except ModuleNotFoundError as exc:  # pragma: no cover - import guard

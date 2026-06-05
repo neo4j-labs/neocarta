@@ -452,7 +452,9 @@ class DatabricksTable(Table):
     layer: str | None = Field(default=None, description="Medallion layer (bronze/silver/gold)")
     table_type: str | None = Field(default=None, description="MANAGED / EXTERNAL / VIEW")
     created: datetime | None = Field(default=None, description="Catalog creation timestamp")
-    last_altered: datetime | None = Field(default=None, description="Catalog last-altered timestamp")
+    last_altered: datetime | None = Field(
+        default=None, description="Catalog last-altered timestamp"
+    )
     contract_version: str = Field(..., description="Graph contract version marker")
 
 
@@ -475,10 +477,16 @@ class DatabricksValue(Value):
 
     count: int | None = Field(default=None, description="Occurrences of the sampled value")
     catalog: str | None = Field(default=None, description="Catalog of the owning column")
-    schema_: str | None = Field(default=None, alias="schema", description="Schema of the owning column")
-    last_run: datetime | None = Field(default=None, description="Run-start stamp for scoped cleanup")
+    schema_: str | None = Field(
+        default=None, alias="schema", description="Schema of the owning column"
+    )
+    last_run: datetime | None = Field(
+        default=None, description="Run-start stamp for scoped cleanup"
+    )
     contract_version: str = Field(..., description="Graph contract version marker")
-    embedding: list[float] | None = Field(default=None, description="Value embedding (added by enrichment)")
+    embedding: list[float] | None = Field(
+        default=None, description="Value embedding (added by enrichment)"
+    )
 
 
 class DatabricksReferences(References):

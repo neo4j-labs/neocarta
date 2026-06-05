@@ -31,13 +31,13 @@ from neocarta.connectors.databricks.ingest.fk.discovery import (
     run_fk_discovery,
 )
 from neocarta.connectors.databricks.ingest.load.neo4j_io import (
+    Neo4jConfig,
     bootstrap_constraints,
     delete_stale_values,
     query_counts,
     write_node,
     write_rel,
 )
-from neocarta.connectors.databricks.ingest.load.writer import Neo4jConfig
 from neocarta.connectors.databricks.ingest.preflight import preflight
 from neocarta.connectors.databricks.ingest.summary import RunSummary
 from neocarta.connectors.databricks.ingest.transform.value_stage import (
@@ -155,7 +155,7 @@ def _run(
     run_error: BaseException | None = None
     try:
         with GraphDatabase.driver(neo4j.uri, auth=(neo4j.username, neo4j.password)) as driver:
-            bootstrap_constraints(driver, settings)
+            bootstrap_constraints(driver)
 
             extract_result = extract(spark, settings, schema_list, summary)
 
