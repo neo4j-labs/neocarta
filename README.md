@@ -252,13 +252,12 @@ bigquery_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
 connector = BigQuerySchemaConnector(
     client=bigquery_client,
     project_id=os.getenv("GCP_PROJECT_ID"),
-    dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
 
 # Run the connector to extract, transform, and load BigQuery schema metadata into Neo4j
-connector.run()
+connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 ##### Code Example - Logs Connector
@@ -286,7 +285,7 @@ connector = BigQueryLogsConnector(
 )
 
 # Run the connector to extract query logs, parse SQL, and load into Neo4j
-connector.run(
+connector.ingest(
     dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     region="region-us",
     start_timestamp="2024-01-01 00:00:00",  # Optional
@@ -303,11 +302,11 @@ For the most complete picture, run both connectors:
 ```python
 # 1. Extract schema metadata
 schema_connector = BigQuerySchemaConnector(...)
-schema_connector.run()
+schema_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 
 # 2. Extract query logs
 logs_connector = BigQueryLogsConnector(...)
-logs_connector.run(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+logs_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 This allows you to compare declared schema vs. actual usage patterns.
@@ -522,11 +521,11 @@ connector = CSVConnector(
 )
 
 # Run the connector to load all CSV files into Neo4j
-connector.run()
+connector.ingest()
 
 # Alternatively, load specific nodes and relationships
 # Enum members are recommended, but exact string values (e.g. "Database", "HAS_SCHEMA") also work.
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
@@ -543,7 +542,7 @@ connector = CSVConnector(
     database_name=neo4j_database,
     csv_file_map=custom_file_map,
 )
-connector.run()
+connector.ingest()
 ```
 
 ##### Sample Dataset
