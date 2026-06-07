@@ -28,6 +28,7 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `DATAPLEX_LOCATION` | Yes for `dataplex *` | — | Dataplex location, e.g. `us` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
+| `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
 
 Secrets are env-only and never logged.
 
@@ -153,6 +154,26 @@ Loads the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) pl
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us --embeddings
 neocarta dataplex glossary --no-entry-links --dry-run --json
+```
+
+---
+
+### `neocarta osi ingest`
+
+Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)) YAML semantic model into the Neocarta graph using `OsiConnector`. The spec source may be a local filesystem path or an HTTP(S) URL. Ingests `OsiSemanticModel`, `OsiTable`, `OsiColumn`, `Query`, `Metric`, `Join`, and aspect nodes plus their relationships; synonyms in `ai_context` are upserted as `BusinessTerm` nodes (merged on name, so they dedupe against catalog-derived terms). When `--embeddings` is enabled, `Database`, `Schema`, `Table`, and `Column` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--spec-source TEXT` — Local filesystem path or HTTP(S) URL to the OSI YAML spec. Overrides `OSI_SPEC_SOURCE`.
+  - `--embeddings / --no-embeddings` — Generate embeddings after ingest (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading a semantic model published as an OSI YAML spec, from disk or directly from a URL.
+
+```bash
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml --embeddings
+OSI_SPEC_SOURCE=./datasets/osi/acme_semantic_model.yaml neocarta osi ingest --dry-run --json
 ```
 
 ---

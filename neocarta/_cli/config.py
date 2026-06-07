@@ -34,6 +34,7 @@ ENV_VARS: dict[str, str] = {
     "DATAPLEX_LOCATION": "Dataplex location, e.g. `us` (for `dataplex *`).",
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
     "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv ingest`).",
+    "OSI_SPEC_SOURCE": "Path or URL to an OSI YAML spec (for `osi ingest`).",
 }
 
 
@@ -68,6 +69,9 @@ class CLISettings(BaseSettings):
 
     # CSV
     csv_directory: str | None = Field(default=None, validation_alias="CSV_DIRECTORY")
+
+    # OSI
+    osi_spec_source: str | None = Field(default=None, validation_alias="OSI_SPEC_SOURCE")
 
 
 def load_settings() -> CLISettings:

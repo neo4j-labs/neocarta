@@ -752,6 +752,7 @@ Today the CLI ships these connector commands:
 | `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
 | `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
 | `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
+| `neocarta osi ingest` | `OsiConnector` — load an OSI YAML semantic model from a local path or HTTP(S) URL |
 
 Plus one introspection verb:
 
@@ -769,6 +770,7 @@ neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
