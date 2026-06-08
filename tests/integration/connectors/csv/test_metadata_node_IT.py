@@ -22,7 +22,7 @@ def test_connector_run_creates_metadata_node(neo4j_driver, temp_csv_dir, sample_
     """A connector run writes a singleton __neocarta_graph__ node stamped with the current version."""
     CSVConnector(
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
-    ).run(include_nodes=[NodeLabel.DATABASE])
+    ).ingest(include_nodes=[NodeLabel.DATABASE])
 
     with neo4j_driver.session(database="neo4j") as session:
         count = session.run("MATCH (n:`__neocarta_graph__`) RETURN count(n) AS c").single()["c"]
@@ -43,7 +43,7 @@ def test_connector_run_preserves_initial_version_on_subsequent_runs(
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
     )
 
-    connector.run(include_nodes=[NodeLabel.DATABASE])
+    connector.ingest(include_nodes=[NodeLabel.DATABASE])
     first = _fetch_metadata_node(neo4j_driver)
 
     # Override the version on the second run to simulate an upgraded connector.

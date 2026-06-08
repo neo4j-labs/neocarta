@@ -8,7 +8,7 @@ from google.cloud import dataplex_v1
 from neo4j import GraphDatabase
 
 from neocarta import NodeLabel
-from neocarta.connectors.dataplex import DataplexConnector
+from neocarta.connectors.dataplex import DataplexGlossaryConnector, DataplexSchemaConnector
 from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 
@@ -39,20 +39,27 @@ def main(
     if include_glossary:
         node_labels += [NodeLabel.BUSINESS_TERM]
 
-    print("Extracting, transforming, and loading Dataplex metadata into Neo4j...")
-    connector = DataplexConnector(
-        catalog_client=catalog_client,
-        glossary_client=glossary_client,
-        project_id=os.getenv("GCP_PROJECT_ID"),
-        project_number=os.getenv("GCP_PROJECT_NUMBER"),
-        dataplex_location=os.getenv("DATAPLEX_LOCATION"),
-        dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
-        neo4j_driver=neo4j_driver,
-        database_name=neo4j_database,
-        include_schema=include_schema,
-        include_glossary=include_glossary,
-    )
-    connector.run()
+    common_kwargs = {
+        "project_id": os.getenv("GCP_PROJECT_ID"),
+        "project_number": os.getenv("GCP_PROJECT_NUMBER"),
+        "dataplex_location": os.getenv("DATAPLEX_LOCATION"),
+        "neo4j_driver": neo4j_driver,
+        "database_name": neo4j_database,
+    }
+
+    # Schema must run before glossary so that TAGGED_WITH edges from the
+    # glossary connector can attach to Column / Table nodes that already exist.
+    if include_schema:
+        print("Ingesting Dataplex schema metadata into Neo4j...")
+        DataplexSchemaConnector(catalog_client=catalog_client, **common_kwargs).ingest(
+            dataset_id=os.getenv("BIGQUERY_DATASET_ID")
+        )
+
+    if include_glossary:
+        print("Ingesting Dataplex glossary metadata into Neo4j...")
+        DataplexGlossaryConnector(glossary_client=glossary_client, **common_kwargs).ingest(
+            include_entry_links=include_schema,
+        )
 
     if with_embeddings and node_labels:
         print("Generating embeddings for nodes...")

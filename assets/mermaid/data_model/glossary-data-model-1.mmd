@@ -4,9 +4,9 @@ config:
 ---
 graph LR
 %% Nodes
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resource_path: STRING")
 
 %% Relationships
 Glossary -->|HAS_CATEGORY| Category

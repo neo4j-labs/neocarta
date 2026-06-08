@@ -1,4 +1,5 @@
-from neocarta.connectors.query_log import QueryLogExtractor, QueryLogTransformer
+from neocarta.connectors.query_log.extract import QueryLogExtractor
+from neocarta.connectors.query_log.transform import QueryLogTransformer
 
 
 def test_transform_to_database_nodes(

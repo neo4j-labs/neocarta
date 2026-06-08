@@ -131,6 +131,29 @@ class Connector:
 
 ### Connectors
 
+#### **OSI Connector**
+
+Bidirectional connector for the [Open Semantic Interchange (OSI)](https://github.com/open-semantic-interchange/OSI) spec — a YAML-based interchange format for semantic models. Unlike the other connectors (which only ingest), OSI supports both directions: load an OSI YAML spec into Neo4j, and emit an `OsiSemanticModel` subgraph back out as an OSI YAML file. See the [OSI README](./neocarta/connectors/osi/README.md) for the full data model diagram and behavioral notes.
+
+**What it ingests** (from an OSI YAML at a local path or HTTP(S) URL):
+* `OsiSemanticModel` (a `Domain` subtype) — the top-level container
+* `OsiTable` / `OsiColumn` — datasets and their fields (with primary keys, unique keys, labels, time-dimension flags)
+* `Query` — datasets whose `source` is a SQL query rather than a 3-part identifier
+* `Metric` with dialect-specific `Expression` definitions
+* `Join` with ordered `from_columns` / `to_columns` for composite-key relationships
+* `OsiAiContext` / `OsiCustomExtensions` aspects, including synonyms-derived `BusinessTerm` upserts (MERGE on `name`, so they collide cleanly with catalog-derived BTs from Dataplex etc.)
+
+**What it exports** (from an `:OsiSemanticModel` subgraph, filtered by name):
+* A spec-compliant OSI YAML file with preserved column ordering, native `ai_context` structure, and literal-block JSON for custom extensions.
+
+This connector only requires Neo4j credentials in `.env`:
+* NEO4J_USERNAME=neo4j-username
+* NEO4J_PASSWORD=neo4j-password
+* NEO4J_URI=neo4j-uri
+* NEO4J_DATABASE=neo4j-database
+
+Sample dataset: [`datasets/osi/acme_semantic_model.yaml`](./datasets/osi/acme_semantic_model.yaml) (the full 33-table ACME warehouse modeled as OSI). Runnable example: [`examples/osi_connector.py`](./examples/osi_connector.py).
+
 #### **BigQuery Schema Connector**
 
 Connector for reading BigQuery Information Schema tables and ingesting **schema metadata** into Neo4j. Primary and foreign keys must be defined in the Information Schema tables in order for column level relationships to be created in the Neo4j graph.
@@ -229,13 +252,12 @@ bigquery_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
 connector = BigQuerySchemaConnector(
     client=bigquery_client,
     project_id=os.getenv("GCP_PROJECT_ID"),
-    dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
 
 # Run the connector to extract, transform, and load BigQuery schema metadata into Neo4j
-connector.run()
+connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 ##### Code Example - Logs Connector
@@ -263,7 +285,7 @@ connector = BigQueryLogsConnector(
 )
 
 # Run the connector to extract query logs, parse SQL, and load into Neo4j
-connector.run(
+connector.ingest(
     dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     region="region-us",
     start_timestamp="2024-01-01 00:00:00",  # Optional
@@ -280,11 +302,11 @@ For the most complete picture, run both connectors:
 ```python
 # 1. Extract schema metadata
 schema_connector = BigQuerySchemaConnector(...)
-schema_connector.run()
+schema_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 
 # 2. Extract query logs
 logs_connector = BigQueryLogsConnector(...)
-logs_connector.run(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+logs_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 This allows you to compare declared schema vs. actual usage patterns.
@@ -499,11 +521,11 @@ connector = CSVConnector(
 )
 
 # Run the connector to load all CSV files into Neo4j
-connector.run()
+connector.ingest()
 
 # Alternatively, load specific nodes and relationships
 # Enum members are recommended, but exact string values (e.g. "Database", "HAS_SCHEMA") also work.
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
@@ -520,7 +542,7 @@ connector = CSVConnector(
     database_name=neo4j_database,
     csv_file_map=custom_file_map,
 )
-connector.run()
+connector.ingest()
 ```
 
 ##### Sample Dataset
@@ -721,12 +743,16 @@ The Neocarta CLI is available via the optional `[cli]` add-on. It wraps the same
 pip install "neocarta[cli]"
 ```
 
-Today the CLI ships two verbs under one connector noun:
+Today the CLI ships these connector commands:
 
 | Command | Wraps |
 |---|---|
 | `neocarta bigquery schema` | `BigQuerySchemaConnector` — load `Database`, `Schema`, `Table`, `Column` nodes |
 | `neocarta bigquery logs` | `BigQueryLogsConnector` — load `Query`, `CTE`, and reference relationships from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` |
+| `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
+| `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
+| `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
+| `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
 
 Plus one introspection verb:
 
@@ -741,6 +767,10 @@ Plus one introspection verb:
 neocarta bigquery schema --project-id my-proj --dataset-id sales
 neocarta bigquery schema --no-embeddings
 neocarta bigquery logs --dataset-id sales --limit 500 --json
+neocarta csv ingest --csv-directory ./datasets/csv
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta query-log ingest --query-log-file ./query_logs.json
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
@@ -781,7 +811,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.5.0",
+        "neocarta[mcp]@0.6.0",
         "neocarta-mcp"
       ],
       "env": {

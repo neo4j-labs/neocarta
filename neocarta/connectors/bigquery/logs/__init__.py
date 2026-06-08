@@ -1,6 +1,5 @@
-"""BigQuery logs connector."""
+"""BigQuery query log sub-connector."""
 
 from .connector import BigQueryLogsConnector
-from .extract import BigQueryLogsExtractor
 
-__all__ = ["BigQueryLogsConnector", "BigQueryLogsExtractor"]
+__all__ = ["BigQueryLogsConnector"]

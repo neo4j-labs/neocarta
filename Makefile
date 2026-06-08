@@ -63,14 +63,15 @@ install-agent:
 	uv sync --group agent
 
 refresh-mermaid-data-model-images:
-	mmdc -i assets/mermaid/data_model/glossary-metadata-data-model-1.mmd -o assets/images/data_model/glossary-metadata-data-model-1.png
-	mmdc -i assets/mermaid/data_model/glossary-data-model-1.mmd -o assets/images/data_model/glossary-data-model-1.png
-	mmdc -i assets/mermaid/data_model/sql-graph-data-model-core.mmd -o assets/images/data_model/sql-graph-data-model-core.png
-	mmdc -i assets/mermaid/data_model/sql-graph-data-model-expanded-1.mmd -o assets/images/data_model/sql-graph-data-model-expanded-1.png
-	mmdc -i assets/mermaid/data_model/lpg-graph-data-model.mmd -o assets/images/data_model/lpg-graph-data-model.png
-	mmdc -i assets/mermaid/data_model/task-query-data-model-1.mmd -o assets/images/data_model/task-query-data-model-1.png
-	mmdc -i assets/mermaid/data_model/query-log-data-model-1.mmd -o assets/images/data_model/query-log-data-model-1.png
-	mmdc -i assets/mermaid/data_model/table-views-data-model-1.mmd -o assets/images/data_model/table-views-data-model-1.png
+	mmdc -i assets/mermaid/data_model/glossary-metadata-data-model-1.mmd -o assets/images/data_model/glossary-metadata-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/glossary-data-model-1.mmd -o assets/images/data_model/glossary-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/sql-graph-data-model-core.mmd -o assets/images/data_model/sql-graph-data-model-core.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/sql-graph-data-model-expanded-1.mmd -o assets/images/data_model/sql-graph-data-model-expanded-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/lpg-graph-data-model.mmd -o assets/images/data_model/lpg-graph-data-model.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/task-query-data-model-1.mmd -o assets/images/data_model/task-query-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/query-log-data-model-1.mmd -o assets/images/data_model/query-log-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/table-views-data-model-1.mmd -o assets/images/data_model/table-views-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/osi-data-model-1.mmd -o assets/images/data_model/osi-data-model-1.png --scale 2 --backgroundColor transparent
 
 refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-connector-architecture.mmd -o assets/images/architecture/bigquery-connector-architecture.png

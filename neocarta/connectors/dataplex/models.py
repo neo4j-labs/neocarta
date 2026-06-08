@@ -2,7 +2,6 @@
 
 from typing import TypedDict
 
-import pandas as pd
 from pydantic import Field
 
 
@@ -51,11 +50,3 @@ class EntryLinkInfoResponse(TypedDict):
     term_id: str = Field(
         ..., description="Neo4j BusinessTerm node id: full term resource name from the SDK"
     )
-
-
-class DataplexExtractorCache(TypedDict):
-    """Cache dictionary used to store extracted Dataplex information."""
-
-    table_info: pd.DataFrame | None
-    glossary_info: pd.DataFrame | None
-    entry_link_info: pd.DataFrame | None

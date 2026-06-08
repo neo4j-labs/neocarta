@@ -238,3 +238,103 @@ def generate_cte_id(query_id: str, cte_name: str) -> str:
     'abc123.paid'
     """
     return f"{query_id}.{_normalize(cte_name)}"
+
+
+def generate_osi_semantic_model_id(name: str) -> str:
+    """
+    Generate an OSI semantic model ID from its name.
+
+    Examples:
+    --------
+    >>> generate_osi_semantic_model_id("Sales Model")
+    'sales_model'
+    """
+    return _normalize(name)
+
+
+def generate_metric_id(semantic_model: str, metric: str) -> str:
+    """
+    Generate a Metric ID from its parent semantic model and metric name.
+
+    Examples:
+    --------
+    >>> generate_metric_id("sales_model", "gross_revenue")
+    'sales_model.gross_revenue'
+    """
+    return f"{_normalize(semantic_model)}.{_normalize(metric)}"
+
+
+def generate_join_id(semantic_model: str, join: str) -> str:
+    """
+    Generate a Join ID from its parent semantic model and join name.
+
+    Examples:
+    --------
+    >>> generate_join_id("sales_model", "orders_to_customers")
+    'sales_model.orders_to_customers'
+    """
+    return f"{_normalize(semantic_model)}.{_normalize(join)}"
+
+
+def generate_expression_id(owner_id: str, dialect: str, expression: str) -> str:
+    """
+    Generate an Expression ID, content-addressed by (dialect, expression) under
+    the owning column/metric.
+
+    Identical expressions on the same owner collapse to one node.
+
+    Examples:
+    --------
+    >>> generate_expression_id("sales_model.gross_revenue", "ANSI_SQL", "SUM(amount)")
+    'sales_model.gross_revenue.55cfe9b30c52a6f9d6c9c91e7af83c40'
+    """
+    digest = hashlib.md5(f"{dialect}::{expression}".encode(), usedforsecurity=False).hexdigest()[
+        :32
+    ]
+    return f"{owner_id}.{digest}"
+
+
+def generate_ai_context_id(semantic_model: str, data: str) -> str:
+    """
+    Generate an OsiAiContext aspect ID, content-addressed within a semantic model.
+
+    Identical AI-context payloads under the same semantic model produce one
+    aspect node referenced by every entity that shares the content.
+
+    Examples:
+    --------
+    >>> generate_ai_context_id("sales_model", '{"synonyms": ["customer"]}')
+    'sales_model.b1d29bb39c6cea25e64fa5d8e2c2c4b3'
+    """
+    digest = hashlib.md5(data.encode(), usedforsecurity=False).hexdigest()[:32]
+    return f"{_normalize(semantic_model)}.{digest}"
+
+
+def generate_query_column_id(query_id: str, column: str) -> str:
+    """
+    Generate a Column ID for a column owned by a Query (rather than a Table).
+
+    Used when an OSI dataset's source is a SQL query: the dataset's fields become
+    columns of the underlying Query node and need an id rooted on the query id
+    (which is itself a SHA-256 hash, not a dotted identifier).
+
+    Examples:
+    --------
+    >>> generate_query_column_id("a1b2c3", "order_id")
+    'a1b2c3.order_id'
+    """
+    return f"{query_id}.{_normalize(column)}"
+
+
+def generate_custom_extension_id(semantic_model: str, vendor: str, data: str) -> str:
+    """
+    Generate an OsiCustomExtensions aspect ID, content-addressed by (vendor, data)
+    under the semantic model.
+
+    Examples:
+    --------
+    >>> generate_custom_extension_id("sales_model", "SNOWFLAKE", '{"warehouse": "S"}')
+    'sales_model.<hash>'  # doctest: +SKIP
+    """
+    digest = hashlib.md5(f"{vendor}::{data}".encode(), usedforsecurity=False).hexdigest()[:32]
+    return f"{_normalize(semantic_model)}.{digest}"

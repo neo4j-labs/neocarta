@@ -28,9 +28,13 @@ ENV_VARS: dict[str, str] = {
     "NEO4J_DATABASE": "Neo4j database name (default: neo4j).",
     "OPENAI_API_KEY": "OpenAI API key for embeddings (secret).",
     "GCP_PROJECT_ID": "Google Cloud project ID.",
+    "GCP_PROJECT_NUMBER": "Google Cloud project number (for `dataplex *`).",
     "BIGQUERY_DATASET_ID": "Default BigQuery dataset ID.",
     "BIGQUERY_REGION": "BigQuery region for INFORMATION_SCHEMA queries.",
+    "DATAPLEX_LOCATION": "Dataplex location, e.g. `us` (for `dataplex *`).",
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
+    "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv ingest`).",
+    "QUERY_LOG_FILE": "Path to a query-log JSON file (for `query-log ingest`).",
 }
 
 
@@ -58,6 +62,16 @@ class CLISettings(BaseSettings):
     gcp_project_id: str | None = Field(default=None, validation_alias="GCP_PROJECT_ID")
     bigquery_dataset_id: str | None = Field(default=None, validation_alias="BIGQUERY_DATASET_ID")
     bigquery_region: str = Field(default="region-us", validation_alias="BIGQUERY_REGION")
+
+    # Dataplex
+    gcp_project_number: str | None = Field(default=None, validation_alias="GCP_PROJECT_NUMBER")
+    dataplex_location: str | None = Field(default=None, validation_alias="DATAPLEX_LOCATION")
+
+    # CSV
+    csv_directory: str | None = Field(default=None, validation_alias="CSV_DIRECTORY")
+
+    # Query log
+    query_log_file: str | None = Field(default=None, validation_alias="QUERY_LOG_FILE")
 
 
 def load_settings() -> CLISettings:

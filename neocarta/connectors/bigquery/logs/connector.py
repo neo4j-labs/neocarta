@@ -1,16 +1,34 @@
 """BigQuery query log connector."""
 
+import warnings
+
 from google.cloud import bigquery
 from neo4j import Driver
 
-from ....errors import ConfigError
+from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from ...query_log.transform import QueryLogTransformer
 from .extract import BigQueryLogsExtractor
 
 
 class BigQueryLogsConnector:
-    """A connector for extracting, transforming, and loading BigQuery query logs into Neo4j."""
+    """
+    Connector for extracting BigQuery query logs into Neo4j.
+
+    Follows an Extract → Transform → Load pipeline. :meth:`ingest` runs all
+    three stages and records the neocarta graph metadata node at the end.
+
+    Parameters
+    ----------
+    client : bigquery.Client
+        The BigQuery client.
+    project_id : str
+        The GCP project ID.
+    neo4j_driver : Driver
+        The Neo4j driver.
+    database_name : str, default "neo4j"
+        The Neo4j database name.
+    """
 
     def __init__(
         self,
@@ -19,20 +37,7 @@ class BigQueryLogsConnector:
         neo4j_driver: Driver,
         database_name: str = "neo4j",
     ) -> None:
-        """
-        Initialize the BigQuery logs connector.
-
-        Parameters
-        ----------
-        client: bigquery.Client
-            The BigQuery client.
-        project_id: str
-            The GCP project ID.
-        neo4j_driver: Driver
-            The Neo4j driver.
-        database_name: str = "neo4j"
-            The Neo4j database name.
-        """
+        """Initialize the BigQuery logs connector."""
         self.client = client
         self.project_id = client.project or project_id
         self.neo4j_driver = neo4j_driver
@@ -46,8 +51,10 @@ class BigQueryLogsConnector:
         self.extractor = BigQueryLogsExtractor(client, project_id)
         self.transformer = QueryLogTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
+        self._extracted = False
+        self._transformed = False
 
-    def extract_metadata(
+    def extract(
         self,
         dataset_id: str,
         region: str = "region-us",
@@ -61,19 +68,21 @@ class BigQueryLogsConnector:
 
         Parameters
         ----------
-        dataset_id: str
+        dataset_id : str
             The dataset ID to filter queries by.
-        region: str = "region-us"
+        region : str, default "region-us"
             The BigQuery region.
-        start_timestamp: Optional[str] = None
+        start_timestamp : str, optional
             Start timestamp for query window.
-        end_timestamp: Optional[str] = None
+        end_timestamp : str, optional
             End timestamp for query window.
-        limit: int = 100
+        limit : int, default 100
             Maximum number of queries to extract.
-        drop_failed_queries: bool = True
+        drop_failed_queries : bool, default True
             Whether to exclude failed queries.
         """
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_query_logs(
             dataset_id=dataset_id,
             region=region,
@@ -83,12 +92,24 @@ class BigQueryLogsConnector:
             drop_failed_queries=drop_failed_queries,
             cache=True,
         )
+        self._extracted = True
 
-    def transform_metadata(self) -> None:
+    def transform(self) -> None:
         """
-        Transform and cache metadata from query logs.
-        `extract_metadata` must be called before this method.
+        Transform cached query log metadata into graph data model objects.
+
+        Raises:
+        ------
+        StateError
+            If called before :meth:`extract`.
         """
+        if not self._extracted:
+            raise StateError(
+                "BigQueryLogsConnector.transform() called before extract().",
+                suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
+            )
+        self._transformed = False
+
         # Transform nodes
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
         self.transformer.transform_to_schema_nodes(self.extractor.schema_info)
@@ -107,12 +128,23 @@ class BigQueryLogsConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
+        self._transformed = True
 
-    def load_metadata(self) -> None:
+    def load(self) -> None:
         """
-        Load query log metadata into Neo4j.
-        `transform_metadata` must be called before this method.
+        Load transformed query log metadata into Neo4j.
+
+        Raises:
+        ------
+        StateError
+            If called before :meth:`transform`.
         """
+        if not self._transformed:
+            raise StateError(
+                "BigQueryLogsConnector.load() called before transform(); call .transform() first.",
+                suggestion="Call connector.extract() and connector.transform() first.",
+            )
+
         # Load nodes
         print(
             self.loader.load_database_nodes(
@@ -140,6 +172,50 @@ class BigQueryLogsConnector:
         )
         print(self.loader.load_defines_relationships(self.transformer.defines_relationships))
 
+    def ingest(
+        self,
+        dataset_id: str,
+        region: str = "region-us",
+        start_timestamp: str | None = None,
+        end_timestamp: str | None = None,
+        limit: int = 100,
+        drop_failed_queries: bool = True,
+    ) -> None:
+        """
+        Run the BigQuery logs connector (extract → transform → load).
+
+        Parameters
+        ----------
+        dataset_id : str
+            The dataset ID to filter queries by.
+        region : str, default "region-us"
+            The BigQuery region.
+        start_timestamp : str, optional
+            Start timestamp for query window.
+        end_timestamp : str, optional
+            End timestamp for query window.
+        limit : int, default 100
+            Maximum number of queries to extract.
+        drop_failed_queries : bool, default True
+            Whether to exclude failed queries.
+        """
+        print("Extracting query logs from BigQuery...")
+        self.extract(
+            dataset_id=dataset_id,
+            region=region,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            limit=limit,
+            drop_failed_queries=drop_failed_queries,
+        )
+        print("Transforming query log metadata...")
+        self.transform()
+        print("Loading metadata into Neo4j...")
+        self.load()
+        print("Recording neocarta graph metadata...")
+        print(self.loader.upsert_neocarta_graph_node().model_dump())
+        print("BigQuery logs connector completed successfully!")
+
     def run(
         self,
         dataset_id: str,
@@ -152,29 +228,20 @@ class BigQueryLogsConnector:
         """
         Run the BigQuery logs connector.
 
-        Parameters
-        ----------
-        dataset_id: str
-            The dataset ID to filter queries by.
-        region: str = "region-us"
-            The BigQuery region.
-        start_timestamp: Optional[str] = None
-            Start timestamp for query window.
-        end_timestamp: Optional[str] = None
-            End timestamp for query window.
-        limit: int = 100
-            Maximum number of queries to extract.
-        drop_failed_queries: bool = True
-            Whether to exclude failed queries.
+        .. deprecated::
+            Use :meth:`ingest` instead. ``run`` will be removed in a future release.
         """
-        print("Extracting query logs from BigQuery...")
-        self.extract_metadata(
-            dataset_id, region, start_timestamp, end_timestamp, limit, drop_failed_queries
+        warnings.warn(
+            "BigQueryLogsConnector.run() is deprecated; "
+            "use BigQueryLogsConnector.ingest() instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        print("Transforming query log metadata...")
-        self.transform_metadata()
-        print("Loading metadata into Neo4j...")
-        self.load_metadata()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("BigQuery logs connector completed successfully!")
+        self.ingest(
+            dataset_id=dataset_id,
+            region=region,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            limit=limit,
+            drop_failed_queries=drop_failed_queries,
+        )
