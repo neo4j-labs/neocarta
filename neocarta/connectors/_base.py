@@ -1,6 +1,6 @@
 """Base protocols defining the public connector contract.
 
-See ``docs/connector-refactor-guidance.md`` for the prose specification. These
+See ``.claude/skills/add-source-connector/connector-contract.md`` for the prose specification. These
 protocols make the contract executable: conformance tests assert that every
 connector in :mod:`neocarta.connectors` matches one of them.
 
