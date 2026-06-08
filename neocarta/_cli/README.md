@@ -30,6 +30,7 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
 | `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
 | `OSI_SEMANTIC_MODEL_NAME` | For `osi export` | — | Name of the `OsiSemanticModel` to export |
+| `QUERY_LOG_FILE` | For `query-log ingest` | — | Path to a query-log JSON file |
 
 Secrets are env-only and never logged.
 
@@ -195,6 +196,20 @@ Exports an OSI semantic model from Neo4j back to an OSI YAML file using `OsiConn
 neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
 OSI_SEMANTIC_MODEL_NAME=acme_corp_model neocarta osi export --output-path acme.yaml
 neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml --dry-run --json
+### `neocarta query-log ingest`
+
+Parses a local query-log JSON file (currently the BigQuery export format) using `QueryLogConnector` and loads `Query` and `CTE` nodes plus the `Database` / `Schema` / `Table` / `Column` structure and the table/column references each query touches. This is **distinct from `neocarta bigquery logs`**, which reads query logs live from the Cloud Logging API; this command reads a file already on disk. No embeddings are generated (query-log nodes carry no descriptions).
+
+- **Flags:**
+  - `--query-log-file TEXT` — Path to the query-log JSON file. Overrides `QUERY_LOG_FILE`.
+  - `--source TEXT` — Source/format of the query-log file (default: `bigquery`; the only value supported today).
+  - `--dry-run` — Print the planned ingestion as JSON; do not read the file or touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading queries from an exported BigQuery query-log file (rather than pulling them live via `bigquery logs`).
+
+```bash
+neocarta query-log ingest --query-log-file ./query_logs.json
+QUERY_LOG_FILE=./query_logs.json neocarta query-log ingest --dry-run --json
 ```
 
 ---

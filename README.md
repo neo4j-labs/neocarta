@@ -754,6 +754,7 @@ Today the CLI ships these connector commands:
 | `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
 | `neocarta osi ingest` | `OsiConnector` — load an OSI YAML semantic model from a local path or HTTP(S) URL |
 | `neocarta osi export` | `OsiConnector` — export an OSI semantic model from Neo4j back to an OSI YAML file |
+| `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
 
 Plus one introspection verb:
 
@@ -773,6 +774,7 @@ neocarta dataplex schema --project-id my-proj --project-number 123456789 --datap
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
 neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
 neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+neocarta query-log ingest --query-log-file ./query_logs.json
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
@@ -885,6 +887,25 @@ The project is organized into the following dependency groups:
 - **mcp**: neocarta MCP server for metadata retrieval from Neo4j semantic layer
 - **agent**: Text2SQL agent with LangChain (includes mcp-server dependencies)
 - **dev**: Development tools (Jupyter notebooks)
+
+### Adding a New Connector
+
+Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/add-source-connector/connector-contract.md). Read it before designing a connector.
+
+The repository ships an `add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
+
+```bash
+# List connectors and their detected kind (source/format)
+uv run .claude/skills/add-source-connector/scripts/driver.py list
+
+# Scaffold a new source connector package + conformance test
+uv run .claude/skills/add-source-connector/scripts/driver.py scaffold <name>
+
+# Verify a connector against the contract (static checks + conformance pytest)
+uv run .claude/skills/add-source-connector/scripts/driver.py verify <name>
+```
+
+A scaffolded connector is lint-clean as generated; fill in the `extract` / `transform` / `load` stages, then re-run `verify`. Connector creation and CLI integration are separate PRs.
 
 ### Sample Datasets
 

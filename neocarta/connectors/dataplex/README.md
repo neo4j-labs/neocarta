@@ -42,9 +42,9 @@ config:
 ---
 graph LR
 %% Nodes
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resource_path: STRING")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
@@ -76,9 +76,9 @@ Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>e
 Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN")
 
 %% Glossary Nodes
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resource_path: STRING")
 
 %% Database Relationships
 Database -->|HAS_SCHEMA| Schema

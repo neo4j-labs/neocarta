@@ -17,7 +17,7 @@ Some information is not accessible by reading query logs. Information such as pr
 
 When creating a graph from query logs, we are able to see how columns are used in `JOIN` conditions. This lets us persist the `JOIN` criteria on `(:Column)-[:REFERENCES]->(:Column)` relationships for additional context.
 
-We also have direct access to queries run against the tables. We may persist the queries as `Query` nodes in the graph and use them as few shot examples in the context.
+We also have direct access to queries run against the tables. We may persist the queries as `Query` nodes in the graph and use them as few shot examples in the context. Inline Common Table Expressions parsed from those queries are stored as query-scoped `CTE` nodes via `(:Query)-[:DEFINES]->(:CTE)`, so they are kept distinct from real catalog tables.
 
 ```mermaid
 ---
@@ -31,6 +31,7 @@ Schema("Schema<br/>id: STRING | KEY<br/>name: STRING")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING")
 Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN")
 Query("Query<br/>id: STRING | KEY<br/>content: STRING")
+CTE("CTE<br/>id: STRING | KEY<br/>name: STRING<br/>definition: STRING<br/>query_id: STRING")
 
 %% Relationships
 Database -->|HAS_SCHEMA| Schema
@@ -39,6 +40,7 @@ Table -->|HAS_COLUMN| Column
 Column -->|REFERENCES<br/>criteria: STRING| Column
 Query -->|USES_TABLE| Table
 Query -->|USES_COLUMN| Column
+Query -->|DEFINES| CTE
 ```
 
 ## Usage
