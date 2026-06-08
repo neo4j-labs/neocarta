@@ -71,7 +71,7 @@ any FAIL. Warnings (e.g. an id f-string) don't fail the run but should be fixed.
    accessors), `transform.py` (build `data_model` objects via `generate_id`
    helpers), and the `load()` body (call `self.loader.load_*` for your node /
    relationship types).
-3. Fill in the `README.md` (see [Required README](#required-readme)).
+3. Fill in the `README.md` (see [§12 Required README](#12-required-readme)).
 4. `verify` until green. Add behavior-specific unit tests beyond conformance.
 5. Run the full unit suite + ruff (see Test), update `CHANGELOG.md`.
 
@@ -83,9 +83,11 @@ make fmt && make lint   # ruff format + lint — must be clean before PR
 make test-it            # integration: real ingest into a Neo4j testcontainer (Docker)
 ```
 
-`.claude/` is excluded from ruff (`extend-exclude` in `pyproject.toml`) — the
-driver is agent tooling, not product surface, so it isn't held to the product's
-`select = ["ALL"]` rules.
+Both the driver and the code it scaffolds are held to the project's
+`select = ["ALL"]` ruff rules — a freshly scaffolded connector is lint-clean and
+format-clean as generated, so `make lint` stays green before you've written any
+implementation. The stub `extract()` / `export()` bodies raise
+`NotImplementedError` until you implement them.
 
 ---
 
@@ -399,11 +401,13 @@ pipeline. The scaffold generates this correctly.
 
 ## Gotchas
 
-- **Per-call source args default to `None` in the skeleton** (`extract(self, source=None)`,
-  `ingest`, `run`). This is deliberate: the conformance test calls `connector.run()`
-  argless to assert the `DeprecationWarning`, mirroring how `CSVConnector` (whose
-  inputs live on the constructor) is tested. Give them real required signatures
-  once the source args are known — but then the generated `run` test needs an arg.
+- **Per-call source args default to `None` in the skeleton**
+  (`extract(self, source: str | None = None)`, `ingest`, `run`). This is
+  deliberate: the conformance test calls `connector.run()` argless to assert the
+  `DeprecationWarning`, mirroring how `CSVConnector` (whose inputs live on the
+  constructor) is tested. Replace `source` with the real signature/type once the
+  source inputs are known — but if you make an arg required, update the generated
+  `run` test to pass one.
 - **Constructor vs method config** (§4): long-lived resources on `__init__`,
   per-call inputs on `extract`/`ingest`.
 - **Sub-connector parent `__init__.py`**: scaffolding `foo/schema` leaves a stub

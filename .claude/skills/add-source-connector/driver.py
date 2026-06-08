@@ -30,6 +30,8 @@ import re
 import subprocess
 import sys
 
+from neocarta.connectors._base import FormatConnectorProtocol, SourceConnectorProtocol
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CONNECTORS_DIR = REPO_ROOT / "neocarta" / "connectors"
 TESTS_DIR = REPO_ROOT / "tests" / "unit" / "connectors"
@@ -71,8 +73,6 @@ def _relative_import_dots(pkg: str) -> str:
 def _connector_py(pkg: str, class_name: str, is_format: bool) -> str:
     dots = _relative_import_dots(pkg)
     mid = _module_id_from_pkg(pkg)
-    prefix = class_name
-    extra_export = ""
     export_method = ""
     if is_format:
         export_method = '''
@@ -82,7 +82,7 @@ def _connector_py(pkg: str, class_name: str, is_format: bool) -> str:
         Export is a single public orchestrator; its internal stages
         (graph read, source-format build, file write) stay private.
         """
-        raise NotImplementedError("TODO: implement export for {cls}.".format(cls=type(self).__name__))
+        raise NotImplementedError(f"TODO: write {type(self).__name__} output to {output_path}")
 '''
     return f'''"""{class_name} connector."""
 
@@ -122,7 +122,7 @@ class {class_name}:
         self._extracted = False
         self._transformed = False
 
-    def extract(self, source=None) -> None:
+    def extract(self, source: str | None = None) -> None:
         """
         Read from the external system and populate the extractor cache.
 
@@ -130,13 +130,12 @@ class {class_name}:
 
         Parameters
         ----------
-        source
+        source : str, optional
             Source-specific input (e.g. a dataset id, file path, API handle).
         """
         self._extracted = False
         self._transformed = False
-        # TODO: drive self.extractor here, e.g.
-        # self.extractor.extract_table_info(source)
+        self.extractor.extract(source)
         self._extracted = True
 
     def transform(self) -> None:
@@ -173,13 +172,13 @@ class {class_name}:
             )
         # TODO: print(self.loader.load_*_nodes(self.transformer.*_nodes))
 
-    def ingest(self, source=None) -> None:
+    def ingest(self, source: str | None = None) -> None:
         """
         Run the {mid} connector (extract → transform → load).
 
         Parameters
         ----------
-        source
+        source : str, optional
             Source-specific input forwarded to :meth:`extract`.
         """
         print("Extracting metadata from {mid}...")
@@ -192,7 +191,7 @@ class {class_name}:
         print(self.loader.upsert_neocarta_graph_node().model_dump())
         print("{class_name} completed successfully!")
 {export_method}
-    def run(self, source=None) -> None:
+    def run(self, source: str | None = None) -> None:
         """
         Run the {mid} connector.
 
@@ -225,9 +224,14 @@ class {base}Extractor:
         """Initialize an empty extractor cache."""
         self._cache: dict = {{}}
 
-    # TODO: add extract_*_info(...) methods that populate self._cache,
-    # and @property accessors (table_info, column_info, ...) for the
-    # transformer to read.
+    def extract(self, source: str | None = None) -> None:
+        """Read from the source and populate ``self._cache``.
+
+        TODO: replace this stub with concrete ``extract_*_info(...)`` methods
+        that populate ``self._cache``, plus ``@property`` accessors
+        (``table_info``, ``column_info``, ...) for the transformer to read.
+        """
+        raise NotImplementedError(f"{{type(self).__name__}}.extract() not implemented for {{source!r}}")
 '''
 
 
@@ -238,8 +242,8 @@ def _transform_py(pkg: str, class_name: str) -> str:
 
 from {dots}connectors.models import NodesCache, RelationshipsCache
 
-# All node ids MUST be produced via generate_id helpers — never inline f-strings.
-# from {dots}connectors.utils.generate_id import generate_table_id, generate_column_id
+# All node ids MUST be produced via helpers in
+# neocarta.connectors.utils.generate_id — never inline an id f-string.
 
 
 class {base}Transformer:
@@ -266,10 +270,9 @@ __all__ = ["{class_name}"]
 
 
 def _readme_md(pkg: str, class_name: str, is_format: bool) -> str:
-    mid = _module_id_from_pkg(pkg)
     kind = "format (ingest + export)" if is_format else "source (ingest only)"
     dotted = _pkg_to_dotted(pkg)
-    return f'''# {class_name.replace("Connector", "")} Connector
+    return f"""# {class_name.replace("Connector", "")} Connector
 
 ## Overview
 
@@ -315,7 +318,7 @@ TODO: which `NodeLabel` / `RelationshipType` values apply, once filtering is add
 ## Known issues / limitations
 
 TODO.
-'''
+"""
 
 
 def _conformance_test(pkg: str, class_name: str, is_format: bool) -> str:
@@ -326,8 +329,11 @@ def _conformance_test(pkg: str, class_name: str, is_format: bool) -> str:
         if is_format
         else "from neocarta.connectors._base import SourceConnectorProtocol"
     )
-    methods = '("extract", "transform", "load", "ingest", "export", "run")' if is_format else \
-        '("extract", "transform", "load", "ingest", "run")'
+    methods = (
+        '("extract", "transform", "load", "ingest", "export", "run")'
+        if is_format
+        else '("extract", "transform", "load", "ingest", "run")'
+    )
     kind_assert = (
         "test_conforms_to_format_connector_protocol"
         if is_format
@@ -413,6 +419,7 @@ def test_load_before_transform_raises_state_error():
 
 
 def cmd_scaffold(args: argparse.Namespace) -> int:
+    """Generate a conformant connector package and its conformance test."""
     pkg = args.pkg.strip("/")
     class_name = args.class_name or _class_name_from_pkg(pkg)
     if not class_name.endswith("Connector"):
@@ -453,8 +460,12 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
     test_f.write_text(_conformance_test(pkg, class_name, is_format))
     print(f"  wrote {test_f.relative_to(REPO_ROOT)}")
 
-    print(f"\nScaffolded {class_name} ({'format' if is_format else 'source'}) at {pkg_dir.relative_to(REPO_ROOT)}")
-    print(f"Next: implement the TODOs, then run:\n  uv run {pathlib.Path(__file__).relative_to(REPO_ROOT)} verify {pkg}")
+    print(
+        f"\nScaffolded {class_name} ({'format' if is_format else 'source'}) at {pkg_dir.relative_to(REPO_ROOT)}"
+    )
+    print(
+        f"Next: implement the TODOs, then run:\n  uv run {pathlib.Path(__file__).relative_to(REPO_ROOT)} verify {pkg}"
+    )
     return 0
 
 
@@ -465,6 +476,7 @@ ID_FSTRING_RE = re.compile(r"""_id\s*=\s*f["']|["']id["']\s*:\s*f["']|\bid=f["']
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
+    """Check an existing connector against the contract; return a process exit code."""
     pkg = args.pkg.strip("/")
     dotted = _pkg_to_dotted(pkg)
     pkg_dir = CONNECTORS_DIR / pkg
@@ -476,7 +488,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     # 1. imports
     try:
         module = importlib.import_module(dotted)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"FAIL: cannot import {dotted}: {type(exc).__name__}: {exc}")
         return 1
 
@@ -494,11 +506,10 @@ def cmd_verify(args: argparse.Namespace) -> int:
         failures.append("missing README.md at package root")
 
     # 4. connector classes conform structurally
-    from neocarta.connectors._base import FormatConnectorProtocol, SourceConnectorProtocol
-
     connector_classes = [
-        getattr(module, n) for n in exported if isinstance(getattr(module, n, None), type)
-        and n.endswith("Connector")
+        getattr(module, n)
+        for n in exported
+        if isinstance(getattr(module, n, None), type) and n.endswith("Connector")
     ]
     if not connector_classes:
         failures.append("no *Connector class exported in __all__")
@@ -509,10 +520,13 @@ def cmd_verify(args: argparse.Namespace) -> int:
             kind = "source"
         else:
             missing = [
-                m for m in ("extract", "transform", "load", "ingest", "run")
+                m
+                for m in ("extract", "transform", "load", "ingest", "run")
                 if not callable(getattr(cls, m, None))
             ]
-            failures.append(f"{cls.__name__} does not satisfy any connector protocol; missing: {missing}")
+            failures.append(
+                f"{cls.__name__} does not satisfy any connector protocol; missing: {missing}"
+            )
             continue
         print(f"  {cls.__name__}: {kind} connector (protocol OK)")
 
@@ -539,15 +553,20 @@ def cmd_verify(args: argparse.Namespace) -> int:
     pytest_rc = 0
     if test_file.exists():
         print(f"\n== running {test_file.relative_to(REPO_ROOT)} ==")
-        pytest_rc = subprocess.run(
-            ["uv", "run", "pytest", str(test_file), "-q"], cwd=REPO_ROOT
+        # Fixed argv (uv on PATH), no shell, no untrusted input — agent tooling.
+        pytest_rc = subprocess.run(  # noqa: S603
+            ["uv", "run", "pytest", str(test_file), "-q"],  # noqa: S607
+            cwd=REPO_ROOT,
+            check=False,
         ).returncode
     else:
         warns.append(f"no conformance test at {test_file.relative_to(REPO_ROOT)}")
         print(f"  WARN: no conformance test at {test_file.relative_to(REPO_ROOT)}")
 
     ok = not failures and pytest_rc == 0
-    print(f"\n{'PASS' if ok else 'FAIL'}: {dotted}" + (f" ({len(warns)} warning(s))" if warns else ""))
+    print(
+        f"\n{'PASS' if ok else 'FAIL'}: {dotted}" + (f" ({len(warns)} warning(s))" if warns else "")
+    )
     return 0 if ok else 1
 
 
@@ -555,8 +574,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 # list
 # --------------------------------------------------------------------------- #
 def cmd_list(args: argparse.Namespace) -> int:
-    from neocarta.connectors._base import FormatConnectorProtocol, SourceConnectorProtocol
-
+    """List connector packages and their detected kind (source/format)."""
     for entry in sorted(CONNECTORS_DIR.iterdir()):
         if not entry.is_dir() or entry.name in SKIP_DIRS:
             continue
@@ -565,7 +583,9 @@ def cmd_list(args: argparse.Namespace) -> int:
         try:
             module = importlib.import_module(dotted)
             exported = getattr(module, "__all__", []) or []
-            classes = [getattr(module, n) for n in exported if isinstance(getattr(module, n, None), type)]
+            classes = [
+                getattr(module, n) for n in exported if isinstance(getattr(module, n, None), type)
+            ]
             kinds = []
             for cls in classes:
                 if issubclass(cls, FormatConnectorProtocol):
@@ -575,24 +595,33 @@ def cmd_list(args: argparse.Namespace) -> int:
                 else:
                     kinds.append(f"{cls.__name__} [?]")
             print(f"{entry.name:14} {', '.join(kinds) if kinds else '(no exported connector)'}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"{entry.name:14} (import error: {type(exc).__name__})")
     return 0
 
 
 def main() -> int:
+    """Parse argv and dispatch to the chosen subcommand."""
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_scaffold = sub.add_parser("scaffold", help="generate a conformant connector package")
-    p_scaffold.add_argument("pkg", help="path under neocarta/connectors/ (e.g. salesforce or salesforce/schema)")
+    p_scaffold.add_argument(
+        "pkg", help="path under neocarta/connectors/ (e.g. salesforce or salesforce/schema)"
+    )
     p_scaffold.add_argument("--class-name", help="connector class name (default derived from pkg)")
-    p_scaffold.add_argument("--format", action="store_true", help="scaffold a format connector (ingest + export)")
-    p_scaffold.add_argument("--force", action="store_true", help="overwrite a non-empty package dir")
+    p_scaffold.add_argument(
+        "--format", action="store_true", help="scaffold a format connector (ingest + export)"
+    )
+    p_scaffold.add_argument(
+        "--force", action="store_true", help="overwrite a non-empty package dir"
+    )
     p_scaffold.set_defaults(func=cmd_scaffold)
 
     p_verify = sub.add_parser("verify", help="check an existing connector against the contract")
-    p_verify.add_argument("pkg", help="path under neocarta/connectors/ (e.g. query_log or bigquery/schema)")
+    p_verify.add_argument(
+        "pkg", help="path under neocarta/connectors/ (e.g. query_log or bigquery/schema)"
+    )
     p_verify.set_defaults(func=cmd_verify)
 
     p_list = sub.add_parser("list", help="list connector packages and detected kind")
