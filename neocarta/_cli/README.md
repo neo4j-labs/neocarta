@@ -28,6 +28,7 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `DATAPLEX_LOCATION` | Yes for `dataplex *` | — | Dataplex location, e.g. `us` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
+| `QUERY_LOG_FILE` | For `query-log ingest` | — | Path to a query-log JSON file |
 
 Secrets are env-only and never logged.
 
@@ -153,6 +154,24 @@ Loads the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) pl
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us --embeddings
 neocarta dataplex glossary --no-entry-links --dry-run --json
+```
+
+---
+
+### `neocarta query-log ingest`
+
+Parses a local query-log JSON file (currently the BigQuery export format) using `QueryLogConnector` and loads `Query` and `CTE` nodes plus the `Database` / `Schema` / `Table` / `Column` structure and the table/column references each query touches. This is **distinct from `neocarta bigquery logs`**, which reads query logs live from the Cloud Logging API; this command reads a file already on disk. No embeddings are generated (query-log nodes carry no descriptions).
+
+- **Flags:**
+  - `--query-log-file TEXT` — Path to the query-log JSON file. Overrides `QUERY_LOG_FILE`.
+  - `--source TEXT` — Source/format of the query-log file (default: `bigquery`; the only value supported today).
+  - `--dry-run` — Print the planned ingestion as JSON; do not read the file or touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading queries from an exported BigQuery query-log file (rather than pulling them live via `bigquery logs`).
+
+```bash
+neocarta query-log ingest --query-log-file ./query_logs.json
+QUERY_LOG_FILE=./query_logs.json neocarta query-log ingest --dry-run --json
 ```
 
 ---

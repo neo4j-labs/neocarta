@@ -34,6 +34,7 @@ ENV_VARS: dict[str, str] = {
     "DATAPLEX_LOCATION": "Dataplex location, e.g. `us` (for `dataplex *`).",
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
     "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv ingest`).",
+    "QUERY_LOG_FILE": "Path to a query-log JSON file (for `query-log ingest`).",
 }
 
 
@@ -68,6 +69,9 @@ class CLISettings(BaseSettings):
 
     # CSV
     csv_directory: str | None = Field(default=None, validation_alias="CSV_DIRECTORY")
+
+    # Query log
+    query_log_file: str | None = Field(default=None, validation_alias="QUERY_LOG_FILE")
 
 
 def load_settings() -> CLISettings:
