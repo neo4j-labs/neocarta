@@ -43,13 +43,6 @@ class Glossary(BaseModel):
         default=None,
         description="The full resource path for the glossary (e.g. the Dataplex resource name)",
     )
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
-    )
 
 
 class Category(BaseModel):
@@ -61,13 +54,6 @@ class Category(BaseModel):
     resource_path: str | None = Field(
         default=None,
         description="The full resource path for the category (e.g. the Dataplex resource name)",
-    )
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
     )
 
 
@@ -85,13 +71,6 @@ class BusinessTerm(BaseModel):
     resource_path: str | None = Field(
         default=None,
         description="The full resource path for the business term (e.g. the Dataplex resource name)",
-    )
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
     )
 
 
@@ -191,44 +170,6 @@ class Defines(BaseModel):
     cte_id: str = Field(..., description="The unique identifier for the CTE")
 
 
-class CatalogAsset(BaseModel):
-    """A generic catalog asset node for Collibra asset types not mapped to a specific node type."""
-
-    id: str = Field(..., description="The unique identifier for the catalog asset")
-    name: str = Field(..., description="The name of the catalog asset")
-    description: str | None = Field(default=None, description="The description of the asset")
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
-    )
-    asset_type: str = Field(..., description="Original Collibra asset type name")
-    domain_id: str = Field(..., description="Parent domain node id (Schema or Glossary)")
-
-
-class HasAsset(BaseModel):
-    """
-    A relationship from a domain (Schema or Glossary) to a generic catalog asset.
-    (Schema|Glossary)-[:HAS_ASSET]->(CatalogAsset).
-    """
-
-    parent_id: str = Field(..., description="Schema or Glossary node id")
-    asset_id: str = Field(..., description="CatalogAsset node id")
-
-
-class FlowsInto(BaseModel):
-    """
-    Technical lineage relationship between two table or column nodes.
-    (Table|Column)-[:FLOWS_INTO]->(Table|Column).
-    """
-
-    source_id: str = Field(..., description="Source node id")
-    target_id: str = Field(..., description="Target node id")
-    lineage_type: str | None = Field(
-        default=None, description="Lineage granularity: 'TABLE' or 'COLUMN'"
-    )
 class Domain(BaseModel):
     """A Domain node representing a semantic grouping of data assets."""
 

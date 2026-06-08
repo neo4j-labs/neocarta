@@ -8,14 +8,11 @@ from ...data_model.metadata import NeocartaGraph
 from ...data_model.rdbms import (
     CTE,
     BusinessTerm,
-    CatalogAsset,
     Category,
     Column,
     Database,
     Defines,
-    FlowsInto,
     Glossary,
-    HasAsset,
     HasBusinessTerm,
     HasCategory,
     HasColumn,
@@ -685,84 +682,6 @@ class Neo4jRDBMSLoader:
         _, summary, _ = self.neo4j_driver.execute_query(
             query_=query,
             parameters_={"rows": [n.model_dump() for n in uses_column_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
-        )
-        return summary.counters.__dict__
-
-    def load_catalog_asset_nodes(
-        self,
-        catalog_asset_nodes: list[CatalogAsset],
-        overwrite_existing: bool = False,
-        properties_list: list[str] = ["name", "description", "status", "collibra_id", "asset_type"],
-    ) -> dict:
-        """Load CatalogAsset nodes into Neo4j."""
-        _validate_properties_list(CatalogAsset, properties_list)
-
-        self._write_node_constraint(node_labels=[NodeLabel.CATALOG_ASSET])
-        query = _build_node_ingest_query(
-            NodeLabel.CATALOG_ASSET, overwrite_existing, properties_list
-        )
-
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in catalog_asset_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
-        )
-        return summary.counters.__dict__
-
-    def load_has_asset_relationships(
-        self,
-        has_asset_relationships: list[HasAsset],
-        overwrite_existing: bool = False,
-        properties_list: list[str] = [],
-    ) -> dict:
-        """Load HAS_ASSET relationships into Neo4j."""
-        if properties_list:
-            _validate_properties_list(HasAsset, properties_list)
-
-        query = _build_relationship_ingest_query(
-            RelationshipType.HAS_ASSET,
-            NodeLabel.SCHEMA,
-            NodeLabel.CATALOG_ASSET,
-            "parent_id",
-            "asset_id",
-            overwrite_existing,
-            properties_list,
-        )
-
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_asset_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
-        )
-        return summary.counters.__dict__
-
-    def load_flows_into_relationships(
-        self,
-        flows_into_relationships: list[FlowsInto],
-        overwrite_existing: bool = False,
-        properties_list: list[str] = ["lineage_type"],
-    ) -> dict:
-        """Load FLOWS_INTO technical lineage relationships into Neo4j."""
-        if properties_list:
-            _validate_properties_list(FlowsInto, properties_list)
-
-        query = _build_relationship_ingest_query(
-            RelationshipType.FLOWS_INTO,
-            NodeLabel.TABLE,
-            NodeLabel.TABLE,
-            "source_id",
-            "target_id",
-            overwrite_existing,
-            properties_list,
-        )
-
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in flows_into_relationships]},
             routing_=RoutingControl.WRITE,
             database_=self.database_name,
         )

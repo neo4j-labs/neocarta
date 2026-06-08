@@ -72,18 +72,8 @@ class Table(BaseModel):
     embedding: list[float] | None = Field(
         default=None, description="The embedding of the table description"
     )
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
-    )
-    collibra_asset_type: str | None = Field(
-        default=None, description="Original Collibra asset type name"
-    )
 
-    @field_validator("description", "status", "collibra_asset_type", mode="before")
+    @field_validator("description", mode="before")
     def validate_string_or_none(cls, v: str | None) -> str | None:
         """
         Validate that the string is string type or None.
@@ -113,15 +103,8 @@ class Column(BaseModel):
     nullable: bool = Field(default=True, description="Whether the column can be null")
     is_primary_key: bool = Field(default=False, description="Whether the column is a primary key")
     is_foreign_key: bool = Field(default=False, description="Whether the column is a foreign key")
-    status: str | None = Field(
-        default=None,
-        description="Governance lifecycle status (e.g. Accepted, Draft, Deprecated)",
-    )
-    collibra_id: str | None = Field(
-        default=None, description="UUID from Collibra for cross-reference"
-    )
 
-    @field_validator("description", "type", "status", mode="before")
+    @field_validator("description", "type", mode="before")
     def validate_string_or_none(cls, v: str | None) -> str | None:
         """
         Validate that the string is string type or None.

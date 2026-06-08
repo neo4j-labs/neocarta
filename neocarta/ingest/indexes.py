@@ -125,3 +125,45 @@ CREATE INDEX {node_label.lower() + "_name_index"} IF NOT EXISTS
         database_=database_name,
     )
     return summary.counters.__dict__
+
+
+def create_range_index(
+    neo4j_driver: Driver,
+    node_label: str,
+    property_name: str,
+    database_name: str = "neo4j",
+) -> dict:
+    """
+    Create a range index on an arbitrary node property.
+
+    A range index backs exact-equality ``MATCH (n:Label {prop: $value})`` lookups. Connectors
+    that resolve relationship endpoints by a non-``id`` property (e.g. the Collibra connector
+    matching nodes by ``collibra_id``) need one so the lookup seeks rather than scans the label.
+
+    Parameters
+    ----------
+    neo4j_driver: Driver
+        The Neo4j driver to use.
+    node_label: str
+        The label of the node to index.
+    property_name: str
+        The property to index.
+    database_name: str
+        The name of the database to create the index in.
+
+    Returns:
+    -------
+    dict
+        The summary of the index created.
+    """
+    range_index_query = f"""
+CREATE INDEX {node_label.lower() + "_" + property_name.lower() + "_index"} IF NOT EXISTS
+    FOR (n:{node_label})
+    ON (n.{property_name})
+"""
+    _, summary, _ = neo4j_driver.execute_query(
+        query_=range_index_query,
+        routing_=RoutingControl.WRITE,
+        database_=database_name,
+    )
+    return summary.counters.__dict__
