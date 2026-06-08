@@ -752,6 +752,8 @@ Today the CLI ships these connector commands:
 | `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
 | `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
 | `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
+| `neocarta osi ingest` | `OsiConnector` — load an OSI YAML semantic model from a local path or HTTP(S) URL |
+| `neocarta osi export` | `OsiConnector` — export an OSI semantic model from Neo4j back to an OSI YAML file |
 | `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
 
 Plus one introspection verb:
@@ -770,6 +772,8 @@ neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
 neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
 neocarta query-log ingest --query-log-file ./query_logs.json
 ```
 

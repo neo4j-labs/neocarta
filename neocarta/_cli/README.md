@@ -28,6 +28,8 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `DATAPLEX_LOCATION` | Yes for `dataplex *` | — | Dataplex location, e.g. `us` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
+| `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
+| `OSI_SEMANTIC_MODEL_NAME` | For `osi export` | — | Name of the `OsiSemanticModel` to export |
 | `QUERY_LOG_FILE` | For `query-log ingest` | — | Path to a query-log JSON file |
 
 Secrets are env-only and never logged.
@@ -158,6 +160,42 @@ neocarta dataplex glossary --no-entry-links --dry-run --json
 
 ---
 
+### `neocarta osi ingest`
+
+Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)) YAML semantic model into the Neocarta graph using `OsiConnector`. The spec source may be a local filesystem path or an HTTP(S) URL. Ingests `OsiSemanticModel`, `OsiTable`, `OsiColumn`, `Query`, `Metric`, `Join`, and aspect nodes plus their relationships; synonyms in `ai_context` are upserted as `BusinessTerm` nodes (merged on name, so they dedupe against catalog-derived terms). When `--embeddings` is enabled, `Database`, `Schema`, `Table`, and `Column` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--spec-source TEXT` — Local filesystem path or HTTP(S) URL to the OSI YAML spec. Overrides `OSI_SPEC_SOURCE`.
+  - `--embeddings / --no-embeddings` — Generate embeddings after ingest (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading a semantic model published as an OSI YAML spec, from disk or directly from a URL.
+
+```bash
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml --embeddings
+OSI_SPEC_SOURCE=./datasets/osi/acme_semantic_model.yaml neocarta osi ingest --dry-run --json
+```
+
+---
+
+### `neocarta osi export`
+
+Exports an OSI semantic model from Neo4j back to an OSI YAML file using `OsiConnector`. Reads the `OsiSemanticModel` with the given name and everything it owns (tables, columns, metrics, joins, aspects) and serializes it to OSI YAML. This is the inverse of `osi ingest`.
+
+- **Flags:**
+  - `--semantic-model-name TEXT` — Name of the `OsiSemanticModel` to export. Overrides `OSI_SEMANTIC_MODEL_NAME`.
+  - `--output-path TEXT` — Destination path for the exported OSI YAML file. Required.
+  - `--dry-run` — Print the planned export as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** round-tripping a semantic model out of the graph, or producing an OSI spec from a model assembled in Neo4j.
+- **Exit codes:** a `--semantic-model-name` with no matching model exits `3` (not found).
+
+```bash
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+OSI_SEMANTIC_MODEL_NAME=acme_corp_model neocarta osi export --output-path acme.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml --dry-run --json
 ### `neocarta query-log ingest`
 
 Parses a local query-log JSON file (currently the BigQuery export format) using `QueryLogConnector` and loads `Query` and `CTE` nodes plus the `Database` / `Schema` / `Table` / `Column` structure and the table/column references each query touches. This is **distinct from `neocarta bigquery logs`**, which reads query logs live from the Cloud Logging API; this command reads a file already on disk. No embeddings are generated (query-log nodes carry no descriptions).
