@@ -117,6 +117,7 @@ dbxcarta = [
 
 [tool.uv.workspace]
 members = [
+    "carta-schema",
     "dbxcarta/dbxcarta-client",
     "dbxcarta/dbxcarta-core",
     "dbxcarta/dbxcarta-materialize",
@@ -128,6 +129,7 @@ members = [
 ]
 
 [tool.uv.sources]
+carta-schema = { workspace = true }
 dbxcarta-client = { workspace = true }
 dbxcarta-core = { workspace = true }
 dbxcarta-materialize = { workspace = true }
@@ -219,6 +221,14 @@ ignore = [
     "ANN",     # Type hints optional in tests
     "D",       # Docstrings optional in tests
     "N999",    # _IT suffix is a deliberate integration-test naming convention
+    "PLC0415", # Lazy imports acceptable in tests
+]
+# carta-schema is a top-level workspace member, so its tests sit outside the
+# root `tests/` dir and need the same test-file leniency applied explicitly.
+"carta-schema/tests/**/*.py" = [
+    "S101",    # assert is idiomatic in pytest
+    "ANN",     # Type hints optional in tests
+    "D",       # Docstrings optional in tests
     "PLC0415", # Lazy imports acceptable in tests
 ]
 "eval/retrievers/bigquery_schema_retriever.py" = [
@@ -317,3 +327,10 @@ no_implicit_optional = true
 check_untyped_defs = true
 warn_unused_ignores = true
 strict_equality = true
+
+# PyDeequ ships no type stubs and is an optional, lazily-imported dependency of
+# the dbxcarta-spark shape checks (its Deequ JAR is installed on the cluster, not
+# via pip). Treat its imports as untyped rather than failing the type check.
+[[tool.mypy.overrides]]
+module = ["pydeequ.*"]
+ignore_missing_imports = true

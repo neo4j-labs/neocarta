@@ -1,0 +1,22 @@
+[project]
+name = "carta-schema"
+version = "0.1.0"
+description = "Shared Pydantic models for the neocarta and dbxcarta graph data model (single source of truth for the core RDBMS schema)"
+authors = [
+    { name = "Ryan Knight" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.12.5",
+    "pandas>=2.0.0,<3",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "carta_schema"

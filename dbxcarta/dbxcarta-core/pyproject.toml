@@ -13,6 +13,10 @@ dependencies = [
     # dbxcarta-submit install, which no longer gets it transitively via
     # dbxcarta-spark — has it. Tiny and pure-Python, so core stays lightweight.
     "python-dotenv",
+    # Shared Pydantic core graph models, the single source of truth the spark
+    # layer derives its data-quality checks from. Tiny (pydantic + pandas), so
+    # it keeps core lightweight. dbxcarta-spark gets it transitively from here.
+    "carta-schema",
 ]
 
 [project.optional-dependencies]

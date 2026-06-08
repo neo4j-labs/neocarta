@@ -2,42 +2,36 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "mcp>=1.26.0",
-#     "python-dotenv>=1.0",
 # ]
 # ///
-"""Exercise the neocarta MCP server end to end.
+"""Exercise a running neocarta MCP server over streamable HTTP.
 
-The neocarta MCP server is a FastMCP server that speaks stdio and is launched
-via the `neocarta-mcp` console script (entry point `neocarta._mcp.server:run`).
-At startup it probes the target Neo4j database for search indexes and the
-presence of BusinessTerm nodes, then registers only the tools whose
-prerequisites are satisfied. The catalog tools (`list_schemas`,
-`list_tables_by_schema`, `get_full_metadata_schema`) are always registered;
-the search tools vary by database. Because of this, the registered tool set
-must be discovered at runtime rather than assumed.
+The neocarta MCP server is a FastMCP server. Launch it independently over HTTP
+with `neocarta-mcp --http` (entry point `neocarta._mcp.server:run`); it reads
+its own Neo4j connection from the environment via load_dotenv() at startup. At
+startup it probes the target Neo4j database for search indexes and the presence
+of BusinessTerm nodes, then registers only the tools whose prerequisites are
+satisfied. The catalog tools (`list_schemas`, `list_tables_by_schema`,
+`get_full_metadata_schema`) are always registered; the search tools vary by
+database. Because of this, the registered tool set must be discovered at runtime
+rather than assumed.
 
-This script connects to the server, lists the available tools with their
-descriptions and input schemas, then calls each tool with a sensible probe
-argument and prints a short preview of every result. By default it launches
-the server itself as a stdio subprocess so the run is self-contained; pass
-`--url` to instead connect to an already running streamable HTTP server.
-
-Neo4j connection config is resolved the same way the rest of the dbxcarta
-scripts resolve config: from an env file. An optional `-e/--env-file` is read
-first, then the repo-root `.env`. Those values are loaded and forwarded to the
-stdio subprocess as environment variables. No secrets are hardcoded.
+This script is the client only. It does not launch the server and reads no
+Neo4j credentials. It connects to the URL passed with `--url`, lists the
+available tools with their descriptions and input schemas, then calls each tool
+with a sensible probe argument and prints a short preview of every result.
 
 Usage:
-    uv run scripts/test-neocarta-mcp.py
+    # terminal 1: launch the server independently over HTTP. It reads NEO4J_*
+    # and OPENAI_API_KEY from its .env (cp .env.example .env and fill it in).
+    uv run neocarta-mcp --http --port 8000
 
-    # use a specific env file for the Neo4j connection
-    uv run scripts/test-neocarta-mcp.py -e ../.env
+    # terminal 2: connect the client and probe every tool
+    uv run scripts/test-neocarta-mcp.py --url http://127.0.0.1:8000/mcp
 
     # probe the search tools with a custom query string
-    uv run scripts/test-neocarta-mcp.py --query "customer orders revenue"
-
-    # connect to an already running streamable HTTP server instead of stdio
-    uv run scripts/test-neocarta-mcp.py --url http://127.0.0.1:8000/mcp
+    uv run scripts/test-neocarta-mcp.py --url http://127.0.0.1:8000/mcp \
+        --query "customer orders revenue"
 """
 
 from __future__ import annotations
@@ -45,36 +39,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
 import sys
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dotenv import dotenv_values
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from mcp.types import Tool
-
-# scripts/ -> dbxcarta/ -> neocarta repo root.
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-
-# Neo4j connection keys the MCP server reads from the environment. These are
-# forwarded to the stdio subprocess so the launched server can connect.
-NEO4J_ENV_KEYS = (
-    "NEO4J_URI",
-    "NEO4J_USERNAME",
-    "NEO4J_PASSWORD",
-    "NEO4J_DATABASE",
-    "EMBEDDING_MODEL",
-    "OPENAI_API_KEY",
-    "GEMINI_API_KEY",
-)
 
 # Tools that take no arguments can be probed with an empty payload.
 NO_ARG_TOOLS = frozenset({"list_schemas", "get_full_metadata_schema"})
@@ -97,104 +72,29 @@ def parse_args() -> argparse.Namespace:
         description="Connect to the neocarta MCP server, list its tools, and probe each one.",
     )
     parser.add_argument(
-        "-e",
-        "--env-file",
-        default=None,
-        type=Path,
-        help="Env file providing the Neo4j connection. Read before the repo-root .env.",
-    )
-    parser.add_argument(
         "--query",
         default=DEFAULT_QUERY,
         help="Probe string passed to search tools via their text_content argument.",
     )
     parser.add_argument(
         "--url",
-        default=None,
-        help="Connect to an already running streamable HTTP server at this URL "
-        "instead of launching a stdio subprocess.",
-    )
-    parser.add_argument(
-        "--launch-command",
-        default="uv run neocarta-mcp",
-        help="Command used to launch the stdio server subprocess. Ignored when --url is set.",
+        required=True,
+        help="URL of a running streamable HTTP neocarta MCP server, e.g. "
+        "http://127.0.0.1:8000/mcp. Launch one with `neocarta-mcp --http`.",
     )
     return parser.parse_args()
 
 
-def resolve_neo4j_env(env_file: Path | None) -> dict[str, str]:
-    """Return the Neo4j-related env values to forward to the server subprocess.
-
-    Values are read from the optional env file first, then the repo-root .env,
-    then the live process environment, with later sources taking precedence so
-    an exported variable always wins. Only the keys the server needs are
-    forwarded; secrets are never hardcoded.
-    """
-    resolved: dict[str, str] = {}
-    sources: list[Path] = []
-    if env_file is not None:
-        if not env_file.is_file():
-            fail(f"env file not found: {env_file}")
-        sources.append(env_file)
-    repo_env = REPO_ROOT / ".env"
-    if repo_env.is_file():
-        sources.append(repo_env)
-
-    for source in sources:
-        for key, value in dotenv_values(source).items():
-            if key in NEO4J_ENV_KEYS and value and key not in resolved:
-                resolved[key] = value
-
-    # Exported process env wins over any file value.
-    for key in NEO4J_ENV_KEYS:
-        value = os.environ.get(key)
-        if value:
-            resolved[key] = value
-
-    return resolved
-
-
 @asynccontextmanager
 async def open_session(args: argparse.Namespace) -> AsyncIterator[ClientSession]:
-    """Open an initialized MCP client session over the chosen transport.
+    """Open an initialized MCP client session over streamable HTTP.
 
-    Defaults to stdio, launching the server as a subprocess so the run is
-    self-contained. When `--url` is set, connects to an already running
-    streamable HTTP server instead.
+    The server is launched independently (`neocarta-mcp --http`); this client
+    only connects to its URL. It never launches the server and reads no Neo4j
+    credentials.
     """
-    if args.url is not None:
-        print(f"transport    : streamable-http -> {args.url}")
-        async with streamablehttp_client(args.url) as (read, write, _get_session_id):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                yield session
-        return
-
-    command_parts = args.launch_command.split()
-    if not command_parts:
-        fail("--launch-command must not be empty")
-    env = resolve_neo4j_env(args.env_file)
-    missing = [key for key in ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD") if key not in env]
-    if missing:
-        fail(
-            "missing required Neo4j env vars for the stdio server: "
-            f"{', '.join(missing)}. Provide them via --env-file, the repo-root "
-            ".env, or exported environment variables."
-        )
-
-    print("transport    : stdio (launching server subprocess)")
-    print(f"launch       : {args.launch_command}")
-    print(f"neo4j uri    : {env['NEO4J_URI']}")
-    print(f"neo4j db     : {env.get('NEO4J_DATABASE', 'neo4j')}")
-
-    # Pass through PATH and friends so `uv` resolves, plus the Neo4j config.
-    server_env = {**os.environ, **env}
-    params = StdioServerParameters(
-        command=command_parts[0],
-        args=command_parts[1:],
-        env=server_env,
-    )
-    async with stdio_client(params) as (read, write):
+    print(f"transport    : streamable-http -> {args.url}")
+    async with streamablehttp_client(args.url) as (read, write, _get_session_id):
         async with ClientSession(read, write) as session:
             await session.initialize()
             yield session

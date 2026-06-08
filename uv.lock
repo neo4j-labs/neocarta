@@ -10,6 +10,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "carta-schema",
     "dbxcarta-client",
     "dbxcarta-core",
     "dbxcarta-dense-schema-example",
@@ -246,6 +247,28 @@ sdist = { url = "https://files.pythonhosted.org/packages/86/e7/18ea2907d2ca91e9c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/a6/24169d70ec5264b65ba54ba49b3d10f46d6b1ad97e185c94556539b3dfc8/cachetools-6.2.5-py3-none-any.whl", hash = "sha256:db3ae5465e90befb7c74720dd9308d77a09b7cf13433570e07caa0845c30d5fe", size = 11553, upload-time = "2026-01-25T14:57:39.112Z" },
 ]
+
+[[package]]
+name = "carta-schema"
+version = "0.1.0"
+source = { editable = "carta-schema" }
+dependencies = [
+    { name = "pandas" },
+    { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pandas", specifier = ">=2.0.0,<3" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pytest", marker = "extra == 'test'" },
+]
+provides-extras = ["test"]
 
 [[package]]
 name = "certifi"
@@ -556,6 +579,7 @@ name = "dbxcarta-core"
 version = "1.1.0"
 source = { editable = "dbxcarta/dbxcarta-core" }
 dependencies = [
+    { name = "carta-schema" },
     { name = "databricks-sdk" },
     { name = "python-dotenv" },
 ]
@@ -567,6 +591,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "carta-schema", editable = "carta-schema" },
     { name = "databricks-sdk", specifier = ">=0.40" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "python-dotenv" },
