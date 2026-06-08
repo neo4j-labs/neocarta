@@ -1,0 +1,13 @@
+database_name,schema_name,table_name,description
+MusicBrainz,musicbrainz,artist,A musician group or other entity credited with creating or performing music
+MusicBrainz,musicbrainz,area,A geographic region such as a country city or administrative division used to locate artists and labels
+MusicBrainz,musicbrainz,artist_credit,A reusable credit grouping that combines one or more artists into a single attribution
+MusicBrainz,musicbrainz,artist_credit_name,A single artist entry within an artist credit including its ordering and join phrase
+MusicBrainz,musicbrainz,release_group,A grouping of releases that represent the same logical album single or other product
+MusicBrainz,musicbrainz,release,A specific issue of a release group such as a particular CD vinyl or digital edition
+MusicBrainz,musicbrainz,recording,A distinct audio recording that can appear on one or more tracks across releases
+MusicBrainz,musicbrainz,track,A single playable item on a medium linking a recording to its position on a release
+MusicBrainz,musicbrainz,medium,A physical or digital carrier within a release such as a CD or vinyl disc
+MusicBrainz,musicbrainz,work,A distinct intellectual or musical work such as a composition song or score
+MusicBrainz,musicbrainz,label,A company or imprint responsible for publishing or distributing releases
+MusicBrainz,musicbrainz,url,An external web resource linked to MusicBrainz entities through relationships

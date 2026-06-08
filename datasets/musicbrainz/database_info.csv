@@ -1,0 +1,2 @@
+database_name,platform,service,description
+MusicBrainz,MusicBrainz,Postgres,Open music encyclopedia database holding the public MusicBrainz core schema of artists releases and recordings

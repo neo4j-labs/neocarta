@@ -76,7 +76,7 @@ def main() -> None:
         # RelationshipType.TAGGED_WITH,
     ]
     # Run the connector to load all CSV files
-    connector.run(include_nodes=include_nodes, include_relationships=include_relationships)
+    connector.ingest(include_nodes=include_nodes, include_relationships=include_relationships)
 
     # Cleanup
     neo4j_driver.close()
