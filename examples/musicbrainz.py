@@ -51,6 +51,12 @@ def main(with_embeddings: bool = True) -> None:
 
     # The MusicBrainz schema only needs the core structural entities.
     node_labels = [NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN]
+    rel_types = [
+        RelationshipType.HAS_SCHEMA,
+        RelationshipType.HAS_TABLE,
+        RelationshipType.HAS_COLUMN,
+        RelationshipType.REFERENCES,
+    ]
 
     print("Extracting, transforming, and loading MusicBrainz schema into Neo4j...")
     connector = CSVConnector(
@@ -58,14 +64,9 @@ def main(with_embeddings: bool = True) -> None:
         neo4j_driver=neo4j_driver,
         database_name=neo4j_database,
     )
-    connector.run(
+    connector.ingest(
         include_nodes=node_labels,
-        include_relationships=[
-            RelationshipType.HAS_SCHEMA,
-            RelationshipType.HAS_TABLE,
-            RelationshipType.HAS_COLUMN,
-            RelationshipType.REFERENCES,
-        ],
+        include_relationships=rel_types,
     )
 
     if with_embeddings:
