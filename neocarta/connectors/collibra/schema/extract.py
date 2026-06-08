@@ -206,10 +206,13 @@ class CollibraSchemaExtractor:
             "description",
         ]
         column_cols = [*table_cols, "table_collibra_id"]
-        if include_nodes is None or NodeLabel.TABLE in include_nodes:
+        want_columns = include_nodes is None or NodeLabel.COLUMN in include_nodes
+        # Tables are cached when requested OR when columns are (columns need their
+        # parent table to build a stable id, per the contract's transient-association rule).
+        if include_nodes is None or NodeLabel.TABLE in include_nodes or want_columns:
             self._cache["table_info"] = pd.DataFrame(tables, columns=table_cols)
             print(f"  Extracted {len(tables)} tables")
-        if include_nodes is None or NodeLabel.COLUMN in include_nodes:
+        if want_columns:
             self._cache["column_info"] = pd.DataFrame(columns, columns=column_cols)
             print(f"  Extracted {len(columns)} columns")
 

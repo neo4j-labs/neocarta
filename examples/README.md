@@ -31,7 +31,7 @@ python bigquery.py --skip-embeddings
 ```
 
 #### `collibra.py` - Collibra Data Catalog Connector
-Extract metadata from Collibra (Communities, Domains, Assets, Attributes, Relations, Lineage) and load into Neo4j.
+Extract metadata from Collibra and load into Neo4j, running both source sub-connectors: `CollibraSchemaConnector` (Database/Schema/Table/Column) then `CollibraGlossaryConnector` (Glossary/Category/BusinessTerm + `TAGGED_WITH` tags).
 
 **Usage:**
 ```bash

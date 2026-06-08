@@ -1,5 +1,6 @@
 """Collibra schema transformer: build Database/Schema/Table/Column subtype nodes."""
 
+import warnings
 from dataclasses import dataclass
 
 from ....data_model.rdbms import (
@@ -12,6 +13,7 @@ from ....data_model.rdbms import (
     HasTable,
 )
 from ....enums import NodeLabel, RelationshipType
+from ....warnings import UnresolvedCollibraParentWarning
 from ...utils.generate_id import (
     generate_column_id,
     generate_database_id,
@@ -19,6 +21,8 @@ from ...utils.generate_id import (
     generate_table_id,
 )
 from .extract import CollibraSchemaExtractor
+
+_MAX_SKIPPED_PREVIEW = 10
 
 
 @dataclass
@@ -163,10 +167,13 @@ class CollibraSchemaTransformer:
         """Build Column nodes + HAS_COLUMN, resolving each column's parent table."""
         emit_node = _included(NodeLabel.COLUMN, include_nodes)
         emit_rel = _included(RelationshipType.HAS_COLUMN, include_relationships)
+        skipped: list[str] = []
         for row in extractor.column_info.to_dict("records"):
             parent = table_context.get(row["table_collibra_id"])
             if parent is None:
-                # Column whose parent table is out of scope — cannot build a stable id.
+                # Column whose parent table is out of scope — a stable column id
+                # requires its table, so it is skipped (reported below).
+                skipped.append(row["asset_name"])
                 continue
             column_id = generate_column_id(
                 parent.database_name, parent.schema_name, parent.table_name, row["asset_name"]
@@ -186,3 +193,18 @@ class CollibraSchemaTransformer:
                 self.has_column_relationships.append(
                     HasColumn(table_id=parent.table_id, column_id=column_id)
                 )
+        self._warn_skipped_columns(skipped)
+
+    @staticmethod
+    def _warn_skipped_columns(skipped: list[str]) -> None:
+        """Emit a single aggregated warning for columns dropped for lack of a parent table."""
+        if not skipped:
+            return
+        preview = ", ".join(sorted(skipped)[:_MAX_SKIPPED_PREVIEW])
+        suffix = ", …" if len(skipped) > _MAX_SKIPPED_PREVIEW else ""
+        warnings.warn(
+            f"Skipped {len(skipped)} Collibra column(s) whose parent table was not in "
+            f"scope (a stable column id requires its table): {preview}{suffix}.",
+            UnresolvedCollibraParentWarning,
+            stacklevel=2,
+        )

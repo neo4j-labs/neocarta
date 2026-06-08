@@ -89,7 +89,9 @@ class CollibraGlossaryExtractor:
         print("Extracting Collibra glossary metadata...")
         domains = self._extract_glossary_domains(resolver, community_ids, domain_ids)
         term_ids = self._extract_assets(resolver, domains, asset_type_names, include_nodes)
-        self._extract_term_categories(resolver, term_ids, include_relationships)
+        # Term→category is always resolved: it feeds the term id (glossary.category.term),
+        # so it must not depend on whether the HAS_BUSINESS_TERM edge is requested.
+        self._extract_term_categories(resolver, term_ids)
         self._extract_tagged_with(resolver, term_ids, include_relationships)
 
     # ------------------------------------------------------------------ #
@@ -182,14 +184,8 @@ class CollibraGlossaryExtractor:
         self,
         resolver: CollibraTypeResolver,
         term_ids: set[str],
-        include_relationships: list[RelationshipType] | None,
     ) -> None:
         """Resolve each term's parent category UUID from category→term relations."""
-        if (
-            include_relationships is not None
-            and RelationshipType.HAS_BUSINESS_TERM not in include_relationships
-        ):
-            return
         bt = self.business_term_info
         if bt.empty or not term_ids:
             return

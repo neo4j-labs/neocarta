@@ -1,6 +1,15 @@
 """
 Collibra Data Catalog → Neo4j connector example.
 
+Runs both Collibra source sub-connectors:
+
+* ``CollibraSchemaConnector``   — physical layer (Database/Schema/Table/Column)
+* ``CollibraGlossaryConnector`` — business glossary (Glossary/Category/BusinessTerm)
+  plus ``TAGGED_WITH`` tags from columns/tables to business terms.
+
+Run the schema connector first so the glossary connector's ``TAGGED_WITH`` edges
+resolve against the Table/Column nodes it created (matched by ``collibra_id``).
+
 Set the following environment variables before running:
 
     Required:
@@ -10,7 +19,7 @@ Set the following environment variables before running:
         NEO4J_PASSWORD       Neo4j password
 
     Authentication (one of):
-        COLLIBRA_TOKEN       JWT Bearer token  (preferred for production)
+        COLLIBRA_TOKEN       JWT / OAuth bearer token  (preferred for production)
         COLLIBRA_USERNAME    Collibra username  (basic auth)
         COLLIBRA_PASSWORD    Collibra password  (basic auth)
 
@@ -26,38 +35,44 @@ import os
 
 from neo4j import GraphDatabase
 
-from neocarta.connectors.collibra import CollibraConnector
+from neocarta.connectors.collibra import (
+    CollibraClient,
+    CollibraGlossaryConnector,
+    CollibraSchemaConnector,
+)
+
+
+def _split_env(name: str) -> list[str] | None:
+    """Parse a comma-separated env var into a list, or None when unset."""
+    raw = os.environ.get(name)
+    return raw.split(",") if raw else None
 
 
 def main() -> None:
-    """Run the Collibra → Neo4j ETL pipeline."""
-    collibra_url = os.environ["COLLIBRA_URL"]
+    """Run the Collibra → Neo4j ETL pipeline (schema, then glossary)."""
     neo4j_uri = os.environ["NEO4J_URI"]
     neo4j_user = os.environ.get("NEO4J_USERNAME", "neo4j")
     neo4j_password = os.environ["NEO4J_PASSWORD"]
 
-    token = os.environ.get("COLLIBRA_TOKEN")
-    username = os.environ.get("COLLIBRA_USERNAME")
-    password = os.environ.get("COLLIBRA_PASSWORD")
+    # The CollibraClient holds the URL + credentials (long-lived resources).
+    client = CollibraClient(
+        base_url=os.environ["COLLIBRA_URL"],
+        token=os.environ.get("COLLIBRA_TOKEN"),
+        username=os.environ.get("COLLIBRA_USERNAME"),
+        password=os.environ.get("COLLIBRA_PASSWORD"),
+    )
 
-    community_ids_raw = os.environ.get("COLLIBRA_COMMUNITY_IDS")
-    community_ids = community_ids_raw.split(",") if community_ids_raw else None
-
-    domain_ids_raw = os.environ.get("COLLIBRA_DOMAIN_IDS")
-    domain_ids = domain_ids_raw.split(",") if domain_ids_raw else None
+    # Per-call scope filters are passed to .ingest().
+    community_ids = _split_env("COLLIBRA_COMMUNITY_IDS")
+    domain_ids = _split_env("COLLIBRA_DOMAIN_IDS")
 
     with GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password)) as driver:
-        connector = CollibraConnector(
-            collibra_url=collibra_url,
-            neo4j_driver=driver,
-            token=token,
-            username=username,
-            password=password,
-            community_ids=community_ids,
-            domain_ids=domain_ids,
-            include_lineage=True,
+        CollibraSchemaConnector(client=client, neo4j_driver=driver).ingest(
+            community_ids=community_ids, domain_ids=domain_ids
         )
-        connector.run(overwrite_existing=False)
+        CollibraGlossaryConnector(client=client, neo4j_driver=driver).ingest(
+            community_ids=community_ids, domain_ids=domain_ids
+        )
 
     print("Collibra ingestion complete.")
 

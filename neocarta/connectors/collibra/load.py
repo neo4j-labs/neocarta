@@ -14,6 +14,8 @@ ids across connectors.
 
 from functools import partial
 
+from neo4j import Driver
+
 from ...data_model.rdbms import (
     CollibraBusinessTerm,
     CollibraCategory,
@@ -35,9 +37,9 @@ _COLLIBRA_ID = "collibra_id"
 class CollibraNeo4jLoader(Neo4jRDBMSLoader):
     """Neo4j loader with Collibra subtype + ``TAGGED_WITH``-by-``collibra_id`` loaders."""
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, neo4j_driver: Driver, database_name: str = "neo4j") -> None:
         """Initialise the base loader and the ``collibra_id`` range-index helper."""
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        super().__init__(neo4j_driver, database_name)
         self._create_collibra_id_range_index = partial(
             create_range_index,
             neo4j_driver=self.neo4j_driver,

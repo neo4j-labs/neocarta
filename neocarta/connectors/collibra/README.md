@@ -2,11 +2,24 @@
 
 ## Overview
 
-This connector reads metadata from the [Collibra Data Catalog](https://www.collibra.com/product/data-catalog/) REST API and loads it into Neo4j following the neocarta graph data model. It maps Collibra's three-level hierarchy (Communities → Domains → Assets) to the structural and semantic node types defined in this library.
+This connector reads metadata from [Collibra Data Intelligence Cloud](https://www.collibra.com/) via the Core REST API v2 and loads it into Neo4j following the neocarta graph data model. It maps Collibra's `Community → Domain → Asset` hierarchy onto the structural and semantic node types defined in this library. Every node it produces carries its source Collibra UUID in a `collibra_id` property and a Collibra-specific secondary label (e.g. `:Table:CollibraTable`), so a re-sync can recognise nodes neocarta sourced from Collibra without disturbing nodes from other connectors.
 
-## Data Model
+## Connector type
 
-### Structural metadata (physical data layer)
+**Source** connector (ingest only). It provides two data-type sub-connectors over the same REST API:
+
+| Sub-connector | Class | Produces |
+|---|---|---|
+| `schema/` | `CollibraSchemaConnector` | physical layer: Database, Schema, Table, Column |
+| `glossary/` | `CollibraGlossaryConnector` | business glossary: Glossary, Category, BusinessTerm, and `TAGGED_WITH` tags |
+
+Run the schema sub-connector first when you want `TAGGED_WITH` edges: the glossary connector matches the tagged Table/Column by `collibra_id`, so those nodes should already exist.
+
+## Data model
+
+Collibra nodes are written as subclasses of the core node types, sharing the core label plus a `Collibra*` secondary label. The mermaid below shows the core labels; each also carries the matching `Collibra*` label and a `collibra_id` property.
+
+### Physical layer (`CollibraSchemaConnector`)
 
 ```mermaid
 ---
@@ -14,29 +27,26 @@ config:
     layout: elk
 ---
 graph LR
-Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>platform: STRING<br/>collibra_id: STRING")
-Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>collibra_id: STRING")
-Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING")
-Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING")
+Database("Database:CollibraDatabase<br/>id: STRING | KEY<br/>name: STRING<br/>platform: STRING<br/>collibra_id: STRING")
+Schema("Schema:CollibraSchema<br/>id: STRING | KEY<br/>name: STRING<br/>collibra_id: STRING")
+Table("Table:CollibraTable<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING<br/>collibra_asset_type: STRING")
+Column("Column:CollibraColumn<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING<br/>collibra_asset_type: STRING")
 
 Database -->|HAS_SCHEMA| Schema
 Schema -->|HAS_TABLE| Table
 Table -->|HAS_COLUMN| Column
-Column -->|TAGGED_WITH| BusinessTerm
-Table -->|TAGGED_WITH| BusinessTerm
-Table -->|FLOWS_INTO| Table
 ```
 
-Collibra mapping:
-
-| Collibra entity | Neocarta node |
+| Collibra entity | neocarta node |
 |---|---|
-| Community | `Database` |
-| Domain (Physical Data Dictionary type) | `Schema` |
-| Asset type = Table / Data Set / Report / View | `Table` |
-| Asset type = Column / Field / Report Attribute | `Column` |
+| Community | `Database` (`CollibraDatabase`) |
+| Domain (Physical Data Dictionary / Physical Data Model / Data Asset Catalog) | `Schema` (`CollibraSchema`) |
+| Asset type = Table / Data Set / Database View / View | `Table` (`CollibraTable`) |
+| Asset type = Column / Field / Report Attribute | `Column` (`CollibraColumn`) |
 
-### Semantic metadata (business glossary layer)
+Columns are attached to their parent table using the Collibra "Table contains Column" relation, which also supplies the table segment of each column's deterministic id.
+
+### Business glossary (`CollibraGlossaryConnector`)
 
 ```mermaid
 ---
@@ -44,129 +54,89 @@ config:
     layout: elk
 ---
 graph LR
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>collibra_id: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>collibra_id: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING")
+Glossary("Glossary:CollibraGlossary<br/>id: STRING | KEY<br/>name: STRING<br/>collibra_id: STRING")
+Category("Category:CollibraCategory<br/>id: STRING | KEY<br/>name: STRING<br/>status: STRING<br/>collibra_id: STRING")
+BusinessTerm("BusinessTerm:CollibraBusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>status: STRING<br/>collibra_id: STRING")
+Tagged("Table / Column")
 
 Glossary -->|HAS_CATEGORY| Category
 Category -->|HAS_BUSINESS_TERM| BusinessTerm
+Tagged -->|TAGGED_WITH| BusinessTerm
 ```
 
-Collibra mapping:
-
-| Collibra entity | Neocarta node |
+| Collibra entity | neocarta node |
 |---|---|
-| Domain (Business Glossary type) | `Glossary` |
-| Asset type = Data Domain / Sub Domain | `Category` |
-| Asset type = Business Term | `BusinessTerm` |
+| Domain (Business Glossary / Business Terminology / Policy Glossary / Reference Data) | `Glossary` (`CollibraGlossary`) |
+| Asset type = Data Category / Data Domain / Sub Domain | `Category` (`CollibraCategory`) |
+| Asset type = Business Term | `BusinessTerm` (`CollibraBusinessTerm`) |
 
-### Unknown / custom asset types
-
-Asset types not covered by the mappings above produce a generic `CatalogAsset` node connected to its parent domain via a `HAS_ASSET` relationship. The original Collibra asset type name is stored in the `asset_type` property.
-
-### Technical lineage
-
-When `include_lineage=True` (the default), the connector calls the Catalog Technical Lineage API (`GET /rest/catalog/1.0/asset/{id}/outboundLineage`) for each Table and Column asset and creates `FLOWS_INTO` relationships between the source and target nodes.
-
-## Authentication
-
-Two modes are supported — pass exactly one:
-
-| Mode | Parameters |
-|---|---|
-| Bearer token (recommended for production) | `token="<jwt>"` |
-| Basic auth (username + password) | `username="..."`, `password="..."` |
-
-Basic auth calls `POST /rest/2.0/auth/sessions` on first use and reuses the resulting session cookie for all subsequent requests.
+`TAGGED_WITH` edges are built from Collibra "associated with business term" relations. The tagged asset is matched by `collibra_id` (backed by a per-label range index), so a column ingested by the schema connector can be tagged by the glossary connector without recomputing its id.
 
 ## Usage
-
-### Minimal example
 
 ```python
 import os
 from neo4j import GraphDatabase
-from neocarta.connectors.collibra import CollibraConnector
+from neocarta.connectors.collibra import (
+    CollibraClient,
+    CollibraGlossaryConnector,
+    CollibraSchemaConnector,
+)
+
+# The client holds the long-lived URL + credentials.
+client = CollibraClient(
+    base_url=os.environ["COLLIBRA_URL"],
+    token=os.environ["COLLIBRA_TOKEN"],   # or username=... , password=...
+)
 
 with GraphDatabase.driver(
     os.environ["NEO4J_URI"],
     auth=(os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"]),
 ) as driver:
-    connector = CollibraConnector(
-        collibra_url=os.environ["COLLIBRA_URL"],
-        neo4j_driver=driver,
-        token=os.environ["COLLIBRA_TOKEN"],   # or username= / password=
-    )
-    connector.run()
+    # Schema first, then glossary (so TAGGED_WITH resolves against Table/Column nodes).
+    CollibraSchemaConnector(client=client, neo4j_driver=driver).ingest()
+    CollibraGlossaryConnector(client=client, neo4j_driver=driver).ingest()
 ```
 
-### Scoped extraction
+### Per-call scope and filtering
 
-Restrict extraction to specific communities, domains, or asset types to reduce API calls and graph size:
+Scope inputs and graph-type filters are passed to `.ingest()` / `.extract()`:
 
 ```python
-connector = CollibraConnector(
-    collibra_url=os.environ["COLLIBRA_URL"],
-    neo4j_driver=driver,
-    token=os.environ["COLLIBRA_TOKEN"],
-    community_ids=["<uuid-1>", "<uuid-2>"],   # restrict to these communities
-    domain_ids=["<uuid-3>"],                   # restrict to these domains
-    asset_type_names=["Table", "Column", "Business Term"],
-    include_lineage=False,                     # skip lineage for faster runs
+CollibraSchemaConnector(client=client, neo4j_driver=driver).ingest(
+    community_ids=["<uuid-1>"],          # restrict to these communities
+    domain_ids=["<uuid-2>"],             # restrict to these domains
+    asset_type_names=["Table", "Column"],  # restrict to these Collibra asset types
+    include_nodes=[NodeLabel.TABLE, NodeLabel.COLUMN],
+    include_relationships=[RelationshipType.HAS_COLUMN],
 )
-connector.run()
 ```
 
-### Step-by-step ETL
+`include_nodes` / `include_relationships` take values from `neocarta.enums.NodeLabel` / `RelationshipType`:
 
-```python
-connector = CollibraConnector(...)
+| Sub-connector | `include_nodes` | `include_relationships` |
+|---|---|---|
+| schema | `DATABASE`, `SCHEMA`, `TABLE`, `COLUMN` | `HAS_SCHEMA`, `HAS_TABLE`, `HAS_COLUMN` |
+| glossary | `GLOSSARY`, `CATEGORY`, `BUSINESS_TERM` | `HAS_CATEGORY`, `HAS_BUSINESS_TERM`, `TAGGED_WITH` |
 
-connector.extract_metadata()          # pulls DataFrames from Collibra REST API
-connector.transform_metadata()        # converts DataFrames to neocarta model objects
-connector.load_metadata(overwrite_existing=True)  # writes to Neo4j
-```
-
-## Environment Variables
+### Environment variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `COLLIBRA_URL` | Yes | Root URL, e.g. `https://myorg.collibra.com` |
-| `COLLIBRA_TOKEN` | One of | JWT Bearer token (production auth) |
-| `COLLIBRA_USERNAME` | One of | Collibra username (basic auth) |
-| `COLLIBRA_PASSWORD` | With username | Collibra password (basic auth) |
-| `NEO4J_URI` | Yes | Neo4j bolt URI, e.g. `neo4j+s://xxx.databases.neo4j.io` |
-| `NEO4J_USERNAME` | Yes | Neo4j username |
-| `NEO4J_PASSWORD` | Yes | Neo4j password |
-| `NEO4J_DATABASE` | No | Neo4j database name (default: `neo4j`) |
+| `COLLIBRA_TOKEN` | One of | JWT / OAuth bearer token (production auth) |
+| `COLLIBRA_USERNAME` / `COLLIBRA_PASSWORD` | One of | Basic-auth credentials |
+| `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | Yes | Neo4j connection |
+| `NEO4J_DATABASE` | No | Neo4j database name (default `neo4j`) |
 
-Optional scope filters (comma-separated UUID lists):
+## Source-specific setup
 
-| Variable | Description |
-|---|---|
-| `COLLIBRA_COMMUNITY_IDS` | Restrict extraction to these community UUIDs |
-| `COLLIBRA_DOMAIN_IDS` | Restrict extraction to these domain UUIDs |
+- **Authentication** — pass exactly one of: a bearer `token` (JWT or OAuth client-credentials access token), or `username` + `password`. Basic auth establishes a session via `POST /rest/2.0/auth/sessions` and reuses the session cookie.
+- **API endpoints used** — `/rest/2.0/{assetTypes,domainTypes,relationTypes}` (type discovery), `/rest/2.0/communities`, `/rest/2.0/domains`, `/rest/2.0/assets`, `/rest/2.0/attributes` (per asset, single `assetId`), `/rest/2.0/relations` (by `relationTypeId`).
+- **Type mapping** — Collibra type display names are customer-configurable; the alias tables in `type_mapping.py` cover the standard operating model. Override-by-instance can be added there.
 
-## Connector Components
+## Known issues / limitations
 
-| Class | Module | Responsibility |
-|---|---|---|
-| `CollibraClient` | `client.py` | HTTP client with auth, pagination, and 429 retry |
-| `CollibraExtractor` | `extract.py` | Calls REST API and returns DataFrames |
-| `CollibraTransformer` | `transform.py` | Maps DataFrames to neocarta model objects |
-| `CollibraConnector` | `connector.py` | Orchestrates extract → transform → load |
-
-## API Endpoints Used
-
-| Endpoint | Purpose |
-|---|---|
-| `POST /rest/2.0/auth/sessions` | Basic auth session establishment |
-| `GET /rest/2.0/assetTypes` | Type UUID discovery |
-| `GET /rest/2.0/domainTypes` | Type UUID discovery |
-| `GET /rest/2.0/relationTypes` | Type UUID discovery |
-| `GET /rest/2.0/communities` | Community extraction |
-| `GET /rest/2.0/domains` | Domain extraction |
-| `GET /rest/2.0/assets` | Asset extraction |
-| `GET /rest/2.0/attributes` | Attribute extraction (batched, ≤100 IDs per request) |
-| `GET /rest/2.0/relations` | Relation extraction |
-| `GET /rest/catalog/1.0/asset/{id}/outboundLineage` | Technical lineage (optional) |
+- **Technical lineage is not yet produced.** Collibra materialises lineage as relations of specific lineage relation types; deriving `FLOWS_INTO` from those is deferred to a follow-up.
+- **First-class non-schema/glossary asset types are not modelled.** Asset types outside each sub-connector's scope (Report, Data Quality Rule, Policy, Data Source, …) are skipped and reported once via `UnmappedCollibraAssetTypeWarning` rather than coerced into an ill-fitting node; mapping them is deferred to follow-ups.
+- **Columns whose parent table is out of scope are skipped**, since a stable column id (`database.schema.table.column`) requires its table. This happens when scoping captures a column but not its table, the "Table contains Column" relation is missing, or the parent failed type classification. Skipped columns are reported via `UnresolvedCollibraParentWarning` (so to capture all columns, extract their tables too).

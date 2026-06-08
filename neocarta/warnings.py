@@ -61,3 +61,23 @@ class UnmappedCollibraAssetTypeWarning(NeocartaWarning):
 
         warnings.filterwarnings("ignore", category=UnmappedCollibraAssetTypeWarning)
     """
+
+
+class UnresolvedCollibraParentWarning(NeocartaWarning):
+    """
+    Emitted when a Collibra column is skipped because its parent table is out of scope.
+
+    A column's neocarta id is hierarchical (``database.schema.table.column``), so a
+    stable id requires the parent table. When the "Table contains Column" relation
+    points to a table that was not extracted — e.g. scoping (``community_ids`` /
+    ``domain_ids`` / ``asset_type_names``) captured the column but not its table, the
+    relation is missing, or the table failed type classification — the column is
+    skipped rather than given an ambiguous id, and reported through this warning.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import UnresolvedCollibraParentWarning
+
+        warnings.filterwarnings("ignore", category=UnresolvedCollibraParentWarning)
+    """
