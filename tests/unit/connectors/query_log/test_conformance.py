@@ -1,7 +1,7 @@
 """Conformance tests for QueryLogConnector.
 
 Asserts conformance with the public connector standard defined in
-``.claude/skills/add-source-connector/SKILL.md`` and codified in
+``.claude/skills/add-source-connector/connector-contract.md`` and codified in
 ``neocarta.connectors._base``.
 """
 

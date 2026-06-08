@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Scaffold and verify neocarta source/format connectors against the contract.
 
-The connector contract lives in this skill's ``SKILL.md`` and is
+The connector contract lives in this skill's ``connector-contract.md`` and is
 made executable by ``neocarta/connectors/_base.py`` (the runtime-checkable
 ``SourceConnectorProtocol`` / ``FormatConnectorProtocol``) plus the per-connector
 ``test_conformance.py`` files. This driver is the agent-facing handle on that
@@ -13,9 +13,9 @@ contract:
 
 Run it through the managed environment, e.g.::
 
-    uv run .claude/skills/add-source-connector/driver.py list
-    uv run .claude/skills/add-source-connector/driver.py scaffold salesforce
-    uv run .claude/skills/add-source-connector/driver.py verify salesforce
+    uv run .claude/skills/add-source-connector/scripts/driver.py list
+    uv run .claude/skills/add-source-connector/scripts/driver.py scaffold salesforce
+    uv run .claude/skills/add-source-connector/scripts/driver.py verify salesforce
 
 ``<pkg>`` is a path under ``neocarta/connectors/`` — ``salesforce`` for a flat
 single-data-type source, ``salesforce/schema`` for a data-type sub-connector.
@@ -32,7 +32,7 @@ import sys
 
 from neocarta.connectors._base import FormatConnectorProtocol, SourceConnectorProtocol
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[4]
 CONNECTORS_DIR = REPO_ROOT / "neocarta" / "connectors"
 TESTS_DIR = REPO_ROOT / "tests" / "unit" / "connectors"
 
@@ -343,7 +343,7 @@ def _conformance_test(pkg: str, class_name: str, is_format: bool) -> str:
     return f'''"""Conformance tests for {class_name}.
 
 Asserts conformance with the public connector standard defined in
-``.claude/skills/add-source-connector/SKILL.md`` and codified in
+``.claude/skills/add-source-connector/connector-contract.md`` and codified in
 ``neocarta.connectors._base``.
 """
 
