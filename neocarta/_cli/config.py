@@ -26,7 +26,11 @@ ENV_VARS: dict[str, str] = {
     "NEO4J_USERNAME": "Neo4j username.",
     "NEO4J_PASSWORD": "Neo4j password (secret).",
     "NEO4J_DATABASE": "Neo4j database name (default: neo4j).",
-    "OPENAI_API_KEY": "OpenAI API key for embeddings (secret).",
+    "OPENAI_API_KEY": (
+        "Embedding-provider API key, read by LiteLLM (secret). OpenAI uses "
+        "OPENAI_API_KEY; other providers use their own vars (GEMINI_API_KEY, "
+        "COHERE_API_KEY, AZURE_*, AWS_*, ...)."
+    ),
     "GCP_PROJECT_ID": "Google Cloud project ID.",
     "GCP_PROJECT_NUMBER": "Google Cloud project number (for `dataplex *`).",
     "BIGQUERY_DATASET_ID": "Default BigQuery dataset ID.",
@@ -52,10 +56,13 @@ class CLISettings(BaseSettings):
     neo4j_password: SecretStr | None = Field(default=None, validation_alias="NEO4J_PASSWORD")
     neo4j_database: str = Field(default="neo4j", validation_alias="NEO4J_DATABASE")
 
-    # Embeddings / OpenAI
-    openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    # Embeddings (LiteLLM, multi-provider). Provider auth (OPENAI_API_KEY,
+    # GEMINI_API_KEY, AZURE_*, AWS_*, ...) is read directly from the environment
+    # by LiteLLM, so no API key is parsed onto this settings object.
     embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 768
+    # None => let LiteLLM use the model's native dimension. Set via
+    # --embedding-dimensions to request truncation on models that support it.
+    embedding_dimensions: int | None = None
     embedding_batch_size: int = 100
 
     # BigQuery

@@ -24,7 +24,7 @@ from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
 from ..output import emit_json
-from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings
+from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _run_embeddings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -66,6 +66,7 @@ def _run_ingest(
     body: dict[str, Any] = {**plan, "database": settings.neo4j_database, "embeddings": embeddings}
     if embeddings:
         body["embedding_model"] = settings.embedding_model
+        body["embedding_dimensions"] = settings.embedding_dimensions
         body["node_labels"] = [label.value for label in node_labels]
 
     if dry_run:
@@ -88,7 +89,7 @@ def _run_ingest(
             if embeddings:
                 stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=node_labels)
+                _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -132,6 +133,12 @@ def _run_ingest(
     help="LiteLLM embedding model name (default: text-embedding-3-small).",
 )
 @click.option(
+    "--embedding-dimensions",
+    type=int,
+    default=None,
+    help="Embedding vector dimensions (default: auto-detected from the model).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -154,6 +161,7 @@ def dataplex_schema(
     dataset_id: str | None,
     embeddings: bool,
     embedding_model: str | None,
+    embedding_dimensions: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -188,6 +196,8 @@ def dataplex_schema(
     )
     if embedding_model is not None:
         settings.embedding_model = embedding_model
+    if embedding_dimensions is not None:
+        settings.embedding_dimensions = embedding_dimensions
 
     def make_connector(driver: Driver) -> Any:
         # Lazy imports: heavy GCP / connector deps only load when the command runs.
@@ -254,6 +264,12 @@ def dataplex_schema(
     help="LiteLLM embedding model name (default: text-embedding-3-small).",
 )
 @click.option(
+    "--embedding-dimensions",
+    type=int,
+    default=None,
+    help="Embedding vector dimensions (default: auto-detected from the model).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -276,6 +292,7 @@ def dataplex_glossary(
     entry_links: bool,
     embeddings: bool,
     embedding_model: str | None,
+    embedding_dimensions: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -307,6 +324,8 @@ def dataplex_glossary(
     )
     if embedding_model is not None:
         settings.embedding_model = embedding_model
+    if embedding_dimensions is not None:
+        settings.embedding_dimensions = embedding_dimensions
 
     def make_connector(driver: Driver) -> Any:
         # Lazy imports: heavy GCP / connector deps only load when the command runs.
