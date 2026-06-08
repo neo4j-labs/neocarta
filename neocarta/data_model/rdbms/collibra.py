@@ -12,7 +12,7 @@ glossary sub-connectors (e.g. ``(:Column)-[:TAGGED_WITH]->(:BusinessTerm)``) —
 without recomputing deterministic ids across connectors.
 """
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from .core import Column, Database, Schema, Table
 from .expanded import BusinessTerm, Category, Glossary
@@ -89,3 +89,21 @@ class CollibraBusinessTerm(BusinessTerm):
         default=None,
         description="Collibra governance status (e.g. Candidate, Accepted, Deprecated)",
     )
+
+
+class CollibraTaggedWith(BaseModel):
+    """
+    A ``TAGGED_WITH`` edge from a tagged catalog asset to a Business Term.
+
+    ``(:Table|:Column)-[:TAGGED_WITH]->(:BusinessTerm)``.
+
+    The tagged source asset is identified by its Collibra UUID rather than a
+    neocarta node id: the source node (a ``CollibraTable``/``CollibraColumn``)
+    is produced by the schema sub-connector, while this edge is produced by the
+    glossary sub-connector, so the loader matches the source by ``collibra_id``
+    (backed by the per-label ``collibra_id`` range index) instead of recomputing
+    the source's deterministic id across connectors.
+    """
+
+    source_collibra_id: str = Field(..., description="UUID of the tagged Collibra asset")
+    business_term_id: str = Field(..., description="neocarta id of the target Business Term node")

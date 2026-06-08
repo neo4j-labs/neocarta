@@ -5,6 +5,8 @@ from typing import Any, Self
 
 import httpx
 
+from ...errors import AuthError
+
 _DEFAULT_PAGE_SIZE = 100
 _MAX_RETRIES = 4
 _RETRY_BASE_SECONDS = 1.0
@@ -39,7 +41,7 @@ class CollibraClient:
 
     Raises:
     ------
-    ValueError
+    AuthError
         If neither (username + password) nor token is provided.
     """
 
@@ -54,7 +56,10 @@ class CollibraClient:
     ) -> None:
         """Initialise the client and authenticate."""
         if not token and not (username and password):
-            raise ValueError("Provide either (username, password) or token.")
+            raise AuthError(
+                "Collibra authentication requires either (username, password) or token.",
+                suggestion="Pass username + password, or a JWT/OAuth bearer token, to CollibraClient.",
+            )
 
         self._base_url = base_url.rstrip("/")
         self._page_size = page_size

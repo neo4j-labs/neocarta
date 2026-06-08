@@ -1,5 +1,15 @@
 """RDBMS data model nodes and relationships."""
 
+from .collibra import (
+    CollibraBusinessTerm,
+    CollibraCategory,
+    CollibraColumn,
+    CollibraDatabase,
+    CollibraGlossary,
+    CollibraSchema,
+    CollibraTable,
+    CollibraTaggedWith,
+)
 from .core import (
     Column,
     Database,
@@ -9,15 +19,6 @@ from .core import (
     References,
     Schema,
     Table,
-)
-from .collibra import (
-    CollibraBusinessTerm,
-    CollibraCategory,
-    CollibraColumn,
-    CollibraDatabase,
-    CollibraGlossary,
-    CollibraSchema,
-    CollibraTable,
 )
 from .expanded import (
     CTE,
@@ -65,6 +66,7 @@ __all__ = [
     "CollibraGlossary",
     "CollibraSchema",
     "CollibraTable",
+    "CollibraTaggedWith",
     "Column",
     "Database",
     "Defines",

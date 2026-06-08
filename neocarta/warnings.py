@@ -42,3 +42,22 @@ class UnsupportedOsiVersionWarning(NeocartaWarning):
 
         warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
     """
+
+
+class UnmappedCollibraAssetTypeWarning(NeocartaWarning):
+    """
+    Emitted when the Collibra connector encounters asset types it does not model.
+
+    Each Collibra sub-connector maps only the asset types within its scope
+    (schema → Table/Column; glossary → Data Category/Business Term). Collibra
+    ships many other first-class asset types (Report, Data Quality Rule, Policy,
+    Data Source, …); assets of those types are skipped and reported through this
+    warning rather than coerced into an ill-fitting node label.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import UnmappedCollibraAssetTypeWarning
+
+        warnings.filterwarnings("ignore", category=UnmappedCollibraAssetTypeWarning)
+    """
