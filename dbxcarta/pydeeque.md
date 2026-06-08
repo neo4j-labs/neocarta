@@ -548,7 +548,9 @@ Phase 3 deletes the old copy, so the finished state has one definition and no
 shim.
 
 **Status: Phase 1 done. Phase 2 check derivation done (not yet wired into the
-Spark pipeline). Phase 3 not started.**
+Spark pipeline). The gating prerequisite is cleared for local dev: a Deequ JAR for
+Spark 4.1 now exists and a smoke test passed on local Spark 4.1.2 (see the gating
+section). Phase 3 not started.**
 
 ### Phase 1 — Build `carta-schema` (DONE)
 
@@ -602,9 +604,10 @@ Done (check derivation, no pipeline changes):
 
 Not done (pipeline wiring, gated on the prerequisite below):
 
-- [ ] Confirm the gating prerequisite below: PyDeequ and the Deequ JAR run on the
-      target Databricks cluster. Local dev has Spark 4.1, which has no matching
-      Deequ JAR, so the live run cannot be proven here.
+- [ ] Confirm the gating prerequisite below on the target Databricks cluster. The
+      local Spark 4.1.2 smoke test now passes (see the gating section), so the
+      JAR-to-runtime match is proven for local dev; the cluster still needs its own
+      confirmation.
 - [ ] Add `pydeequ` to `dbxcarta-spark`'s dependencies, and add the Deequ Maven
       JAR to the cluster and submit config.
 - [ ] Call `verify_shape` in `run.py`: after `_project` in `_write_label_nodes()`,
@@ -628,21 +631,83 @@ The final cut. After this there is one definition and the old path is gone.
       move did not alter behavior.
 - [ ] Update neocarta's `CHANGELOG.md`.
 
-## Gating prerequisite: confirm first
+## Gating prerequisite: status and what we learned
 
-PyDeequ plus the Deequ JAR on the target Databricks runtime gates the whole phase.
-Confirm it before writing the check code:
+PyDeequ plus the Deequ JAR on the target runtime gates the whole phase. When this
+proposal was first written, the concern was that Deequ topped out at Spark 3.5 and
+local dev ran Spark 4.1.2 with no matching Deequ JAR, so the live run could not be
+proven here. That has changed. As of June 2026 the JAR exists, and a local smoke
+test on Spark 4.1.2 passed.
 
-- dbxcarta targets `pyspark>=3.5`. Confirm the cluster's exact Spark and DBR
-  version, then install the matching Deequ Maven JAR, for example
-  `com.amazon.deequ:deequ:<ver>-spark-3.5`, on the submit cluster, excluding
-  `net.sourceforge.f2j:arpack_combined_all`.
-- `pip install pydeequ` on the cluster, and set the `SPARK_VERSION` env var before
-  the first `import pydeequ`. PyDeequ reads it to pick the JAR coordinate.
-- PyDeequ has lagged Spark support in the past, see awslabs/python-deequ issue 192.
-  Spark 3.5 is supported now, but the JAR-to-runtime match is the classic failure
-  point. Verify a trivial `VerificationSuite(...).run()` succeeds on the actual
-  cluster before building the derivation layer.
+### What changed since the first draft
+
+- **A Spark 4.1 Deequ JAR now exists.** `com.amazon.deequ:deequ:2.0.18-spark-4.1`
+  was published on 2026-06-04, alongside `2.0.18-spark-3.5` and a new `3.0.x-spark-3.5`
+  line. The JVM side is no longer the blocker. The Deequ project ships a separate
+  JAR per Spark minor version (`-spark-3.1/3.2/3.3/3.5/4.0/4.1`), so you must use
+  the build that matches the runtime, not a near one.
+- **PyDeequ added Spark 4 support, but it is not on PyPI yet.** PR #259
+  (`awslabs/python-deequ`) added Spark 4.0 and widened the `pyspark` pin to
+  `<5.0.0`. It merged on 2026-04-28, but into the `release/1.0.0-spark-4.0` branch,
+  not `master`. The released wheels (`1.4.0` stable, `2.0.0b1` beta) still cap at
+  Spark 3.5. So Spark 4 support today means installing PyDeequ from that branch.
+- **PyDeequ's version-to-JAR mapping keys on `major.minor`.** `configs.py` holds
+  `SPARK_TO_DEEQU_COORD_MAPPING` and looks up the running Spark's `major.minor`
+  (for example `"4.1"`). The branch only ships keys up to `"4.0"`, so on Spark
+  4.1.2 the lookup raises `Found incompatible Spark version 4.1` before any data
+  runs. That is a hard guard in PyDeequ, not a binary incompatibility. Adding one
+  line, `"4.1": "com.amazon.deequ:deequ:2.0.18-spark-4.1"`, clears it.
+- **Spark 4 needs Scala 2.13 and Java 17 or 21.** PR #259 replaced the Scala 2.12
+  collection converters that Scala 2.13 removed. Spark 4.1 runs on Scala 2.13. Use
+  Java 17 or 21. Newer Java (for example 25) is not a supported Spark runtime.
+
+### Local smoke test that passed (Spark 4.1.2)
+
+Run on 2026-06-08 against the local `pyspark==4.1.2` install, in a throwaway venv:
+
+1. Install PyDeequ from the branch:
+   `uv pip install "git+https://github.com/awslabs/python-deequ.git@release/1.0.0-spark-4.0"`
+   (it installs as `pydeequ==1.5.0`).
+2. Add `"4.1": "com.amazon.deequ:deequ:2.0.18-spark-4.1"` to
+   `SPARK_TO_DEEQU_COORD_MAPPING` in the installed `pydeequ/configs.py`, and set
+   `SPARK_VERSION=4.1.2` before importing pydeequ.
+3. Use Java 21 (`JAVA_HOME` to a 21 JDK). The default Java 25 here is not a
+   supported Spark runtime.
+4. Build the session with the Deequ package and a couple of excludes:
+   `spark.jars.packages = pydeequ.deequ_maven_coord`,
+   `spark.jars.excludes = f"{pydeequ.f2j_maven_coord},org.slf4j:slf4j-api"`.
+   Excluding `org.slf4j:slf4j-api` avoids an Ivy resolution failure on the old
+   `1.7.5` transitive; Spark bundles its own slf4j.
+
+A trivial `VerificationSuite` with `isComplete("id")` and `isComplete("name")` over
+a three-row frame with one null `id` returned the correct result: `id` completeness
+`Failure` at 0.667, `name` completeness `Success`, suite status `Error`. Deequ
+translated the checks into a Spark job natively and produced
+`checkResultsAsDataFrame` rows. No `NoSuchMethodError`, no Scala 2.13 breakage, no
+Catalyst-internals mismatch. The fail-closed path the design relies on works.
+
+Two errors seen along the way were local-environment noise, not Deequ:
+`java.net.BindException` on the driver (fixed by `spark.driver.bindAddress` and
+`spark.driver.host` set to `127.0.0.1`, and `SPARK_LOCAL_IP=127.0.0.1`), and
+`PYTHON_VERSION_MISMATCH` from a stray system Python worker (fixed by setting
+`PYSPARK_PYTHON` and `PYSPARK_DRIVER_PYTHON` to the venv interpreter).
+
+### Still to confirm on the target cluster
+
+The local result proves the stack runs, but production targets a Databricks
+runtime, not local Spark. Before wiring it in:
+
+- Confirm the cluster's exact Spark, Scala, and Java version. Databricks Runtime
+  17.x is Spark 4.0 (use the released `"4.0"` coord, `deequ:2.0.14-spark-4.0`);
+  16.x is Spark 3.5. Spark 4.1 is not in a DBR yet.
+- Install the matching Deequ Maven JAR on the cluster, excluding
+  `net.sourceforge.f2j:arpack_combined_all` (and slf4j as above if Ivy resolution
+  fails on it).
+- Decide how to pin PyDeequ. The branch is unreleased and PR #259's CI shows 0 of 2
+  checks passing, so pinning a git ref or vendoring the one-line mapping patch is a
+  supply-chain decision, not a `pip install pydeequ`.
+- Set `SPARK_VERSION` on the cluster before the first `import pydeequ`, and verify a
+  trivial `VerificationSuite(...).run()` succeeds there before building on it.
 
 ## Verification
 
@@ -650,7 +715,9 @@ Confirm it before writing the check code:
    hits. neocarta and dbxcarta both build and import `carta_schema`. The full
    neocarta test suite passes unchanged, which proves the move did not alter
    behavior.
-2. **Gating smoke test.** A trivial Deequ suite runs green on the target cluster.
+2. **Gating smoke test.** A trivial Deequ suite runs green. Done locally on Spark
+   4.1.2 (see the gating section); still to confirm on the target Databricks
+   cluster.
 3. **Unit, no Spark.** `add_model_checks` against each model produces exactly the
    expected constraints: Column gives completeness on id and name plus three
    booleans with Boolean type, Database gives id and name only, References gives
