@@ -23,13 +23,6 @@ def test_neo4j_password_is_secret_str(monkeypatch):
     assert settings.neo4j_password.get_secret_value() == "super-secret-value"
 
 
-def test_openai_api_key_is_secret_str(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-not-a-real-key")
-    settings = CLISettings()
-    assert isinstance(settings.openai_api_key, SecretStr)
-    assert settings.openai_api_key.get_secret_value() == "sk-not-a-real-key"
-
-
 def test_secret_does_not_leak_through_str_or_repr(monkeypatch):
     monkeypatch.setenv("NEO4J_PASSWORD", "super-secret-value")
     settings = CLISettings()
@@ -40,13 +33,11 @@ def test_secret_does_not_leak_through_str_or_repr(monkeypatch):
 
 def test_secret_does_not_leak_through_json_dumps(monkeypatch):
     monkeypatch.setenv("NEO4J_PASSWORD", "super-secret-value")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-not-a-real-key")
     settings = CLISettings()
     # ``default=str`` is the exact path used by ``emit_json`` in output.py.
     # It must NOT round-trip the raw secret value.
     serialized = json.dumps(settings.model_dump(), default=str)
     assert "super-secret-value" not in serialized
-    assert "sk-not-a-real-key" not in serialized
 
 
 def test_require_secret_raises_on_missing():

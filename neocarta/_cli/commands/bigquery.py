@@ -21,6 +21,7 @@ from ._common import (
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
+    _run_embeddings,
 )
 
 
@@ -45,13 +46,13 @@ def bigquery() -> None:
 @click.option(
     "--embedding-model",
     default=None,
-    help="OpenAI embedding model name (default: text-embedding-3-small).",
+    help="Embedding model id in LiteLLM format (default: text-embedding-3-small).",
 )
 @click.option(
     "--embedding-dimensions",
     type=int,
     default=None,
-    help="Embedding vector dimensions (default: 768).",
+    help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
     "--dry-run",
@@ -83,7 +84,7 @@ def bigquery_schema(
     Loads Database, Schema, Table, and Column nodes plus their relationships.
     When --embeddings is enabled (default), description embeddings are
     generated and written back to the graph. Pass --no-embeddings to skip the
-    OpenAI step, or --dry-run to print the planned ingestion without touching
+    embedding step, or --dry-run to print the planned ingestion without touching
     Neo4j or BigQuery. The project ID and dataset ID can come from --project-id
     / --dataset-id flags, or from GCP_PROJECT_ID / BIGQUERY_DATASET_ID env vars.
     """
@@ -149,7 +150,7 @@ def bigquery_schema(
             if embeddings:
                 stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=node_labels)
+                _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -313,7 +314,7 @@ def bigquery_logs(
             if embeddings:
                 stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
+                _run_embeddings(embedder, [NodeLabel.TABLE, NodeLabel.COLUMN])
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
