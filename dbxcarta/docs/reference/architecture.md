@@ -44,7 +44,7 @@ the tool's own exhaust.
    │   dbxcarta-spark         │        │  NEO4J  (the semantic layer)  │
    │   build pipeline         │ write  │  Database─HAS_SCHEMA→Schema    │
    │   preflight → extract →  ├───────►│  ─HAS_TABLE→Table─HAS_COLUMN→  │
-   │   graph DFs → embed →    │ fail-  │  Column ; Table.layer (v1.1)   │
+   │   graph DFs → embed →    │ fail-  │  Column ; Table.layer          │
    │   sample → FK discover   │ closed │  REFERENCES{confidence}        │
    └────────────┬─────────────┘        │  vector indexes on embeddings │
                 │                       └───────────────┬──────────────┘
@@ -87,9 +87,9 @@ Embeddings on table and column nodes, backed by vector indexes, make "near in
 meaning" a query a question can run. `REFERENCES` edges carry a confidence score
 and are discovered from declared constraints and metadata heuristics, so a join
 path the catalog never declared is still navigable and ranked by how much to
-trust it. The `layer` property under graph contract v1.1
-records each table's medallion tier, so a retriever can prefer the curated gold
-table over a rawer silver one when both could answer a question.
+trust it. The `layer` property records each table's medallion tier, so a
+retriever can prefer the curated gold table over a rawer silver one when both
+could answer a question.
 
 This plane is the one the client reads at query time, and it is regenerable by
 design. Because Unity Catalog is the source of truth, the semantic layer can be

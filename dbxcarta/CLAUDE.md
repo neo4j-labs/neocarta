@@ -11,7 +11,7 @@ Before writing or changing Spark code, read `docs/reference/best-practices.md`. 
 
 ## Environment configuration (layered)
 
-dbxcarta loads env config in two layers. See `docs/proposals/env-layering.md`.
+dbxcarta loads env config in two layers.
 
 - The repo-root `.env` is the shared **base**: Databricks infra (profile, compute, workspace, warehouse), shared chat/embedding endpoints, and the base Neo4j secrets. It is gitignored and **never edited per integration**. It does **not** set `DATABRICKS_SECRET_SCOPE` (that is per-integration, see below).
 - Each integration ships a committed, secret-free `examples/<name>/dbxcarta-overlay.env`. This is the **single source of truth** for that integration's per-example dbxcarta config: catalog/catalogs/layer-map/schemas, volume, summary, sample/embedding flags, client arms, **and the per-integration `DATABRICKS_SECRET_SCOPE`** (a scope name, not a secret). Presets carry no env config — only optional behavior (readiness, question upload).

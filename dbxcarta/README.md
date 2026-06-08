@@ -101,22 +101,6 @@ import surface, so library consumers import the layer they need.
 `dbxcarta-spark` and run them with `dbxcarta-submit`. The rest are for evaluation
 and demos. New here? Jump to the [Quickstart](#quickstart-demo-catalog).
 
-**Layer responsibilities:**
-
-*The product*
-
-- **Core** is the shared bottom layer every other package builds on. It provides the common building blocks for naming and paths, reading config and secrets, running SQL, and loading settings. It depends only on the Databricks SDK, never Spark, Neo4j, or the job runner. The boundaries are enforced by `tests/boundary/test_import_boundaries.py`.
-- **Spark** reads Unity Catalog and builds the Neo4j semantic layer: extract, embed, infer foreign keys, write the graph, and verify it. It provides the `dbxcarta` command for verify and preset.
-
-*Operator tooling*
-
-- **Submit** is the command you run on your own machine to build, upload, and submit Databricks jobs. It is the only layer that touches the job runner, and it never runs on the cluster.
-
-*Evaluation & demo*
-
-- **Client** queries the finished graph to retrieve schema context and runs the Text2SQL evaluation that proves the layer earns its place.
-- **Materialize** is a Databricks job that creates the example demo tables from a saved blueprint.
-
 The component-level breakdown of each layer is in [`docs/reference/architecture.md`](docs/reference/architecture.md#packages-and-layer-responsibilities).
 
 This repository uses a clean boundary cutover. Old top-level imports are deleted
@@ -130,14 +114,6 @@ graph contract, verification, Databricks validators, the preset capability
 protocols, and the `dbxcarta` domain CLI for verify and preset. It builds the
 Neo4j semantic layer.
 
-**What the build pipeline does:**
-
-- Extracts Unity Catalog metadata across one or more catalogs: table names, column descriptions, comments, and sampled values
-- Tags every table with its medallion layer from the `catalog:layer` entries in `DBXCARTA_CATALOGS`; dbxcarta reads only the silver and gold layers, folding them into one graph
-- Embeds each piece using a Databricks foundation model
-- Discovers foreign keys from declared constraints plus metadata and semantic inference, each edge scored by confidence
-- Writes the result to Neo4j as typed nodes with vector properties
-
 ### Graph schema
 
 The build pipeline writes a stable typed contract the client traverses: nodes
@@ -145,7 +121,7 @@ The build pipeline writes a stable typed contract the client traverses: nodes
 `HAS_TABLE`, `HAS_COLUMN`, `HAS_VALUE`, and confidence-scored `REFERENCES` edges
 between columns. Each node carries a dotted catalog-qualified `id`, a
 `description`, and an `embedding` where applicable; `Table` nodes also carry a
-`layer` tier under graph contract v1.1. The full contract, including identifier
+`layer` tier. The full contract, including identifier
 generation, per-node properties, embeddings, and versioning, is in
 [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md).
 
@@ -200,32 +176,20 @@ secret handling, metadata-source scope, and run observability, are in
 The client package owns retrieval primitives and the Text2SQL eval harness. It
 queries the Neo4j semantic layer the Spark package built.
 
-### Query time: client retrieves schema context
+At query time a client embeds a user question, runs a vector similarity search to
+find the most relevant `Table`, `Column`, and `Value` nodes, then traverses
+`HAS_COLUMN`, `HAS_VALUE`, and `REFERENCES` edges to expand that seed into a full
+schema subgraph before the LLM call, delivering semantic relevance and structural
+completeness in one step.
 
-A client embeds a user question, runs a vector similarity search to find the most
-relevant `Table`, `Column`, and `Value` nodes, then traverses `HAS_COLUMN`,
-`HAS_VALUE`, and `REFERENCES` edges to expand that seed into a full schema
-subgraph before the LLM call. The combination delivers semantic relevance and
-structural completeness in one retrieval step. The query-time and validation
-walkthrough is in
-[`docs/reference/architecture.md`](docs/reference/architecture.md#how-we-validate).
-
-### Demo client details
-
-The client is a batch evaluation job that proves the semantic layer earns its
-place. It runs each question through up to four arms selected by
-`DBXCARTA_CLIENT_ARMS`, scored the same way (parsed, executed, non-empty, matched
-against a reference result):
-
-- **`reference`** executes the ground-truth SQL to establish the correct result.
-- **`no_context`** gives the model only the catalog name, the floor.
-- **`schema_dump`** pastes a bounded schema pulled from the graph, capped to a token-matched budget so it is a real control rather than a paste-everything strawman.
-- **`graph_rag`** is the semantic layer in use: vector-seed plus confidence-ranked `REFERENCES` expansion. It justifies the build pipeline only if it beats `schema_dump` at the matched budget and both clear `no_context`.
-
-The arms cache generation in the ops catalog so unchanged re-runs skip inference.
-The cache layout and refresh controls are in
-[`docs/reference/public-api.md`](docs/reference/public-api.md#client-evaluation-harness),
-and the validation rationale is in
+The demo client is a batch evaluation job that runs each question through up to
+four arms selected by `DBXCARTA_CLIENT_ARMS` (`reference`, `no_context`,
+`schema_dump`, `graph_rag`), all scored the same way and caching generation in the
+ops catalog so unchanged re-runs skip inference. `graph_rag` justifies the build
+pipeline only if it beats the token-matched `schema_dump` control and both clear
+`no_context`. The arm definitions, cache layout, and refresh controls are in
+[`docs/reference/public-api.md`](docs/reference/public-api.md#client-evaluation-harness);
+the query-time and validation rationale is in
 [`docs/reference/architecture.md`](docs/reference/architecture.md#how-we-validate).
 
 In the quickstart the client runs the `graph_rag` arm against
@@ -599,4 +563,4 @@ breaking-change policy, and the old-to-new import migration table are in
 Operational lessons from running the pipeline, including why dropping a data
 catalog on a Default-Storage account is not round-trippable through the tooling,
 are in
-[`docs/reference/operational-lessons.md`](docs/reference/operational-lessons.md).
+[`docs/reference/best-practices.md`](docs/reference/best-practices.md#operational-lessons).

@@ -132,68 +132,28 @@ confident and uses guessing only where there is nothing better.
 
 ## The "both sides are just called id" problem
 
-> **Status: the value-overlap rescue described in this section was dropped
-> and is no longer part of the pipeline.** A pair where both sides are just
-> named `id` is now simply held back, permanently, with no rescue. The
-> "shared example values" rescue below was judged not worth its cost: the
-> set of cases where it actually helps in a large enterprise catalog is too
-> narrow to justify the sampling, the id-vs-id comparison, and the overlap
-> join it required. The current behavior is the "The problem" subsection
-> only; everything from "The rescue" onward is retained **for historical
-> reference**, to explain what was tried and why it was removed. The sound
-> fix for a both-`id` link that genuinely matters is to declare the foreign
-> key (or primary key) in the catalog, even as an informational, unenforced
-> constraint, which moves it onto the exact, always-trusted declared path.
-> Note this is only about the *rescue*: sampled Value nodes themselves are
-> still produced and are still used elsewhere (client text-to-SQL grounding).
-
-### The problem
-
 Many tables have a key column simply called `id`. If the pipeline guessed
-links purely from names, every `id` would look like it could point at
-every other `id`, which would invent a flood of foreign keys that do not
-exist. To avoid that, a pair where both sides are just named `id` is held
-back by default rather than asserted.
+links purely from names, every `id` would look like it could point at every
+other `id`, which would invent a flood of foreign keys that do not exist. A
+pair where both sides are just named `id` is therefore held back rather than
+asserted.
 
-### The rescue: shared example values
+The accepted miss: a high-volume surrogate key (a long numeric or UUID `id`
+with millions of distinct values) that has no declared foreign key, no helpful
+name, and no clear meaning signal will not be linked. We accept this. The sound
+fix for any case that genuinely matters is to declare the foreign key (or
+primary key) in the catalog, even as an informational, unenforced constraint,
+which moves the link onto the exact, always-trusted declared path. We prefer
+that to loosening the guessing, which would trade a little recall for a much
+larger risk of inventing relationships that are not real.
 
-Holding those pairs back would also lose the real links among them. So
-there is a rescue: the pipeline samples a handful of actual values from
-each column and checks whether they genuinely overlap. If one column's
-sampled values really do appear in the other, that is concrete evidence of
-a real relationship, not just a coincidence of naming, and the link is
-allowed back in.
-
-### Why the rescue only works for small lists
-
-This rescue is reliable only for columns with a small number of distinct
-values, such as a status, type, or category key. For those, the sample
-captures almost every value, so a true overlap is actually seen.
-
-For a high-volume identifier with millions of distinct values, sampling a
-few from each side will almost never land on the same ones, even when one
-column genuinely references the other. The overlap evidence simply will
-not appear by chance. Because of this, very high-variety columns are
-deliberately left out of value sampling entirely. The rescue is, by
-design, a small-list tool only.
-
-### The accepted miss
-
-This leaves one specific gap. A high-volume surrogate key (think a long
-numeric or UUID id with millions of distinct values) that also has no
-declared foreign key, no helpful name, and no clear meaning signal will
-not be linked. The declared, name, and meaning ways all came up empty, and
-the value rescue cannot apply because the column is too high-variety to
-sample usefully.
-
-We accept this. Collecting more samples does not fix it, because the odds
-of overlap stay vanishingly small for high-variety columns. The sound fix
-for any case that genuinely matters is to declare the foreign key (or the
-primary key) in the catalog, even as an informational, unenforced
-constraint, which moves the link onto the exact, always-trusted path. We
-prefer that to loosening the guessing, which would trade a little extra
-recall for a much larger risk of inventing relationships that are not
-real.
+> **Historical note:** an earlier "shared example values" rescue sampled each
+> column and re-admitted a both-`id` pair when the sampled values genuinely
+> overlapped. It was dropped: it only worked for small-cardinality columns
+> (status/type/category keys), never for the high-variety surrogate keys that
+> motivated it, and the sampling, id-vs-id comparison, and overlap join were not
+> worth that narrow benefit. Sampled `Value` nodes themselves are still produced
+> and used elsewhere (client text-to-SQL grounding); only the FK rescue is gone.
 
 ## Tagging key targets with a second write
 
