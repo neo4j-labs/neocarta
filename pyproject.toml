@@ -102,6 +102,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+# Agent tooling (e.g. skill drivers) is not product surface and is not held to
+# the strict product lint/docstring rules below.
+extend-exclude = [".claude"]
 
 [tool.ruff.format]
 docstring-code-format = true
