@@ -55,9 +55,9 @@ def test_embedding_endpoint_returns_correct_dimension(neo4j_driver, ws, run_summ
 
     with neo4j_driver.session() as session:
         row = session.run(
-            "SHOW VECTOR INDEXES YIELD name, options WHERE name = 'table_embedding'"
+            "SHOW VECTOR INDEXES YIELD name, options WHERE name = 'table_vector_index'"
         ).single()
-    assert row is not None, "Vector index 'table_embedding' not found"
+    assert row is not None, "Vector index 'table_vector_index' not found"
     expected_dim = row["options"]["indexConfig"]["vector.dimensions"]
 
     vecs = _embed_texts(ws, endpoint, ["tables related to customer orders"])
@@ -93,7 +93,7 @@ def test_table_semantic_self_ranking(neo4j_driver, run_summary) -> None:
     with neo4j_driver.session() as session:
         for row in rows:
             result = session.run(
-                "CALL db.index.vector.queryNodes('table_embedding', $k, $vec) "
+                "CALL db.index.vector.queryNodes('table_vector_index', $k, $vec) "
                 "YIELD node, score WHERE node.id = $id RETURN score",
                 k=_TOP_K,
                 vec=row["vector"],
@@ -131,7 +131,7 @@ def test_graph_expansion_from_vector_search(neo4j_driver, run_summary) -> None:
     with neo4j_driver.session() as session:
         top_tables = list(
             session.run(
-                "CALL db.index.vector.queryNodes('table_embedding', 5, $vec) "
+                "CALL db.index.vector.queryNodes('table_vector_index', 5, $vec) "
                 "YIELD node RETURN node.id AS id",
                 vec=probe["vector"],
             )

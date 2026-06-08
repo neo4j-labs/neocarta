@@ -18,7 +18,7 @@ from dbxcarta.core.identifiers import (
     validate_serving_endpoint_name,
     validate_uc_volume_subpath,
 )
-from dbxcarta.spark.contract import DEFAULT_EMBEDDING_ENDPOINT
+from dbxcarta.spark.contract import DEFAULT_EMBEDDING_ENDPOINT, NEOCARTA_GRAPH_VERSION
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
@@ -124,6 +124,11 @@ class SparkIngestSettings(BaseSettings):
     # completes with status='success'. When True, any violation raises and the
     # task fails. Flip after two consecutive zero-violation warn-only runs.
     dbxcarta_verify_gate: bool = False
+    # neocarta library version stamped on the `__neocarta_graph__` metadata node
+    # (see contract.NEOCARTA_GRAPH_VERSION). Set this to match the neocarta
+    # version the MCP server reading this graph runs, so its version check logs
+    # a match rather than a mismatch warning.
+    dbxcarta_neocarta_graph_version: str = NEOCARTA_GRAPH_VERSION
 
     @field_validator("dbxcarta_rel_write_partitions")
     @classmethod

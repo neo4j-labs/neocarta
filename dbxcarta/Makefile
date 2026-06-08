@@ -54,7 +54,7 @@ endef
 #   -o consider_namespace_packages=true
 #       the dbxcarta packages share the PEP 420 `dbxcarta` namespace across
 #       several editable distributions; without this pytest binds `dbxcarta` to a
-#       single directory (the subtree shadows it via neocarta's pythonpath=".")
+#       single directory (the dbxcarta directory shadows it via neocarta's pythonpath=".")
 #       and `import dbxcarta.submit` etc. fail to collect.
 PYTEST_FLAGS = --import-mode=importlib -o consider_namespace_packages=true
 

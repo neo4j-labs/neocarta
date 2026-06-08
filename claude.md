@@ -32,9 +32,9 @@ Use the following Make commands for Ruff formatting and linting:
 * Formatting -> `make fmt`
 * Linting -> `make lint`
 
-## Databricks work (dbxcarta subtree)
+## Databricks work (dbxcarta directory)
 
-The `dbxcarta/` subtree hosts the Databricks semantic-layer capability: the `dbxcarta-core` and `dbxcarta-spark` packages (published as the `neocarta[dbxcarta-core]` and `neocarta[dbxcarta-spark]` extras), plus the `dbxcarta-client`, `dbxcarta-submit`, and `dbxcarta-materialize` workspace packages. Before writing or changing anything under `dbxcarta/`, read `dbxcarta/CLAUDE.md` — it carries the pipeline design rules (no Python UDFs for rule logic, no catalog-scale collect to the driver) and the layered env/secret configuration. Those rules are scoped to `dbxcarta/`.
+The `dbxcarta/` directory hosts the Databricks semantic-layer capability: the `dbxcarta-core` and `dbxcarta-spark` packages (published as the `neocarta[dbxcarta-core]` and `neocarta[dbxcarta-spark]` extras), plus the `dbxcarta-client`, `dbxcarta-submit`, and `dbxcarta-materialize` workspace packages. Before writing or changing anything under `dbxcarta/`, read `dbxcarta/CLAUDE.md` — it carries the pipeline design rules (no Python UDFs for rule logic, no catalog-scale collect to the driver) and the layered env/secret configuration. Those rules are scoped to `dbxcarta/`.
 
 ## Project Architecture Overview
 

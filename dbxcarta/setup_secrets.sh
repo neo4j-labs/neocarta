@@ -9,6 +9,10 @@
 # the scope is created with that example's own DATABRICKS_PROFILE unless
 # --profile overrides it.
 #
+# Optionally, when an example's overlay sets OPENAI_SECRET_SCOPE, the shared
+# OpenAI key is read from that example's standalone .env (OPENAI_API_KEY) and
+# written into that (shared) scope for an external-models embedding endpoint.
+#
 # Usage:
 #   ./setup_secrets.sh [--profile NAME] [--example NAME ...]
 #
@@ -22,6 +26,8 @@
 #   .env  NEO4J_URI           required to provision (absent => example skipped)
 #   .env  NEO4J_USERNAME      required
 #   .env  NEO4J_PASSWORD      required
+#   dbxcarta-overlay.env  OPENAI_SECRET_SCOPE  optional; enables OpenAI provisioning
+#   .env  OPENAI_API_KEY      required only when OPENAI_SECRET_SCOPE is set
 #
 # Secret key names are uppercase by design. They match the keys read by the
 # Databricks jobs and databricks-job-runner secret injection.
@@ -37,7 +43,7 @@ ONLY_EXAMPLES=()
 ENV_FILE=""
 
 usage() {
-  sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 trim() {
@@ -182,6 +188,10 @@ for dir in "$EXAMPLES_DIR"/*/; do
     echo "  skip: DATABRICKS_SECRET_SCOPE not set in $overlay"
     continue
   fi
+  # Optional shared OpenAI scope name (committed, not a secret). Read from the
+  # overlay alongside the Neo4j scope; when unset, OpenAI provisioning is
+  # skipped below.
+  openai_scope="$(env_value OPENAI_SECRET_SCOPE || true)"
 
   # Secrets live only in the gitignored standalone .env.
   ENV_FILE="${dir}.env"
@@ -195,6 +205,8 @@ for dir in "$EXAMPLES_DIR"/*/; do
     echo "  skip: NEO4J_URI not set in $ENV_FILE"
     continue
   fi
+  # Optional OpenAI key VALUE, read only from the gitignored standalone .env.
+  openai_key="$(env_value OPENAI_API_KEY || true)"
 
   profile="${PROFILE_OVERRIDE:-$(env_value DATABRICKS_PROFILE || true)}"
   if is_placeholder "$profile"; then
@@ -213,6 +225,21 @@ for dir in "$EXAMPLES_DIR"/*/; do
   put_secret "$scope" "NEO4J_USERNAME" "$username"
   put_secret "$scope" "NEO4J_PASSWORD" "$password"
   provisioned=$((provisioned + 1))
+
+  # Optional: provision the shared OpenAI key into the scope named by the
+  # overlay's OPENAI_SECRET_SCOPE. The key value lives only in the gitignored
+  # standalone .env. When the overlay names no scope this is skipped, so
+  # existing integrations are unaffected. Several examples may name the same
+  # shared scope; ensure_scope/put_secret are idempotent.
+  if ! is_placeholder "$openai_scope"; then
+    if is_placeholder "$openai_key"; then
+      echo "  openai: OPENAI_SECRET_SCOPE=$openai_scope but OPENAI_API_KEY not set in ${dir}.env — skipped"
+    else
+      echo "  openai scope:  $openai_scope (shared, from overlay)"
+      ensure_scope "$openai_scope"
+      put_secret "$openai_scope" "OPENAI_API_KEY" "$openai_key"
+    fi
+  fi
 done
 
 echo

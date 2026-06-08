@@ -66,6 +66,21 @@ DEFAULT_EMBEDDING_ENDPOINT = "databricks-gte-large-en"
 # match the neocarta core convention (Database.service examples=["BIGQUERY"]).
 DATABASE_SERVICE = "DATABRICKS"
 
+# The neocarta graph-metadata node label. Written once per run so the neocarta
+# MCP server's version check finds a `__neocarta_graph__` singleton and logs a
+# match instead of a "no metadata node" warning. Deliberately NOT a NodeLabel
+# member: NodeLabel drives the id-constraint, count, and embedding loops, none
+# of which apply to the metadata node (it carries no `id`).
+NEOCARTA_GRAPH_LABEL = "__neocarta_graph__"
+
+# The neocarta library version stamped on the `__neocarta_graph__` node. The
+# MCP server only *warns* (never fails) when this differs from its own
+# neocarta.__version__, so this must track the neocarta version the MCP server
+# runs. dbxcarta-spark does not depend on neocarta and cannot import it on the
+# cluster, so the value is mirrored here and overridable per-integration via
+# DBXCARTA_NEOCARTA_GRAPH_VERSION.
+NEOCARTA_GRAPH_VERSION = "0.6.0"
+
 
 class NodeLabel(StrEnum):
     """Neo4j node labels. `.value` yields the literal label string used in

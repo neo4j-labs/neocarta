@@ -287,8 +287,8 @@ def _core_bundled_into(project_dir: Path) -> Iterator[None]:
     from databricks_job_runner.errors import RunnerError
 
     root = Path(project_dir)
-    # Package dirs sit directly under the dbxcarta subtree root (no ``packages/``
-    # layer after the move into neocarta); project_dir is that subtree root.
+    # Package dirs sit directly under the dbxcarta directory root (no ``packages/``
+    # layer after the move into neocarta); project_dir is that directory root.
     core_src = root / "dbxcarta-core" / "src" / "dbxcarta" / "core"
     if not core_src.is_dir():
         raise RunnerError(

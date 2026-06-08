@@ -88,9 +88,9 @@ test-smoke:
 test-all:
 	uv run pytest tests/ -v
 
-# --- dbxcarta subtree -------------------------------------------------------
+# --- dbxcarta directory -----------------------------------------------------
 # The Databricks capability lives under dbxcarta/ with its own Make targets.
-# These delegate via `make -C dbxcarta`, which runs with the dbxcarta subtree as
+# These delegate via `make -C dbxcarta`, which runs with the dbxcarta directory as
 # the working directory (what the submit tooling expects) while still using the
 # single workspace env at the repo root.
 dbxcarta-test:
@@ -109,7 +109,7 @@ dbxcarta-typecheck:
 	$(MAKE) -C dbxcarta typecheck
 
 # e2e pipeline targets (e.g. `make e2e-finance-genie-ingest`) delegate to the
-# dbxcarta subtree, which holds the overlays, scripts, and .env they need.
+# dbxcarta directory, which holds the overlays, scripts, and .env they need.
 e2e-%:
 	$(MAKE) -C dbxcarta e2e-$*
 

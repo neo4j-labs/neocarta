@@ -35,6 +35,7 @@ from dbxcarta.spark.ingest.load.neo4j_io import (
     bootstrap_constraints,
     delete_stale_values,
     query_counts,
+    upsert_neocarta_graph_node,
     write_node,
     write_rel,
 )
@@ -192,6 +193,7 @@ def _run(
     try:
         with GraphDatabase.driver(neo4j.uri, auth=(neo4j.username, neo4j.password)) as driver:
             bootstrap_constraints(driver, settings)
+            upsert_neocarta_graph_node(driver, settings.dbxcarta_neocarta_graph_version)
 
             extract_result = extract(spark, settings, schema_list, summary)
 

@@ -1,4 +1,4 @@
-# Ruff config for the dbxcarta subtree.
+# Ruff config for the dbxcarta directory.
 #
 # This is intentionally minimal: it inherits the entire repo-standard ruff config
 # (select = ["ALL"], the ignore list, per-file-ignores, naming, pydocstyle) from
@@ -9,7 +9,7 @@
 # target-version per config resolution, and the root infers 3.10 from neocarta's
 # published requires-python — which would (a) reject the PEP 695 syntax as a
 # parse error here and (b) suppress neocarta's own 3.10-compat lints if bumped
-# globally. Scoping the 3.12 target to this subtree resolves both without
+# globally. Scoping the 3.12 target to this directory resolves both without
 # disturbing neocarta's linting.
 extend = "../pyproject.toml"
 target-version = "py312"

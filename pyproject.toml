@@ -95,7 +95,7 @@ eval = [
     "mcp>=1.26.0",
     "tiktoken>=0.12.0",
 ]
-# Dev/test/type tooling for the dbxcarta subtree. Installs every dbxcarta
+# Dev/test/type tooling for the dbxcarta directory. Installs every dbxcarta
 # workspace package (so the suite can import core, spark, client, submit,
 # materialize, and the example presets) plus the test/type tooling. pyspark and
 # neo4j arrive transitively via dbxcarta-spark / dbxcarta-client[graph], so they
@@ -155,7 +155,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 # Lint target stays inferred from neocarta's requires-python (3.10) so neocarta's
-# own 3.10-compatibility rules (e.g. UP017) keep firing. The dbxcarta subtree
+# own 3.10-compatibility rules (e.g. UP017) keep firing. The dbxcarta directory
 # needs 3.12 parsing (PEP 695 type parameters); it gets that from a nested
 # `dbxcarta/ruff.toml` that extends this config and only overrides target-version.
 
@@ -224,7 +224,7 @@ ignore = [
 "eval/retrievers/bigquery_schema_retriever.py" = [
     "PLC0415", # Lazy import to avoid circular dependency with eval package
 ]
-# dbxcarta subtree. Missing-docstring presence rules (D1xx) and the PySpark
+# dbxcarta directory. Missing-docstring presence rules (D1xx) and the PySpark
 # `functions as F` alias (N812) are ignored only for dbxcarta source, examples,
 # scripts, and tests. dbxcarta source predates neocarta's docstring gate;
 # backfilling docstrings is tracked separately, not part of the migration.

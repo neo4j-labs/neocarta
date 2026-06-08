@@ -53,6 +53,8 @@ One node per catalog ingested.
 | `embedding`          | float[] | yes      | 1024-dim cosine vector; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_DATABASES=true` |
 
 Neo4j constraint: `database_id` — `id IS UNIQUE`.
+Vector index: `database_vector_index` on `embedding` when embeddings are enabled.
+Range index: `database_name_index` on `name`.
 
 ---
 
@@ -69,6 +71,8 @@ One node per Unity Catalog schema in scope.
 | `embedding`          | float[] | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_SCHEMAS=true` |
 
 Neo4j constraint: `schema_id` — `id IS UNIQUE`.
+Vector index: `schema_vector_index` on `embedding` when embeddings are enabled.
+Range index: `schema_name_index` on `name`.
 
 ---
 
@@ -89,7 +93,9 @@ One node per table or view in scope.
 | `embedding`          | float[]   | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_TABLES=true` |
 
 Neo4j constraint: `table_id` — `id IS UNIQUE`.
-Vector index: `table_embedding` on `embedding` when embeddings are enabled.
+Vector index: `table_vector_index` on `embedding` when embeddings are enabled.
+Full-text index: `table_full_text_index` on `[name, description]`.
+Range index: `table_name_index` on `name`.
 
 ---
 
@@ -112,7 +118,9 @@ One node per column in scope.
 
 Neo4j constraint: `column_id` — `id IS UNIQUE`.
 Neo4j index: `column_type` on `type`.
-Vector index: `column_embedding` on `embedding` when embeddings are enabled.
+Vector index: `column_vector_index` on `embedding` when embeddings are enabled.
+Full-text index: `column_full_text_index` on `[name, description]`.
+Range index: `column_name_index` on `name`.
 
 ---
 
@@ -130,7 +138,9 @@ cardinality falls below the configured threshold.
 | `embedding`          | float[] | yes      | 1024-dim; present only when `DBXCARTA_INCLUDE_EMBEDDINGS_VALUES=true` |
 
 Neo4j constraint: `value_id` — `id IS UNIQUE`.
-Vector index: `value_embedding` on `embedding` when embeddings are enabled.
+No vector index is created for `Value` (neocarta defines none; Value nodes are
+reached via `HAS_VALUE` traversal). When `DBXCARTA_INCLUDE_EMBEDDINGS_VALUES=true`
+the `embedding` property is still written but is not indexed.
 
 ---
 
@@ -219,7 +229,10 @@ Each label has an independent feature flag:
 | Value    | `DBXCARTA_INCLUDE_EMBEDDINGS_VALUES`      | true    |
 
 When a flag is disabled, the `embedding` property is absent from the
-corresponding nodes. Vector indexes for that label are not created.
+corresponding nodes. Vector indexes for that label are not created. Index names
+follow the neocarta convention `{label}_vector_index` (Database, Schema, Table,
+Column) so the neocarta MCP server and the dbxcarta client query the same
+indexes; `Value` has no vector index regardless of its flag.
 
 ---
 

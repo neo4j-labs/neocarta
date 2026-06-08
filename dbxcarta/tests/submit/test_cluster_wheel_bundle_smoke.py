@@ -9,7 +9,7 @@ those wheels exactly the way publish-wheels does and asserts each one contains
 both ``dbxcarta/core/`` and its own entrypoint module.
 
 It guards the path logic across the move into neocarta: the package dirs now sit
-directly under the dbxcarta subtree root (no ``packages/`` layer), and a stale
+directly under the dbxcarta directory root (no ``packages/`` layer), and a stale
 path would leave the wheels missing core and only surface as an ImportError on
 the cluster. The build needs ``uv`` on PATH but no live credentials, so it is
 kept out of the fast lane and run via ``make dbxcarta-test-wheel``.
@@ -32,7 +32,7 @@ _ENTRYPOINT_MODULE = {
     "dbxcarta-materialize": "dbxcarta/materialize/",
 }
 
-# The dbxcarta subtree root: tests/submit/<file> -> tests -> dbxcarta root.
+# The dbxcarta directory root: tests/submit/<file> -> tests -> dbxcarta root.
 _DBXCARTA_ROOT = Path(__file__).resolve().parents[2]
 
 

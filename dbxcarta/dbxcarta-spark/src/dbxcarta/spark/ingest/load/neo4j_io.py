@@ -10,7 +10,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from dbxcarta.spark.contract import REFERENCES_PROPERTIES, NodeLabel, RelType
+from dbxcarta.spark.contract import (
+    NEOCARTA_GRAPH_LABEL,
+    REFERENCES_PROPERTIES,
+    NodeLabel,
+    RelType,
+)
 from dbxcarta.spark.ingest.load.writer import (
     write_nodes,
     write_relationship,
@@ -33,8 +38,19 @@ def _single_count(result: Any) -> int:
 
 
 def bootstrap_constraints(driver: Driver, settings: SparkIngestSettings) -> None:
-    """Create id-uniqueness constraints, Column `type` index, and per-label
-    vector indexes when the matching embedding flag is enabled.
+    """Create the Neo4j indexes the neocarta MCP server expects.
+
+    Beyond the id-uniqueness constraints and the dbxcarta-internal Column
+    `type` / Value `last_run` indexes, this creates the three index families
+    the MCP queries by hardcoded name (see ``neocarta/ingest/indexes.py``):
+
+    - per-label vector indexes named ``{label}_vector_index`` (when the
+      matching embedding flag is enabled; Value is excluded — neocarta defines
+      no Value vector index),
+    - full-text indexes ``table_full_text_index`` / ``column_full_text_index``
+      over ``name`` + ``description``,
+    - range indexes ``{label}_name_index`` on ``name`` for Database, Schema,
+      Table, and Column so the catalog tools' exact-name lookups seek.
     """
     from neo4j.exceptions import ClientError
 
@@ -76,16 +92,80 @@ def bootstrap_constraints(driver: Driver, settings: SparkIngestSettings) -> None
             f"IF NOT EXISTS FOR (n:{NodeLabel.VALUE.value}) ON (n.last_run)"
         )
 
+        # Per-label vector indexes named to match neocarta's
+        # `{label}_vector_index` so the MCP server's hardcoded names resolve.
+        # Value is excluded: neocarta defines no Value vector index and the MCP
+        # never vector-searches Value nodes (they are reached via HAS_VALUE
+        # traversal on the `value` property).
         for enabled, label in embedding_label_flags:
-            if enabled:
+            if enabled and label is not NodeLabel.VALUE:
                 session.run(
-                    f"CREATE VECTOR INDEX {label.value.lower()}_embedding IF NOT EXISTS "
+                    f"CREATE VECTOR INDEX {label.value.lower()}_vector_index IF NOT EXISTS "
                     f"FOR (n:{label.value}) ON n.embedding "
                     f"OPTIONS {{indexConfig: {{`vector.dimensions`: {dim},"
                     f" `vector.similarity_function`: 'cosine'}}}}"
                 )
 
+        # Full-text indexes over name + description, named to match neocarta's
+        # `{label}_full_text_index` so the MCP full-text/hybrid tools register
+        # and resolve. Independent of embeddings: Table and Column always carry
+        # both properties.
+        for label in (NodeLabel.TABLE, NodeLabel.COLUMN):
+            session.run(
+                f"CREATE FULLTEXT INDEX {label.value.lower()}_full_text_index "
+                f"IF NOT EXISTS FOR (n:{label.value}) "
+                "ON EACH [n.name, n.description]"
+            )
+
+        # Range indexes on `name` named to match neocarta's `{label}_name_index`
+        # so the MCP catalog tools' exact-name lookups (MATCH (n:Label {name:
+        # $value})) seek instead of scanning the label.
+        for label in (
+            NodeLabel.DATABASE,
+            NodeLabel.SCHEMA,
+            NodeLabel.TABLE,
+            NodeLabel.COLUMN,
+        ):
+            session.run(
+                f"CREATE INDEX {label.value.lower()}_name_index IF NOT EXISTS "
+                f"FOR (n:{label.value}) ON (n.name)"
+            )
+
     logger.info("[dbxcarta] neo4j constraints and indexes bootstrapped")
+
+
+def upsert_neocarta_graph_node(driver: Driver, version: str) -> None:
+    """Upsert the singleton ``__neocarta_graph__`` metadata node.
+
+    Mirrors ``neocarta/ingest/metadata.py:upsert_neocarta_graph_node``: on
+    create it stamps ``initial_version`` + ``create_date``; on every run it
+    refreshes ``latest_version`` + ``last_updated``. The neocarta MCP server
+    reads this node to compare the writer's neocarta version against its own;
+    when the node is absent it only logs a warning, so this exists to make a
+    cleanly-aligned graph report a version match.
+
+    Parameters
+    ----------
+    driver : Driver
+        The Neo4j driver to issue the upsert through.
+    version : str
+        The neocarta version to record (see
+        ``SparkIngestSettings.dbxcarta_neocarta_graph_version``).
+    """
+    with driver.session() as session:
+        session.run(
+            f"MERGE (n:`{NEOCARTA_GRAPH_LABEL}`) "
+            "ON CREATE SET n.initial_version = $version, "
+            "n.latest_version = $version, "
+            "n.create_date = datetime(), n.last_updated = datetime() "
+            "ON MATCH SET n.latest_version = $version, "
+            "n.last_updated = datetime()",
+            version=version,
+        )
+    logger.info(
+        "[dbxcarta] upserted __neocarta_graph__ metadata node (version %s)",
+        version,
+    )
 
 
 def delete_stale_values(
@@ -168,6 +248,7 @@ __all__ = [
     "bootstrap_constraints",
     "delete_stale_values",
     "query_counts",
+    "upsert_neocarta_graph_node",
     "write_node",
     "write_rel",
 ]

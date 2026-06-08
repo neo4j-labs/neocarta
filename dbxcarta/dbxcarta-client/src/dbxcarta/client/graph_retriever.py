@@ -21,8 +21,11 @@ if TYPE_CHECKING:
     from dbxcarta.client.settings import ClientSettings
     from neo4j import Session
 
-_COL_INDEX = "column_embedding"
-_TABLE_INDEX = "table_embedding"
+# Neocarta-aligned vector index names (neocarta/ingest/indexes.py); the ingest
+# bootstrap creates these exact names so the dbxcarta-client and the neocarta
+# MCP server query the same indexes.
+_COL_INDEX = "column_vector_index"
+_TABLE_INDEX = "table_vector_index"
 
 _STOP_WORDS = frozenset(
     {
