@@ -13,6 +13,13 @@ by a `test_conformance.py`. Drive the whole loop with the driver:
 
 All paths below are relative to the repo root.
 
+## Scope: one connector, one PR
+
+Building the connector library package and wiring it into the `neocarta` CLI are
+**separate PRs**. This skill covers only the library connector — the package under
+`neocarta/connectors/`, its tests, and its README. Do **not** add a CLI subcommand
+(`neocarta/_cli/`) in the same PR. CLI integration lands in a follow-up PR.
+
 ## Prerequisites
 
 The managed environment only — no system packages needed for scaffold/verify.
