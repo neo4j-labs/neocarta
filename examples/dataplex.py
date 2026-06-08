@@ -6,11 +6,10 @@ import os
 from dotenv import load_dotenv
 from google.cloud import dataplex_v1
 from neo4j import GraphDatabase
-from openai import OpenAI
 
 from neocarta import NodeLabel
-from neocarta.connectors.dataplex import DataplexConnector
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.connectors.dataplex import DataplexGlossaryConnector, DataplexSchemaConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 
 def main(
@@ -40,29 +39,34 @@ def main(
     if include_glossary:
         node_labels += [NodeLabel.BUSINESS_TERM]
 
-    print("Extracting, transforming, and loading Dataplex metadata into Neo4j...")
-    connector = DataplexConnector(
-        catalog_client=catalog_client,
-        glossary_client=glossary_client,
-        project_id=os.getenv("GCP_PROJECT_ID"),
-        project_number=os.getenv("GCP_PROJECT_NUMBER"),
-        dataplex_location=os.getenv("DATAPLEX_LOCATION"),
-        dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
-        neo4j_driver=neo4j_driver,
-        database_name=neo4j_database,
-        include_schema=include_schema,
-        include_glossary=include_glossary,
-    )
-    connector.run()
+    common_kwargs = {
+        "project_id": os.getenv("GCP_PROJECT_ID"),
+        "project_number": os.getenv("GCP_PROJECT_NUMBER"),
+        "dataplex_location": os.getenv("DATAPLEX_LOCATION"),
+        "neo4j_driver": neo4j_driver,
+        "database_name": neo4j_database,
+    }
+
+    # Schema must run before glossary so that TAGGED_WITH edges from the
+    # glossary connector can attach to Column / Table nodes that already exist.
+    if include_schema:
+        print("Ingesting Dataplex schema metadata into Neo4j...")
+        DataplexSchemaConnector(catalog_client=catalog_client, **common_kwargs).ingest(
+            dataset_id=os.getenv("BIGQUERY_DATASET_ID")
+        )
+
+    if include_glossary:
+        print("Ingesting Dataplex glossary metadata into Neo4j...")
+        DataplexGlossaryConnector(glossary_client=glossary_client, **common_kwargs).ingest(
+            include_entry_links=include_schema,
+        )
 
     if with_embeddings and node_labels:
-        embedding_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         print("Generating embeddings for nodes...")
-        embeddings = OpenAIEmbeddingsConnector(
+        # Configure provider via env vars (e.g. OPENAI_API_KEY, GEMINI_API_KEY).
+        embeddings = LiteLLMEmbeddingsConnector(
             neo4j_driver=neo4j_driver,
-            client=embedding_client,
-            embedding_model="text-embedding-3-small",
-            dimensions=768,
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             database_name=neo4j_database,
         )
         embeddings.run(node_labels=node_labels)

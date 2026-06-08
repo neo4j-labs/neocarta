@@ -2,7 +2,7 @@
 Sync Embeddings Example.
 
 This example demonstrates how to generate embeddings synchronously
-using the OpenAI Embeddings API on an existing Neo4j graph.
+on an existing Neo4j graph using LiteLLM (multi-provider).
 
 This is useful for simpler workflows or when you don't need the
 parallelization benefits of async processing.
@@ -22,7 +22,10 @@ Environment Variables Required:
     - NEO4J_USERNAME: Neo4j username
     - NEO4J_PASSWORD: Neo4j password
     - NEO4J_DATABASE: Neo4j database name (optional, defaults to 'neo4j')
-    - OPENAI_API_KEY: OpenAI API key for embeddings
+    - EMBEDDING_MODEL: LiteLLM model id (optional, defaults to 'text-embedding-3-small').
+      The vector dimension is auto-detected from the model on first use.
+    - Provider credentials, e.g. OPENAI_API_KEY, GEMINI_API_KEY, COHERE_API_KEY,
+      AZURE_API_KEY/AZURE_API_BASE, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION_NAME
 """
 
 import argparse
@@ -30,10 +33,9 @@ import os
 
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
-from openai import OpenAI
 
 from neocarta import NodeLabel
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 
 def main(
@@ -50,20 +52,16 @@ def main(
         auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
     )
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-    embedding_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     print(f"Generating embeddings synchronously for: {', '.join(node_labels)}")
     print(f"Batch size: {batch_size}")
 
-    # Create embeddings for the nodes using sync client
-    openai_embeddings_connector = OpenAIEmbeddingsConnector(
+    embeddings_connector = LiteLLMEmbeddingsConnector(
         neo4j_driver=neo4j_driver,
-        client=embedding_client,
-        embedding_model="text-embedding-3-small",
-        dimensions=768,
+        embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
         database_name=neo4j_database,
     )
-    openai_embeddings_connector.run(
+    embeddings_connector.run(
         node_labels=node_labels,
         batch_size=batch_size,
     )

@@ -14,18 +14,19 @@ The server is configured via environment variables (or a `.env` file):
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key for embedding generation |
+| Provider credentials (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `COHERE_API_KEY`, `AZURE_*`, `AWS_*`, …) | Yes | — | Auth for the embedding provider your `EMBEDDING_MODEL` targets. Read by LiteLLM at call time. |
 | `NEO4J_URI` | Yes | — | Neo4j connection URI (e.g. `bolt://localhost:7687`) |
 | `NEO4J_USERNAME` | Yes | — | Neo4j username |
 | `NEO4J_PASSWORD` | Yes | — | Neo4j password |
 | `NEO4J_DATABASE` | No | `neo4j` | Neo4j database name |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | OpenAI embedding model |
-| `EMBEDDING_DIMENSIONS` | No | `768` | Embedding vector dimensions |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | LiteLLM embedding model id (provider prefix optional for OpenAI) |
+
+The embedding vector dimension is auto-detected from the model — no manual configuration is needed.
 
 ## Running the server
 
 ```bash
-uvx --from "neocarta[mcp]@0.3.0" neocarta-mcp
+uvx --from "neocarta[mcp]@0.6.0" neocarta-mcp
 ```
 
 The server will only run in `stdio` transport mode and read all configuration parameters from the environment. 
@@ -54,7 +55,7 @@ Lists all tables within a given schema.
 
 ---
 
-### `get_metadata_schema_by_column_semantic_similarity`
+### `get_context_by_column_vector_search`
 
 Finds the most relevant tables by computing semantic similarity between the query and **column embeddings** stored in the graph. Returns full table context including column descriptions, data types, example values, and foreign key references.
 
@@ -67,7 +68,7 @@ Finds the most relevant tables by computing semantic similarity between the quer
 
 ---
 
-### `get_metadata_schema_by_table_semantic_similarity`
+### `get_context_by_table_vector_search`
 
 Finds the most relevant tables by computing semantic similarity between the query and **table embeddings** stored in the graph. Returns full table context including column descriptions, data types, example values, and foreign key references.
 
@@ -80,7 +81,7 @@ Finds the most relevant tables by computing semantic similarity between the quer
 
 ---
 
-### `get_metadata_schema_by_schema_and_table_semantic_similarity`
+### `get_context_by_schema_and_table_vector_search`
 
 Finds the most relevant tables by computing semantic similarity against **schema and table embeddings**. Tables are ranked by schema relevance first, then table relevance, with a configurable cap on results.
 
@@ -90,6 +91,45 @@ Finds the most relevant tables by computing semantic similarity against **schema
 - **Output:** list of `TableContext` (ordered by schema score DESC, table score DESC)
 - **Retrieval:** queries `schema_vector_index` (top 5 schemas, score threshold `> 0.5`), then filters tables where `table_score > schema_score - 0.2`
 - **Use when:** the query is broad and may span multiple schemas — e.g. `"everything related to billing"`.
+
+---
+
+### `get_context_by_table_full_text_search` / `get_context_by_column_full_text_search`
+
+Find tables by full-text matching on table or column name and description. Returns `TableContext` rows ordered by Lucene score (column variant aggregates matching columns up to their parent tables by average score). No embeddings required.
+
+- **Retrieval:** queries `table_full_text_index` or `column_full_text_index` with the provided `text_content` (Lucene query syntax supported)
+- **Use when:** the query contains literal tokens that should match table or column names/descriptions verbatim.
+
+---
+
+### `get_context_by_table_hybrid_search` / `get_context_by_column_hybrid_search`
+
+Hybrid retrieval combining vector similarity and full-text search on the same node label. Scores from each branch are min-max normalized by the branch maximum and merged per node by taking the maximum.
+
+- **Retrieval:** UNION of `*_vector_index` and `*_full_text_index` at the chosen label, then enrichment to `TableContext`
+- **Use when:** the query mixes conceptual phrasing with literal tokens and you want both branches to vote.
+
+---
+
+### `get_context_by_table_business_term_hybrid_search` / `get_context_by_column_business_term_hybrid_search`
+
+Hybrid retrieval whose full-text branch is bridged through `:BusinessTerm` tags: matching BusinessTerm nodes surface tables/columns that also match the query AND are connected via `TAGGED_WITH`. Combined with the vector branch through per-branch normalization and max-per-node merge.
+
+- **Retrieval:** UNION of `*_vector_index` and `(businessterm_full_text_index + *_full_text_index where TAGGED_WITH)`, then enrichment to `TableContext`
+- **Use when:** the query uses business-glossary phrasing (e.g. `"average order value"`) that may not appear verbatim in table/column metadata but is tagged to relevant nodes.
+
+---
+
+### Tool registration priority
+
+At startup the MCP server probes the target database for its node-scoped search indexes and the presence of `:BusinessTerm` nodes. For each searchable label (Table, Column), the single highest-priority retrieval tool whose prerequisites are satisfied is registered:
+
+1. `business_term_hybrid` — requires the label's vector and full-text indexes, the `businessterm_full_text_index`, and at least one `:BusinessTerm` node.
+2. `hybrid` — requires the label's vector and full-text indexes.
+3. `vector` or `full_text` — whichever index exists; if both exist, `hybrid` (or `business_term_hybrid`) wins.
+
+Schema-level vector retrieval and catalog tools are registered independently when their prerequisites are met.
 
 ---
 
@@ -112,7 +152,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.3.0",
+        "neocarta[mcp]@0.6.0",
         "neocarta-mcp"
       ],
       "env": {
@@ -121,8 +161,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
         "NEO4J_PASSWORD": "your-password",
         "NEO4J_DATABASE": "neo4j",
         "OPENAI_API_KEY": "sk-...",
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768"
+        "EMBEDDING_MODEL": "text-embedding-3-small"
       }
     }
   }

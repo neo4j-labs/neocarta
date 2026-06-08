@@ -1,4 +1,4 @@
-from neocarta.connectors.bigquery import BigQuerySchemaExtractor
+from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor
 
 
 def test_get_database_info(bigquery_extractor_with_cache: BigQuerySchemaExtractor):

@@ -4,6 +4,7 @@ from neo4j import Driver, RoutingControl
 from pydantic import BaseModel
 
 from ..enums import NodeLabel, RelationshipType
+from ..errors import ConfigError
 
 
 def is_enterprise_edition(neo4j_driver: Driver, database_name: str = "neo4j") -> bool:
@@ -79,7 +80,7 @@ def write_neo4j_constraints(
             try:
                 c = key_constraints[node_label]
             except KeyError as e:
-                raise ValueError(
+                raise ConfigError(
                     f"Node key constraint not found for node label {node_label}."
                 ) from e
             _, summary, _ = neo4j_driver.execute_query(
@@ -92,7 +93,7 @@ def write_neo4j_constraints(
             try:
                 c = unique_constraints[node_label]
             except KeyError as e:
-                raise ValueError(
+                raise ConfigError(
                     f"Node unique constraint not found for node label {node_label}."
                 ) from e
             _, summary, _ = neo4j_driver.execute_query(
@@ -116,18 +117,21 @@ def _validate_properties_list(model: BaseModel, properties_list: list[str]) -> N
 
     Raises:
     ------
-    ValueError
+    ConfigError
         If any properties are not found in the model fields.
     """
     invalid_props = set(properties_list) - set(model.model_fields)
     if invalid_props:
-        raise ValueError(
+        raise ConfigError(
             f"Properties list contains invalid properties for model {model.__class__.__name__}: {invalid_props}"
         )
 
 
 def _build_node_ingest_query(
-    node_label: NodeLabel, overwrite_existing: bool, properties_list: list[str]
+    node_label: NodeLabel,
+    overwrite_existing: bool,
+    properties_list: list[str],
+    secondary_labels: list[NodeLabel] | None = None,
 ) -> str:
     """
     Build a node ingest query for a given node label, overwrite existing flag, and properties list.
@@ -141,6 +145,10 @@ def _build_node_ingest_query(
         Whether to overwrite existing nodes on MATCH.
     properties_list: list[str]
         The list of properties to set on the node.
+    secondary_labels: list[NodeLabel] | None
+        Optional additional labels to tag onto the node alongside ``node_label``.
+        Used for subtype labels such as ``:Table:OsiTable``. Each label is added
+        in the same SET clause as the property assignments.
 
     Returns:
     -------
@@ -152,23 +160,27 @@ UNWIND $rows as row
 MERGE (n:{node_label} {{id: row.id}})
 """
 
-    # Only add ON CREATE and SET if there are properties to set
-    if len(properties_list) == 0:
+    secondary_labels = secondary_labels or []
+    if len(properties_list) == 0 and not secondary_labels:
         return query.rstrip()
 
-    # Determine indentation based on overwrite setting
-    if not overwrite_existing:
-        query += "ON CREATE\n    SET "
-        indent = " " * 8  # 8 spaces for continuation lines
-    else:
-        query += "SET "
-        indent = " " * 4  # 4 spaces for continuation lines
+    label_items = [f"n:{label}" for label in secondary_labels]
+    prop_items = [f"n.{prop} = row.{prop}" for prop in properties_list]
 
-    for idx, prop in enumerate(properties_list):
-        query += f"n.{prop} = row.{prop}"
-        if idx < len(properties_list) - 1:
-            query += ",\n" + indent
+    if overwrite_existing:
+        # Apply labels AND properties on every MERGE.
+        all_items = label_items + prop_items
+        query += "SET " + (",\n    ").join(all_items)
+        return query
 
+    # overwrite_existing=False: properties only fire on first create, but secondary
+    # labels must apply regardless so the OSI subtype label sticks even when the
+    # node was created by a prior call or another connector. This requires both
+    # ON CREATE SET and ON MATCH SET clauses.
+    create_items = label_items + prop_items
+    query += "ON CREATE\n    SET " + (",\n        ").join(create_items)
+    if label_items:
+        query += "\nON MATCH\n    SET " + (",\n        ").join(label_items)
     return query
 
 

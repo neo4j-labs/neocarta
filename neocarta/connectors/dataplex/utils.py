@@ -1,5 +1,7 @@
 """Utility functions for parsing Dataplex resource paths."""
 
+from ...errors import ConfigError
+
 
 def parse_glossary_resource_path(resource_path: str) -> str:
     """
@@ -20,18 +22,18 @@ def parse_glossary_resource_path(resource_path: str) -> str:
 
     Raises:
     ------
-    ValueError
+    ConfigError
         If the path does not contain a ``glossaries`` segment with a slug following it.
     """
     parts = resource_path.split("/")
     try:
         glossaries_idx = parts.index("glossaries")
     except ValueError:
-        raise ValueError(
+        raise ConfigError(
             f"Expected a Dataplex resource path containing 'glossaries', got: {resource_path!r}"
         ) from None
     if glossaries_idx + 1 >= len(parts):
-        raise ValueError(f"Expected 'glossaries/<slug>' in path, got: {resource_path!r}")
+        raise ConfigError(f"Expected 'glossaries/<slug>' in path, got: {resource_path!r}")
     return "/".join(parts[: glossaries_idx + 2])
 
 
@@ -52,12 +54,12 @@ def parse_category_slug(resource_path: str) -> str:
 
     Raises:
     ------
-    ValueError
+    ConfigError
         If the path does not contain a ``categories`` segment immediately before the slug.
     """
     parts = resource_path.split("/")
     if len(parts) < 2 or parts[-2] != "categories":
-        raise ValueError(
+        raise ConfigError(
             f"Expected a Dataplex category resource path (…/categories/<slug>), got: {resource_path!r}"
         )
     return parts[-1]
@@ -80,12 +82,12 @@ def parse_business_term_slug(resource_path: str) -> str:
 
     Raises:
     ------
-    ValueError
+    ConfigError
         If the path does not contain a ``terms`` segment immediately before the slug.
     """
     parts = resource_path.split("/")
     if len(parts) < 2 or parts[-2] != "terms":
-        raise ValueError(
+        raise ConfigError(
             f"Expected a Dataplex term resource path (…/terms/<slug>), got: {resource_path!r}"
         )
     return parts[-1]

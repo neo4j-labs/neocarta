@@ -3,7 +3,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from neocarta.connectors.bigquery.logs import BigQueryLogsExtractor
+from neocarta.connectors.bigquery.logs.extract import BigQueryLogsExtractor
+from neocarta.errors import ConfigError
 
 
 def test_extractor_initialization(mock_bigquery_client):
@@ -178,11 +179,11 @@ def test_extract_with_default_timestamps(mock_bq_logs_extractor):
 
 
 def test_extractor_with_no_project_id_raises_error():
-    """Test that initializing without project_id raises ValueError."""
+    """Test that initializing without project_id raises ConfigError."""
     mock_client = MagicMock()
     mock_client.project = None
 
-    with pytest.raises(ValueError, match="Project ID is required"):
+    with pytest.raises(ConfigError, match="Project ID is required"):
         BigQueryLogsExtractor(client=mock_client)
 
 

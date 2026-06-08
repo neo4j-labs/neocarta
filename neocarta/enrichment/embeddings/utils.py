@@ -9,6 +9,7 @@ import pandas as pd
 from neo4j import Driver, RoutingControl
 
 from ...enums import NodeLabel
+from ...errors import ConfigError
 
 
 def get_nodes_to_embed(
@@ -40,7 +41,7 @@ def get_nodes_to_embed(
         - description: The description of the node.
     """
     if min_length <= 0:
-        raise ValueError("Minimum length must be greater than 0")
+        raise ConfigError("Minimum length must be greater than 0")
 
     query = f"""
 MATCH (n:{node_label})

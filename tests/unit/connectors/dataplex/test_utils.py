@@ -7,6 +7,7 @@ from neocarta.connectors.dataplex.utils import (
     parse_category_slug,
     parse_glossary_resource_path,
 )
+from neocarta.errors import ConfigError
 
 
 class TestParseCategorySlug:
@@ -22,16 +23,16 @@ class TestParseCategorySlug:
 
     def test_invalid_path_missing_categories_segment(self):
         path = "projects/my-project/locations/us/glossaries/my-glossary"
-        with pytest.raises(ValueError, match="categories"):
+        with pytest.raises(ConfigError, match="categories"):
             parse_category_slug(path)
 
     def test_invalid_path_term_segment(self):
         path = "projects/my-project/locations/us/glossaries/my-glossary/terms/order-item-id"
-        with pytest.raises(ValueError, match="categories"):
+        with pytest.raises(ConfigError, match="categories"):
             parse_category_slug(path)
 
     def test_invalid_empty_string(self):
-        with pytest.raises(ValueError, match="categories"):
+        with pytest.raises(ConfigError, match="categories"):
             parse_category_slug("")
 
 
@@ -46,18 +47,18 @@ class TestParseBusinessTermSlug:
 
     def test_invalid_path_missing_terms_segment(self):
         path = "projects/my-project/locations/us/glossaries/my-glossary"
-        with pytest.raises(ValueError, match="terms"):
+        with pytest.raises(ConfigError, match="terms"):
             parse_business_term_slug(path)
 
     def test_invalid_path_category_segment(self):
         path = (
             "projects/my-project/locations/us/glossaries/my-glossary/categories/entity-identifiers"
         )
-        with pytest.raises(ValueError, match="terms"):
+        with pytest.raises(ConfigError, match="terms"):
             parse_business_term_slug(path)
 
     def test_invalid_empty_string(self):
-        with pytest.raises(ValueError, match="terms"):
+        with pytest.raises(ConfigError, match="terms"):
             parse_business_term_slug("")
 
 
@@ -88,14 +89,14 @@ class TestParseGlossaryResourcePath:
 
     def test_invalid_path_missing_glossaries_segment(self):
         path = "projects/my-project/locations/us"
-        with pytest.raises(ValueError, match="glossaries"):
+        with pytest.raises(ConfigError, match="glossaries"):
             parse_glossary_resource_path(path)
 
     def test_invalid_path_no_slug_after_glossaries(self):
         path = "projects/my-project/locations/us/glossaries"
-        with pytest.raises(ValueError, match="glossaries"):
+        with pytest.raises(ConfigError, match="glossaries"):
             parse_glossary_resource_path(path)
 
     def test_invalid_empty_string(self):
-        with pytest.raises(ValueError, match="glossaries"):
+        with pytest.raises(ConfigError, match="glossaries"):
             parse_glossary_resource_path("")

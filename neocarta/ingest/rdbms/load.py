@@ -4,6 +4,7 @@ from functools import partial
 
 from neo4j import Driver, RoutingControl
 
+from ...data_model.metadata import NeocartaGraph
 from ...data_model.rdbms import (
     CTE,
     BusinessTerm,
@@ -31,6 +32,8 @@ from ...data_model.rdbms import (
     Value,
 )
 from ...enums import NodeLabel, RelationshipType
+from ..indexes import create_full_text_index, create_name_range_index
+from ..metadata import upsert_neocarta_graph_node
 from ..utils import (
     _build_node_ingest_query,
     _build_relationship_ingest_query,
@@ -59,15 +62,40 @@ class Neo4jRDBMSLoader:
             database_name=self.database_name,
         )
 
+        self._create_full_text_index = partial(
+            create_full_text_index,
+            neo4j_driver=self.neo4j_driver,
+            database_name=self.database_name,
+        )
+
+        self._create_name_range_index = partial(
+            create_name_range_index,
+            neo4j_driver=self.neo4j_driver,
+            database_name=self.database_name,
+        )
+
+    def _run_write(self, cypher: str, rows: list[dict]) -> dict:
+        """Execute a write Cypher against the configured database and return counters."""
+        _, summary, _ = self.neo4j_driver.execute_query(
+            query_=cypher,
+            parameters_={"rows": rows},
+            routing_=RoutingControl.WRITE,
+            database_=self.database_name,
+        )
+        return summary.counters.__dict__
+
     def load_database_nodes(
         self,
         database_nodes: list[Database],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description", "service", "platform"],
+        create_name_index: bool = True,
     ) -> dict:
         """Load Database nodes into Neo4j."""
         _validate_properties_list(Database, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.DATABASE])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.DATABASE)
         query = _build_node_ingest_query(NodeLabel.DATABASE, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -84,11 +112,17 @@ class Neo4jRDBMSLoader:
         schema_nodes: list[Schema],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
+        create_name_index: bool = True,
     ) -> dict:
         """Load Schema nodes into Neo4j."""
         _validate_properties_list(Schema, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.SCHEMA])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.SCHEMA)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.SCHEMA])
         query = _build_node_ingest_query(NodeLabel.SCHEMA, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -104,11 +138,17 @@ class Neo4jRDBMSLoader:
         table_nodes: list[Table],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
+        create_name_index: bool = True,
     ) -> dict:
         """Load Table nodes into Neo4j."""
         _validate_properties_list(Table, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.TABLE])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.TABLE)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.TABLE])
         query = _build_node_ingest_query(NodeLabel.TABLE, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -131,11 +171,17 @@ class Neo4jRDBMSLoader:
             "is_primary_key",
             "is_foreign_key",
         ],
+        create_full_text_index: bool = True,
+        create_name_index: bool = True,
     ) -> dict:
         """Load Column nodes into Neo4j."""
         _validate_properties_list(Column, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.COLUMN])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.COLUMN)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
         query = _build_node_ingest_query(NodeLabel.COLUMN, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -283,11 +329,14 @@ class Neo4jRDBMSLoader:
         glossary_nodes: list[Glossary],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_name_index: bool = True,
     ) -> dict:
         """Load Glossary nodes into Neo4j."""
         _validate_properties_list(Glossary, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.GLOSSARY])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.GLOSSARY)
         query = _build_node_ingest_query(NodeLabel.GLOSSARY, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -303,11 +352,14 @@ class Neo4jRDBMSLoader:
         category_nodes: list[Category],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_name_index: bool = True,
     ) -> dict:
         """Load Category nodes into Neo4j."""
         _validate_properties_list(Category, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.CATEGORY])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.CATEGORY)
         query = _build_node_ingest_query(NodeLabel.CATEGORY, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -323,11 +375,17 @@ class Neo4jRDBMSLoader:
         business_term_nodes: list[BusinessTerm],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
+        create_name_index: bool = True,
     ) -> dict:
         """Load BusinessTerm nodes into Neo4j."""
         _validate_properties_list(BusinessTerm, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.BUSINESS_TERM])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.BUSINESS_TERM)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.BUSINESS_TERM])
         query = _build_node_ingest_query(
             NodeLabel.BUSINESS_TERM, overwrite_existing, properties_list
         )
@@ -410,7 +468,7 @@ class Neo4jRDBMSLoader:
             RelationshipType.TAGGED_WITH,
             NodeLabel.COLUMN,
             NodeLabel.BUSINESS_TERM,
-            "entity_id",
+            "source_id",
             "business_term_id",
             overwrite_existing,
             properties_list,
@@ -438,7 +496,7 @@ class Neo4jRDBMSLoader:
             RelationshipType.TAGGED_WITH,
             NodeLabel.TABLE,
             NodeLabel.BUSINESS_TERM,
-            "entity_id",
+            "source_id",
             "business_term_id",
             overwrite_existing,
             properties_list,
@@ -505,11 +563,14 @@ class Neo4jRDBMSLoader:
         cte_nodes: list[CTE],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "definition", "query_id"],
+        create_name_index: bool = True,
     ) -> dict:
         """Load CTE nodes into Neo4j."""
         _validate_properties_list(CTE, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.CTE])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.CTE)
         query = _build_node_ingest_query(NodeLabel.CTE, overwrite_existing, properties_list)
 
         _, summary, _ = self.neo4j_driver.execute_query(
@@ -575,6 +636,31 @@ class Neo4jRDBMSLoader:
             database_=self.database_name,
         )
         return summary.counters.__dict__
+
+    def upsert_neocarta_graph_node(self, version: str | None = None) -> NeocartaGraph:
+        """
+        Create or update the singleton ``__neocarta_graph__`` metadata node.
+
+        Connectors should invoke this once per run so that the graph carries an
+        up-to-date record of which neocarta version last wrote to it.
+
+        Parameters
+        ----------
+        version: str, optional
+            Override the recorded neocarta version. Defaults to the installed
+            ``neocarta`` package version; explicit overrides should be reserved
+            for tests.
+
+        Returns:
+        -------
+        NeocartaGraph
+            The current state of the metadata node after the upsert.
+        """
+        return upsert_neocarta_graph_node(
+            neo4j_driver=self.neo4j_driver,
+            database_name=self.database_name,
+            version=version,
+        )
 
     def load_uses_column_relationships(
         self,

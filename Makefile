@@ -1,4 +1,4 @@
-.PHONY: help agent create-graph create-graph-no-embeddings clean
+.PHONY: help agent create-graph create-graph-no-embeddings musicbrainz-agent create-graph-from-musicbrainz create-graph-from-musicbrainz-no-embeddings clean
 
 help:
 	@echo "Available commands:"
@@ -11,6 +11,10 @@ help:
 	@echo "  make agent ................... Run the Text2SQL agent"
 	@echo "  make create-graph ............ Extract BigQuery metadata and load into Neo4j with embeddings"
 	@echo "  make create-graph-no-embeddings  Extract BigQuery metadata (skip embeddings)"
+	@echo "  .............................."
+	@echo "  make create-graph-from-musicbrainz ............... Load the MusicBrainz schema into Neo4j with embeddings"
+	@echo "  make create-graph-from-musicbrainz-no-embeddings  Load the MusicBrainz schema (skip embeddings)"
+	@echo "  make musicbrainz-agent ....... Run the MusicBrainz agent"
 	@echo "  .............................."
 	@echo "  make clean ................... Remove Python cache files and temporary directories"
 	@echo "  make fmt ..................... Format the code with Ruff"
@@ -27,6 +31,15 @@ create-graph-from-bigquery:
 
 create-graph-from-bigquery-no-embeddings:
 	uv run examples/bigquery.py --skip-embeddings
+
+create-graph-from-musicbrainz:
+	uv run examples/musicbrainz.py
+
+create-graph-from-musicbrainz-no-embeddings:
+	uv run examples/musicbrainz.py --skip-embeddings
+
+musicbrainz-agent:
+	uv run agent/musicbrainz_agent.py
 
 load-ecommerce-dataset-into-bigquery:
 	uv run datasets/ecommerce_bigquery.py
@@ -50,14 +63,15 @@ install-agent:
 	uv sync --group agent
 
 refresh-mermaid-data-model-images:
-	mmdc -i assets/mermaid/data_model/glossary-metadata-data-model-1.mmd -o assets/images/data_model/glossary-metadata-data-model-1.png
-	mmdc -i assets/mermaid/data_model/glossary-data-model-1.mmd -o assets/images/data_model/glossary-data-model-1.png
-	mmdc -i assets/mermaid/data_model/sql-graph-data-model-core.mmd -o assets/images/data_model/sql-graph-data-model-core.png
-	mmdc -i assets/mermaid/data_model/sql-graph-data-model-expanded-1.mmd -o assets/images/data_model/sql-graph-data-model-expanded-1.png
-	mmdc -i assets/mermaid/data_model/lpg-graph-data-model.mmd -o assets/images/data_model/lpg-graph-data-model.png
-	mmdc -i assets/mermaid/data_model/task-query-data-model-1.mmd -o assets/images/data_model/task-query-data-model-1.png
-	mmdc -i assets/mermaid/data_model/query-log-data-model-1.mmd -o assets/images/data_model/query-log-data-model-1.png
-	mmdc -i assets/mermaid/data_model/table-views-data-model-1.mmd -o assets/images/data_model/table-views-data-model-1.png
+	mmdc -i assets/mermaid/data_model/glossary-metadata-data-model-1.mmd -o assets/images/data_model/glossary-metadata-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/glossary-data-model-1.mmd -o assets/images/data_model/glossary-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/sql-graph-data-model-core.mmd -o assets/images/data_model/sql-graph-data-model-core.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/sql-graph-data-model-expanded-1.mmd -o assets/images/data_model/sql-graph-data-model-expanded-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/lpg-graph-data-model.mmd -o assets/images/data_model/lpg-graph-data-model.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/task-query-data-model-1.mmd -o assets/images/data_model/task-query-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/query-log-data-model-1.mmd -o assets/images/data_model/query-log-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/table-views-data-model-1.mmd -o assets/images/data_model/table-views-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/osi-data-model-1.mmd -o assets/images/data_model/osi-data-model-1.png --scale 2 --backgroundColor transparent
 
 refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-connector-architecture.mmd -o assets/images/architecture/bigquery-connector-architecture.png
@@ -68,13 +82,20 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
 	
 test-unit:
-	uv run pytest tests/unit -v
+	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent
 
 test-it:
-	uv run pytest tests/integration -v
+	uv run pytest tests/integration -v --ignore=tests/integration/_mcp --ignore=tests/integration/_cli
 
 test-mcp:
 	uv run pytest tests/integration/_mcp -v
+	uv run pytest tests/unit/_mcp -v
+
+test-cli:
+	uv run pytest tests/unit/_cli -v
+
+test-agent:
+	uv run pytest tests/unit/agent -v
 
 test-smoke:
 	uv run pytest tests/smoke -v

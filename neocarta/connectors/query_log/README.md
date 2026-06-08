@@ -13,11 +13,11 @@ BigQuery query logs may be retrieved directly from the database via the [`BigQue
 
 ## Data Models
 
-Some information is not accessible by reading query logs. Information such as primary and foreign key identifiers and whether a column is nullable is not avialable. Each column is therefore loaded with `nullable=True`, `isPrimaryKey=False`, `isForeignKey=False` and missing `type` information. We also do not include `description` or `embedding` properties on any nodes.
+Some information is not accessible by reading query logs. Information such as primary and foreign key identifiers and whether a column is nullable is not avialable. Each column is therefore loaded with `nullable=True`, `is_primary_key=False`, `is_foreign_key=False` and missing `type` information. We also do not include `description` or `embedding` properties on any nodes.
 
 When creating a graph from query logs, we are able to see how columns are used in `JOIN` conditions. This lets us persist the `JOIN` criteria on `(:Column)-[:REFERENCES]->(:Column)` relationships for additional context.
 
-We also have direct access to queries run against the tables. We may persist the queries as `Query` nodes in the graph and use them as few shot examples in the context.
+We also have direct access to queries run against the tables. We may persist the queries as `Query` nodes in the graph and use them as few shot examples in the context. Inline Common Table Expressions parsed from those queries are stored as query-scoped `CTE` nodes via `(:Query)-[:DEFINES]->(:CTE)`, so they are kept distinct from real catalog tables.
 
 ```mermaid
 ---
@@ -29,8 +29,9 @@ graph LR
 Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>platform: STRING<br/>service: STRING")
 Schema("Schema<br/>id: STRING | KEY<br/>name: STRING")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING")
-Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>nullable: BOOLEAN<br/>isPrimaryKey: BOOLEAN<br/>isForeignKey: BOOLEAN")
+Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN")
 Query("Query<br/>id: STRING | KEY<br/>content: STRING")
+CTE("CTE<br/>id: STRING | KEY<br/>name: STRING<br/>definition: STRING<br/>query_id: STRING")
 
 %% Relationships
 Database -->|HAS_SCHEMA| Schema
@@ -39,6 +40,7 @@ Table -->|HAS_COLUMN| Column
 Column -->|REFERENCES<br/>criteria: STRING| Column
 Query -->|USES_TABLE| Table
 Query -->|USES_COLUMN| Column
+Query -->|DEFINES| CTE
 ```
 
 ## Usage
@@ -66,7 +68,7 @@ connector = QueryLogConnector(
 )
 
 # Run the connector to extract, transform, and load query log metadata into Neo4j
-connector.run(
+connector.ingest(
     query_log_file="path/to/query_log.json",
     source="bigquery"  # Currently only "bigquery" is supported
 )

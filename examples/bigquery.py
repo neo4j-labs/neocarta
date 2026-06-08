@@ -6,11 +6,10 @@ import os
 from dotenv import load_dotenv
 from google.cloud import bigquery
 from neo4j import GraphDatabase
-from openai import OpenAI
 
 from neocarta import NodeLabel
 from neocarta.connectors.bigquery import BigQuerySchemaConnector
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 
 def main(with_embeddings: bool = True) -> None:
@@ -23,7 +22,6 @@ def main(with_embeddings: bool = True) -> None:
         auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
     )
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-    embedding_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     bigquery_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
 
     # Enum members are recommended, but exact string values (e.g. "Table", "Column") also work.
@@ -42,15 +40,14 @@ def main(with_embeddings: bool = True) -> None:
 
     if with_embeddings:
         print("Generating embeddings for nodes...")
-        # create embeddings for the nodes
-        openai_embeddings_connector = OpenAIEmbeddingsConnector(
+        # create embeddings for the nodes; configure via env vars for the chosen provider
+        # (e.g. OPENAI_API_KEY, GEMINI_API_KEY).
+        embeddings_connector = LiteLLMEmbeddingsConnector(
             neo4j_driver=neo4j_driver,
-            client=embedding_client,
-            embedding_model="text-embedding-3-small",
-            dimensions=768,
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             database_name=neo4j_database,
         )
-        openai_embeddings_connector.run(node_labels=node_labels)
+        embeddings_connector.run(node_labels=node_labels)
 
     print("Connector completed successfully!")
 

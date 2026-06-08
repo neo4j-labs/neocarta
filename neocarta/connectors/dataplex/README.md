@@ -10,7 +10,7 @@ Currently this connector supports reading BigQuery metadata stored in Dataplex a
 
 ### BigQuery Metadata
 
-The BigQuery metadata available via Dataplex is not as comprehensive as reading the metadata directly from BigQuery. Below is the supported data model. Notably absent are the primary and foreign key identifiers. Each column is therefore loaded with `isPrimaryKey=False` and `isForeignKey=False`.
+The BigQuery metadata available via Dataplex is not as comprehensive as reading the metadata directly from BigQuery. Below is the supported data model. Notably absent are the primary and foreign key identifiers. Each column is therefore loaded with `is_primary_key=False` and `is_foreign_key=False`.
 
 ```mermaid
 ---
@@ -42,9 +42,9 @@ config:
 ---
 graph LR
 %% Nodes
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resource_path: STRING")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 
@@ -73,12 +73,12 @@ graph LR
 Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
-Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN<br/>isPrimaryKey: BOOLEAN<br/>isForeignKey: BOOLEAN")
+Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN")
 
 %% Glossary Nodes
-Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
-BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Glossary("Glossary<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+Category("Category<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>resource_path: STRING")
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resource_path: STRING")
 
 %% Database Relationships
 Database -->|HAS_SCHEMA| Schema
@@ -97,7 +97,12 @@ Table -->|TAGGED_WITH| BusinessTerm
 
 ## Usage
 
-The Dataplex connector orchestrates the extraction, transformation, and loading of metadata from Dataplex into Neo4j.
+Dataplex is a source connector with two purpose-scoped sub-connectors:
+
+- `DataplexSchemaConnector` — BigQuery catalog metadata (Database / Schema / Table / Column).
+- `DataplexGlossaryConnector` — business glossary terms plus catalog↔glossary entry links that back `(:Column)-[:TAGGED_WITH]->(:BusinessTerm)` and `(:Table)-[:TAGGED_WITH]->(:BusinessTerm)` edges.
+
+Ingest schema first so the glossary connector's TAGGED_WITH edges find their target Column / Table nodes. The glossary connector accepts `include_entry_links=False` to skip the REST-API round trips when the catalog is not in this Neo4j instance.
 
 ### Code Example
 
@@ -105,9 +110,8 @@ The Dataplex connector orchestrates the extraction, transformation, and loading 
 import os
 from neo4j import GraphDatabase
 from google.cloud import dataplex_v1
-from neocarta.connectors.dataplex import DataplexConnector
+from neocarta.connectors.dataplex import DataplexGlossaryConnector, DataplexSchemaConnector
 
-# Initialize clients
 neo4j_driver = GraphDatabase.driver(
     uri=os.getenv("NEO4J_URI"),
     auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
@@ -116,22 +120,21 @@ neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
 catalog_client = dataplex_v1.CatalogServiceClient()
 glossary_client = dataplex_v1.BusinessGlossaryServiceClient()
 
-# Create connector instance
-connector = DataplexConnector(
-    catalog_client=catalog_client,
-    glossary_client=glossary_client,
+common = dict(
     project_id=os.getenv("GCP_PROJECT_ID"),
     project_number=os.getenv("GCP_PROJECT_NUMBER"),
     dataplex_location=os.getenv("DATAPLEX_LOCATION"),
-    dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
-    include_schema=True,      # Include BigQuery metadata
-    include_glossary=True,     # Include Glossary information
 )
 
-# Run the connector to extract, transform, and load Dataplex metadata into Neo4j
-connector.run()
+DataplexSchemaConnector(catalog_client=catalog_client, **common).ingest(
+    dataset_id=os.getenv("BIGQUERY_DATASET_ID")
+)
+
+DataplexGlossaryConnector(glossary_client=glossary_client, **common).ingest(
+    include_entry_links=True,
+)
 ```
 
 ### Environment Variables
@@ -145,13 +148,5 @@ The following environment variables are required:
 * `GCP_PROJECT_ID` - Google Cloud project ID
 * `GCP_PROJECT_NUMBER` - Google Cloud project number
 * `DATAPLEX_LOCATION` - Dataplex location (e.g., `us-central1`)
-* `BIGQUERY_DATASET_ID` - BigQuery dataset ID (optional, can be passed to `run()` method)
-
-### Connector Components
-
-The `DataplexConnector` class encapsulates three main components:
-
-* **DataplexExtractor** - Extracts metadata from Dataplex Universal Catalog
-* **DataplexTransformer** - Transforms extracted data to the graph schema
-* **Neo4jLoader** - Loads transformed data into Neo4j
+* `BIGQUERY_DATASET_ID` - BigQuery dataset ID (passed to `DataplexSchemaConnector.ingest(dataset_id=...)`)
 
