@@ -35,6 +35,7 @@ ENV_VARS: dict[str, str] = {
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
     "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv ingest`).",
     "OSI_SPEC_SOURCE": "Path or URL to an OSI YAML spec (for `osi ingest`).",
+    "OSI_SEMANTIC_MODEL_NAME": "Name of the OsiSemanticModel to export (for `osi export`).",
 }
 
 
@@ -72,6 +73,9 @@ class CLISettings(BaseSettings):
 
     # OSI
     osi_spec_source: str | None = Field(default=None, validation_alias="OSI_SPEC_SOURCE")
+    osi_semantic_model_name: str | None = Field(
+        default=None, validation_alias="OSI_SEMANTIC_MODEL_NAME"
+    )
 
 
 def load_settings() -> CLISettings:

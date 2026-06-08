@@ -29,6 +29,7 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
 | `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
+| `OSI_SEMANTIC_MODEL_NAME` | For `osi export` | — | Name of the `OsiSemanticModel` to export |
 
 Secrets are env-only and never logged.
 
@@ -174,6 +175,26 @@ Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-inter
 neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
 neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml --embeddings
 OSI_SPEC_SOURCE=./datasets/osi/acme_semantic_model.yaml neocarta osi ingest --dry-run --json
+```
+
+---
+
+### `neocarta osi export`
+
+Exports an OSI semantic model from Neo4j back to an OSI YAML file using `OsiConnector`. Reads the `OsiSemanticModel` with the given name and everything it owns (tables, columns, metrics, joins, aspects) and serializes it to OSI YAML. This is the inverse of `osi ingest`.
+
+- **Flags:**
+  - `--semantic-model-name TEXT` — Name of the `OsiSemanticModel` to export. Overrides `OSI_SEMANTIC_MODEL_NAME`.
+  - `--output-path TEXT` — Destination path for the exported OSI YAML file. Required.
+  - `--dry-run` — Print the planned export as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** round-tripping a semantic model out of the graph, or producing an OSI spec from a model assembled in Neo4j.
+- **Exit codes:** a `--semantic-model-name` with no matching model exits `3` (not found).
+
+```bash
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+OSI_SEMANTIC_MODEL_NAME=acme_corp_model neocarta osi export --output-path acme.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml --dry-run --json
 ```
 
 ---

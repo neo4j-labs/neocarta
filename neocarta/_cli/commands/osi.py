@@ -1,10 +1,11 @@
 """``neocarta osi ...`` commands.
 
-One verb is exposed:
+Two verbs are exposed, wrapping :class:`neocarta.connectors.osi.OsiConnector`:
 
-* ``ingest`` — wraps :class:`neocarta.connectors.osi.OsiConnector`, loading an
-  OSI (Open Semantic Interchange) YAML semantic model from a local path or an
-  HTTP(S) URL into the Neo4j semantic graph.
+* ``ingest`` — load an OSI (Open Semantic Interchange) YAML semantic model from a
+  local path or an HTTP(S) URL into the Neo4j semantic graph.
+* ``export`` — read an OSI semantic model back out of Neo4j and write it to an OSI
+  YAML file.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import click
 
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
-from ..errors import cli_error_from
+from ..errors import CLIError, cli_error_from
 from ..output import emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
@@ -146,4 +147,120 @@ def osi_ingest(
             f"Ingested OSI semantic model from [bold]{spec_source}[/bold] into "
             f"[bold]{settings.neo4j_database}[/bold] "
             f"({'with' if embeddings else 'without'} embeddings)."
+        )
+
+
+@osi.command("export")
+@click.option(
+    "--semantic-model-name",
+    default=None,
+    help="Name of the OsiSemanticModel to export. Overrides OSI_SEMANTIC_MODEL_NAME.",
+)
+@click.option(
+    "--output-path",
+    default=None,
+    help="Destination path for the exported OSI YAML file.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print the planned export without touching Neo4j.",
+)
+@click.option(
+    "--json",
+    "json_flag",
+    is_flag=True,
+    default=False,
+    help="Emit JSON on stdout. Also accepted as a top-level flag.",
+)
+@click.pass_context
+def osi_export(
+    ctx: click.Context,
+    *,
+    semantic_model_name: str | None,
+    output_path: str | None,
+    dry_run: bool,
+    json_flag: bool,
+) -> None:
+    """Export an OSI semantic model from Neo4j to an OSI YAML file.
+
+    Reads the ``OsiSemanticModel`` with the given name (and everything it owns:
+    tables, columns, metrics, joins, aspects) from the graph and writes it back
+    out as an OSI YAML spec. The model name can come from the
+    --semantic-model-name flag or the OSI_SEMANTIC_MODEL_NAME env var;
+    --output-path is required. Pass --dry-run to print the planned export without
+    touching Neo4j. If no model matches the name, the command exits with a
+    not_found error (exit code 3).
+    """
+    settings = load_settings()
+    semantic_model_name = require(
+        "--semantic-model-name",
+        resolve(semantic_model_name, settings.osi_semantic_model_name),
+        env_var="OSI_SEMANTIC_MODEL_NAME",
+    )
+    output_path = require("--output-path", output_path)
+
+    stdout = ctx.obj["stdout"]
+    stderr = ctx.obj["stderr"]
+    as_json = ctx.obj["as_json"] or json_flag
+
+    if dry_run:
+        payload = {
+            "osi_export": {
+                "dry_run": True,
+                "semantic_model_name": semantic_model_name,
+                "output_path": output_path,
+                "database": settings.neo4j_database,
+            }
+        }
+        if as_json:
+            emit_json(payload)
+        else:
+            stdout.print(payload)
+        return
+
+    _require_neo4j_settings(settings)
+
+    # Lazy import: keep the connector dependency off the --help / --dry-run path.
+    from ...connectors.osi import OsiConnector  # noqa: PLC0415
+
+    stderr.print("[dim]Starting OSI connector...[/dim]")
+
+    with _neo4j_driver(settings) as driver:
+        try:
+            connector = OsiConnector(
+                neo4j_driver=driver,
+                database_name=settings.neo4j_database,
+            )
+            connector.export(
+                semantic_model_name=semantic_model_name,
+                output_path=output_path,
+            )
+        except NeocartaError as exc:
+            raise cli_error_from(exc) from exc
+        except ValueError as exc:
+            # OsiConnector.export raises a plain ValueError when no
+            # OsiSemanticModel matches the name; surface it as a clean not_found
+            # (exit 3) rather than an unhandled traceback (exit 1).
+            raise CLIError(
+                "not_found",
+                str(exc),
+                suggestion="Verify the --semantic-model-name exists in the graph.",
+            ) from exc
+
+    payload = {
+        "osi_export": {
+            "semantic_model_name": semantic_model_name,
+            "output_path": output_path,
+            "database": settings.neo4j_database,
+            "status": "succeeded",
+        }
+    }
+    if as_json:
+        emit_json(payload)
+    else:
+        stdout.print(
+            f"Exported OSI semantic model [bold]{semantic_model_name}[/bold] "
+            f"from [bold]{settings.neo4j_database}[/bold] to [bold]{output_path}[/bold]."
         )

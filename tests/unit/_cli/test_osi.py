@@ -70,13 +70,17 @@ def test_ingest_missing_spec_source_fails_with_usage_error(monkeypatch):
     assert "spec-source" in payload["error"]["message"].lower()
 
 
+_MODEL_NAME = "acme_corp_model"
+
+
 @pytest.fixture
 def _cli_env(monkeypatch):
-    """Populate the env vars required for the osi command to start."""
+    """Populate the env vars required for the osi commands to start."""
     monkeypatch.setenv("NEO4J_URI", "bolt://localhost:7687")
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "password")
     monkeypatch.setenv("OSI_SPEC_SOURCE", _SPEC_SOURCE)
+    monkeypatch.setenv("OSI_SEMANTIC_MODEL_NAME", _MODEL_NAME)
 
 
 @pytest.mark.usefixtures("_cli_env")
@@ -128,3 +132,99 @@ def test_osi_ingest_routes_library_errors_to_exit_codes(
         f"{type(error).__name__} should exit {expected_exit_code}, got {result.exit_code}. "
         f"Output: {result.output!r}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# osi export
+# --------------------------------------------------------------------------- #
+
+
+def test_export_help_documents_key_flags():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["osi", "export", "--help"])
+    assert result.exit_code == 0
+    output = result.output
+    for token in ("--semantic-model-name", "--output-path", "--dry-run"):
+        assert token in output, f"--help should document {token}"
+
+
+def test_export_dry_run_emits_json_and_skips_clients():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "osi",
+            "export",
+            "--semantic-model-name",
+            _MODEL_NAME,
+            "--output-path",
+            "out.yaml",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["osi_export"]
+    assert body["dry_run"] is True
+    assert body["semantic_model_name"] == _MODEL_NAME
+    assert body["output_path"] == "out.yaml"
+
+
+@pytest.mark.parametrize(
+    ("args", "missing_token"),
+    [
+        (["--output-path", "x.yaml"], "semantic-model-name"),
+        (["--semantic-model-name", "m"], "output-path"),
+    ],
+)
+def test_export_missing_required_fails_with_usage_error(monkeypatch, args, missing_token):
+    # Stub dotenv (the repo .env would otherwise be discovered) and clear the
+    # one env fallback so the missing-flag path is exercised cleanly.
+    monkeypatch.setattr("neocarta._cli.config.load_dotenv", lambda *_a, **_kw: None)
+    monkeypatch.delenv("OSI_SEMANTIC_MODEL_NAME", raising=False)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--json", "osi", "export", *args, "--dry-run"])
+    assert result.exit_code == 2, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["error"]["code"] == "usage_error"
+    assert missing_token in payload["error"]["message"].lower()
+
+
+@pytest.mark.usefixtures("_cli_env")
+def test_export_success_emits_json():
+    runner = CliRunner()
+    with (
+        patch("neocarta._cli.commands.osi._neo4j_driver") as mock_driver_ctx,
+        patch("neocarta.connectors.osi.OsiConnector", return_value=MagicMock()),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(cli, ["--json", "osi", "export", "--output-path", "out.yaml"])
+
+    assert result.exit_code == 0, result.output
+    out = result.output
+    payload = json.loads(out[out.index("{") :])
+    assert payload["osi_export"]["status"] == "succeeded"
+    assert payload["osi_export"]["semantic_model_name"] == _MODEL_NAME
+
+
+@pytest.mark.usefixtures("_cli_env")
+def test_export_unknown_model_returns_not_found():
+    """A name with no matching OsiSemanticModel becomes a clean not_found exit."""
+    runner = CliRunner()
+    mock_instance = MagicMock()
+    mock_instance.export.side_effect = ValueError("No OsiSemanticModel found with name 'nope'")
+    with (
+        patch("neocarta._cli.commands.osi._neo4j_driver") as mock_driver_ctx,
+        patch("neocarta.connectors.osi.OsiConnector", return_value=mock_instance),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(
+            cli,
+            ["osi", "export", "--semantic-model-name", "nope", "--output-path", "x.yaml"],
+        )
+
+    assert result.exit_code == EXIT_CODES["not_found"]["code"], result.output
