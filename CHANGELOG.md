@@ -1,7 +1,14 @@
 # Changelog of neocarta library and MCP server
 
+## Upcoming
 
-## Upcoming 
+### Fixed
+
+### Changed
+
+### Added
+
+## v0.7.0 
 
 ### Fixed
 
