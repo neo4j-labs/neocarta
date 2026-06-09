@@ -5,6 +5,7 @@
 
 ### Fixed
 
+- MCP server integration tests (`tests/integration/_mcp/test_server_IT.py`) no longer hit the real embedding provider. The batched-embedding change routes graph enrichment through the new `_create_embeddings_sync` / `_create_embeddings_async` batch methods, but the test `MockEmbeddingsConnector` only overrode the single-item `_create_embedding_*` methods — so the module-scoped `loaded_graph` fixture fell through to `litellm`, erroring all eight tests (a 401 in CI with `OPENAI_API_KEY=dummy`, a dimension mismatch locally with a real key). The mock now also overrides the batch methods.
 - Connector lifecycle state-tracking. `extract()` on every connector now resets the downstream `_extracted` / `_transformed` flags so a stale prior `transform()` can't be inadvertently `load()`ed after a second `extract()`. `load()` now checks `_transformed` (not `_extracted`), enforcing the lifecycle rule from `.claude/skills/add-source-connector/connector-contract.md` §9 instead of accepting any extract-followed-by-load sequence.
 - Embedding generation now sends one batched request per `batch_size` chunk instead of one request per node, which is much faster on large graphs. The sync and async embedders (`LiteLLMEmbeddingsConnector`, `OpenAIEmbeddingsConnector`) embed each chunk in a single `embedding(input=[...])` call. Closes #173.
 
