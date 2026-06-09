@@ -112,3 +112,61 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         except Exception as e:
             print(e)
             return None
+
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (sync).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Falls back to
+            per-item calls if the batch request fails, so a single failed input
+            does not drop the whole batch.
+        """
+        try:
+            response = litellm.embedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            print(e)
+            return [self._create_embedding_sync(description) for description in descriptions]
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (async).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Falls back to
+            per-item calls if the batch request fails, so a single failed input
+            does not drop the whole batch.
+        """
+        try:
+            response = await litellm.aembedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            print(e)
+            return [
+                await self._create_embedding_async(description) for description in descriptions
+            ]

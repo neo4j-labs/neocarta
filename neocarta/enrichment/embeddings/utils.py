@@ -1,6 +1,5 @@
 """Utilities for computing and storing node embeddings in Neo4j."""
 
-import asyncio
 from collections.abc import Callable
 from math import ceil
 from typing import Any
@@ -64,68 +63,61 @@ RETURN n.id as id,
 
 
 def _create_embeddings_for_batch_sync(
-    embedding_fn: Callable[[str], list[float]], batch: pd.DataFrame
-) -> list[tuple[str, list[dict[str, Any]]]]:
+    embedding_fn: Callable[[list[str]], list[list[float] | None]], batch: pd.DataFrame
+) -> list[tuple[str, list[float]]]:
     """
     Create embeddings for a batch of node descriptions to embed (sync version).
 
     Parameters
     ----------
     embedding_fn: Callable
-        The embedding function to use. Must take in a node description and return a list of floats.
+        The embedding function to use. Must take in a list of node descriptions and return a list of embeddings, one per description in input order (None for any that failed).
     batch : pd.DataFrame
         A Pandas DataFrame where each row represents a node to embed.
         Has columns `id`, `node_label`, and `description`.
 
     Returns:
     -------
-    list[tuple[str, list[dict[str, Any]]]]
+    list[tuple[str, list[float]]]
         A list of tuples, where the first element is the node id and the second element is the embedding for the node description.
     """
-    results = []
-    for _, row in batch.iterrows():
-        embedding = embedding_fn(description=row["description"])
-        if embedding is not None:
-            results.append((row["id"], embedding))
-    return results
+    embeddings = embedding_fn(batch["description"].tolist())
+    return [
+        (node_id, embedding)
+        for node_id, embedding in zip(batch["id"], embeddings, strict=False)
+        if embedding is not None
+    ]
 
 
 async def _create_embeddings_for_batch_async(
-    embedding_fn: Callable[[str], list[float]], batch: pd.DataFrame
-) -> list[tuple[str, list[dict[str, Any]]]]:
+    embedding_fn: Callable[[list[str]], Any], batch: pd.DataFrame
+) -> list[tuple[str, list[float]]]:
     """
-    Create embeddings for a batch of node descriptions to embed.
+    Create embeddings for a batch of node descriptions to embed (async version).
 
     Parameters
     ----------
     embedding_fn: Callable
-        The embedding function to use. Must take in a node description and return a list of floats.
+        The embedding function to use. Must take in a list of node descriptions and return a list of embeddings, one per description in input order (None for any that failed).
     batch : pd.DataFrame
         A Pandas DataFrame where each row represents a node to embed.
         Has columns `id`, `node_label`, and `description`.
-    failed_cache : list[tuple[str, str]]
-        A list of tuples, where the first element is the node id, the second element is the node label, and the third element is the node description.
-        This is used to log failed embeddings across batches.
 
     Returns:
     -------
-    list[tuple[str, list[dict[str, Any]]]]
+    list[tuple[str, list[float]]]
         A list of tuples, where the first element is the node id and the second element is the embedding for the node description.
     """
-    # Create tasks for all nodes in the batch
-    # order is maintained
-    tasks = [embedding_fn(description=row["description"]) for _, row in batch.iterrows()]
-    # Execute all tasks concurrently
-    embedding_results = await asyncio.gather(*tasks)
+    embeddings = await embedding_fn(batch["description"].tolist())
     return [
         (node_id, embedding)
-        for node_id, embedding in zip(batch["id"], embedding_results, strict=False)
+        for node_id, embedding in zip(batch["id"], embeddings, strict=False)
         if embedding is not None
     ]
 
 
 def create_embeddings_in_batches_sync(
-    embedding_fn: Callable[[str], list[float]],
+    embedding_fn: Callable[[list[str]], list[list[float] | None]],
     nodes_dataframe: pd.DataFrame,
     batch_size: int,
 ) -> list[tuple[str, list[Any]]]:
@@ -134,8 +126,8 @@ def create_embeddings_in_batches_sync(
 
     Parameters
     ----------
-    embedding_fn: Callable[[str], list[float]]
-        The embedding function to use. Must take in a node description and return a list of floats.
+    embedding_fn: Callable[[list[str]], list[list[float] | None]]
+        The embedding function to use. Must take in a list of node descriptions and return a list of embeddings, one per description in input order (None for any that failed).
     nodes_dataframe : pd.DataFrame
         A Pandas DataFrame where each row represents a node.
         Has columns `id`, `node_label`, and `description`.
@@ -167,7 +159,7 @@ def create_embeddings_in_batches_sync(
 
 
 async def create_embeddings_in_batches_async(
-    embedding_fn: Callable[[str], list[float]],
+    embedding_fn: Callable[[list[str]], list[list[float] | None]],
     nodes_dataframe: pd.DataFrame,
     batch_size: int,
 ) -> list[tuple[str, list[Any]]]:
@@ -176,8 +168,8 @@ async def create_embeddings_in_batches_async(
 
     Parameters
     ----------
-    embedding_fn: Callable[[str], list[float]]
-        The embedding function to use. Must take in a node description and return a list of floats.
+    embedding_fn: Callable[[list[str]], list[list[float] | None]]
+        The embedding function to use. Must take in a list of node descriptions and return a list of embeddings, one per description in input order (None for any that failed).
     nodes_dataframe : pd.DataFrame
         A Pandas DataFrame where each row represents a node.
         Has columns `id`, `node_label`, and `description`.
