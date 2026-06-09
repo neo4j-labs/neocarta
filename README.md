@@ -96,38 +96,7 @@ This project provides connector classes that organize the ETL process into reusa
 * **Loaders** - Ingest transformed data into Neo4j
 * **Connectors** - Orchestrate the extract, transform, and load process
 
-Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for metadata ingestion.
-
-### Connector Class Architecture
-
-All connectors follow a consistent class-based architecture:
-
-```python
-class Connector:
-    def __init__(self, clients, config):
-        # Initialize with required clients and configuration
-        self.extractor = Extractor(...)
-        self.transformer = Transformer(...)
-        self.loader = Loader(...)
-
-    def extract_metadata(self):
-        # Extract data from source and cache
-        pass
-
-    def transform_metadata(self):
-        # Transform extracted data to graph schema and cache
-        pass
-
-    def load_metadata(self):
-        # Load transformed data into Neo4j
-        pass
-
-    def run(self):
-        # Orchestrate the full ETL pipeline
-        self.extract_metadata()
-        self.transform_metadata()
-        self.load_metadata()
-```
+Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for ingestion.
 
 ### Connectors
 
