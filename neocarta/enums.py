@@ -26,6 +26,13 @@ class NodeLabel(str, Enum):
     ASPECT = "Aspect"
     OSI_AI_CONTEXT = "OsiAiContext"
     OSI_CUSTOM_EXTENSIONS = "OsiCustomExtensions"
+    COLLIBRA_DATABASE = "CollibraDatabase"
+    COLLIBRA_SCHEMA = "CollibraSchema"
+    COLLIBRA_TABLE = "CollibraTable"
+    COLLIBRA_COLUMN = "CollibraColumn"
+    COLLIBRA_GLOSSARY = "CollibraGlossary"
+    COLLIBRA_CATEGORY = "CollibraCategory"
+    COLLIBRA_BUSINESS_TERM = "CollibraBusinessTerm"
     NEOCARTA_GRAPH = "__neocarta_graph__"
 
     def __str__(self) -> str:

@@ -518,6 +518,50 @@ connector.ingest()
 
 A sample e-commerce dataset is provided in `datasets/csv/` that demonstrates the expected CSV file structure and can be used for testing the CSV connector.
 
+#### **Collibra Data Catalog**
+
+Source connector for extracting metadata from [Collibra Data Intelligence Cloud](https://www.collibra.com/) (Core REST API v2) into Neo4j. It provides two data-type sub-connectors over the same API:
+
+* `CollibraSchemaConnector` — Communities → Database, physical Domains → Schema, Table/Column assets → Table/Column.
+* `CollibraGlossaryConnector` — business-glossary Domains → Glossary, Data Category assets → Category, Business Term assets → BusinessTerm, plus `TAGGED_WITH` tags from columns/tables to business terms.
+
+Nodes are written as `Collibra*` subtypes (e.g. `:Table:CollibraTable`) carrying the source `collibra_id`. Supports bearer-token and basic auth, and community/domain/asset-type scoping plus `include_nodes` / `include_relationships` filtering.
+
+This connector requires the following variables to be set:
+
+* `COLLIBRA_URL` — root URL, e.g. `https://myorg.collibra.com`
+* One of: `COLLIBRA_TOKEN` (bearer JWT/OAuth) **or** `COLLIBRA_USERNAME` + `COLLIBRA_PASSWORD` (basic auth)
+* `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`
+
+##### Code Example
+
+```python
+import os
+from neo4j import GraphDatabase
+from neocarta.connectors.collibra import (
+    CollibraClient,
+    CollibraGlossaryConnector,
+    CollibraSchemaConnector,
+)
+
+client = CollibraClient(
+    base_url=os.environ["COLLIBRA_URL"],
+    token=os.environ.get("COLLIBRA_TOKEN"),
+    username=os.environ.get("COLLIBRA_USERNAME"),
+    password=os.environ.get("COLLIBRA_PASSWORD"),
+)
+
+with GraphDatabase.driver(
+    os.environ["NEO4J_URI"],
+    auth=(os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"]),
+) as driver:
+    # Schema first so glossary TAGGED_WITH edges resolve against Table/Column nodes.
+    CollibraSchemaConnector(client=client, neo4j_driver=driver).ingest()
+    CollibraGlossaryConnector(client=client, neo4j_driver=driver).ingest()
+```
+
+See [`neocarta/connectors/collibra/README.md`](neocarta/connectors/collibra/README.md) for the full data model mapping and configuration options.
+
 
 ### Embeddings 
 

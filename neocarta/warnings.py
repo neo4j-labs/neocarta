@@ -42,3 +42,42 @@ class UnsupportedOsiVersionWarning(NeocartaWarning):
 
         warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
     """
+
+
+class UnmappedCollibraAssetTypeWarning(NeocartaWarning):
+    """
+    Emitted when the Collibra connector encounters asset types it does not model.
+
+    Each Collibra sub-connector maps only the asset types within its scope
+    (schema → Table/Column; glossary → Data Category/Business Term). Collibra
+    ships many other first-class asset types (Report, Data Quality Rule, Policy,
+    Data Source, …); assets of those types are skipped and reported through this
+    warning rather than coerced into an ill-fitting node label.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import UnmappedCollibraAssetTypeWarning
+
+        warnings.filterwarnings("ignore", category=UnmappedCollibraAssetTypeWarning)
+    """
+
+
+class UnresolvedCollibraParentWarning(NeocartaWarning):
+    """
+    Emitted when a Collibra column is skipped because its parent table is out of scope.
+
+    A column's neocarta id is hierarchical (``database.schema.table.column``), so a
+    stable id requires the parent table. When the "Table contains Column" relation
+    points to a table that was not extracted — e.g. scoping (``community_ids`` /
+    ``domain_ids`` / ``asset_type_names``) captured the column but not its table, the
+    relation is missing, or the table failed type classification — the column is
+    skipped rather than given an ambiguous id, and reported through this warning.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import UnresolvedCollibraParentWarning
+
+        warnings.filterwarnings("ignore", category=UnresolvedCollibraParentWarning)
+    """
