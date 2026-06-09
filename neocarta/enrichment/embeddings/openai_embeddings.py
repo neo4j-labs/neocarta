@@ -112,7 +112,8 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
     def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
         """
         Create embeddings for a batch of node descriptions (sync version).
-        If the batch request fails, fall back to per-item calls.
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
 
         Parameters
         ----------
@@ -123,7 +124,6 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
         -------
         list[Optional[list[float]]]
             One embedding per description, in input order.
-            If an individual embedding fails, its entry is None.
         """
         if self.client is None:
             raise ConfigError("Sync client is not provided")
@@ -138,12 +138,13 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             return [item.embedding for item in ordered]
         except Exception as e:
             print(e)
-            return [self._create_embedding_sync(description) for description in descriptions]
+            raise
 
     async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
         """
         Create embeddings for a batch of node descriptions (async version).
-        If the batch request fails, fall back to per-item calls.
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
 
         Parameters
         ----------
@@ -154,7 +155,6 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
         -------
         list[Optional[list[float]]]
             One embedding per description, in input order.
-            If an individual embedding fails, its entry is None.
         """
         if self.async_client is None:
             raise ConfigError("Async client is not provided")
@@ -169,6 +169,4 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             return [item.embedding for item in ordered]
         except Exception as e:
             print(e)
-            return [
-                await self._create_embedding_async(description) for description in descriptions
-            ]
+            raise

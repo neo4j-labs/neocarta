@@ -125,9 +125,9 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         Returns:
         -------
         list[Optional[list[float]]]
-            One embedding vector per description, in input order. Falls back to
-            per-item calls if the batch request fails, so a single failed input
-            does not drop the whole batch.
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
         """
         try:
             response = litellm.embedding(
@@ -139,7 +139,7 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             return [item["embedding"] for item in ordered]
         except Exception as e:
             print(e)
-            return [self._create_embedding_sync(description) for description in descriptions]
+            raise
 
     async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
         """
@@ -153,9 +153,9 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         Returns:
         -------
         list[Optional[list[float]]]
-            One embedding vector per description, in input order. Falls back to
-            per-item calls if the batch request fails, so a single failed input
-            does not drop the whole batch.
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
         """
         try:
             response = await litellm.aembedding(
@@ -167,6 +167,4 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             return [item["embedding"] for item in ordered]
         except Exception as e:
             print(e)
-            return [
-                await self._create_embedding_async(description) for description in descriptions
-            ]
+            raise
