@@ -1,0 +1,101 @@
+{
+  "schemas": [
+    {
+      "name": "analytics",
+      "remarks": ""
+    },
+    {
+      "name": "public",
+      "remarks": ""
+    }
+  ],
+  "tables": [
+    {
+      "schema": "analytics",
+      "name": "daily_revenue",
+      "remarks": "Aggregated daily revenue",
+      "columns": [
+        {
+          "name": "day",
+          "type": "date",
+          "nullable": false,
+          "remarks": "",
+          "is_primary_key": true,
+          "is_foreign_key": false
+        },
+        {
+          "name": "revenue",
+          "type": "numeric",
+          "nullable": true,
+          "remarks": "",
+          "is_primary_key": false,
+          "is_foreign_key": false
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "customers",
+      "remarks": "Customer master records",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "remarks": "",
+          "is_primary_key": true,
+          "is_foreign_key": false
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "nullable": true,
+          "remarks": "",
+          "is_primary_key": false,
+          "is_foreign_key": false
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "orders",
+      "remarks": "Customer orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "remarks": "",
+          "is_primary_key": true,
+          "is_foreign_key": false
+        },
+        {
+          "name": "customer_id",
+          "type": "int4",
+          "nullable": true,
+          "remarks": "",
+          "is_primary_key": false,
+          "is_foreign_key": true
+        },
+        {
+          "name": "total",
+          "type": "numeric",
+          "nullable": true,
+          "remarks": "",
+          "is_primary_key": false,
+          "is_foreign_key": false
+        }
+      ]
+    }
+  ],
+  "foreign_keys": [
+    {
+      "source_schema": "public",
+      "source_table": "orders",
+      "source_column": "customer_id",
+      "target_schema": "public",
+      "target_table": "customers",
+      "target_column": "id"
+    }
+  ]
+}

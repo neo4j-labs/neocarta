@@ -8,6 +8,8 @@
 
 ### Added
 
+- `JdbcSchemaConnector` (`neocarta.connectors.jdbc`): a source connector that extracts schema metadata (`Database`, `Schema`, `Table`, `Column`, and `REFERENCES` foreign-key edges) from any JDBC-compatible database (PostgreSQL, MySQL, Oracle, SQL Server, Redshift, …). The Java↔Python bridge shells out to the SchemaCrawler CLI's `template` command with a bundled FreeMarker template (`schema/catalog.json.ftl`) that renders a compact JSON catalog with full table/column/primary-key/foreign-key detail, then flattens it into the shared `Neo4jRDBMSLoader` pipeline. (SchemaCrawler's `serialize` JSON omits tables and foreign keys, so the template is required to populate `REFERENCES`.) Host prerequisites — Java 11+, the SchemaCrawler distribution (its `_schemacrawler/lib/*` classpath), a FreeMarker JAR on that classpath, and a JDBC driver JAR — are user-supplied (Java availability is checked at construction; all documented in `neocarta/connectors/jdbc/README.md`). The DB password is passed to SchemaCrawler via the environment, never on the command line. Extraction is scoped with `ingest(schemas=[...])`. Ships unit tests (mocked subprocess + a real captured golden fixture) and a skip-guarded Dockerized-PostgreSQL integration test (`tests/integration/connectors/jdbc/`), plus `examples/jdbc.py` and `JDBC_*` entries in `.env.example`.
+
 ## v0.7.0 
 
 ### Fixed

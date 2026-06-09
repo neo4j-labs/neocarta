@@ -66,7 +66,7 @@ neocarta-mcp = "neocarta._mcp.server:run"
 dev = [
     "ipykernel>=7.1.0",
     "pytest>=9.0.2",
-    "testcontainers[neo4j]>=4.14.2",
+    "testcontainers[neo4j,postgres]>=4.14.2",
     "ruff>=0.15.10",
 ]
 
