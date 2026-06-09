@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -55,3 +56,56 @@ def test_arun_keeps_neo4j_driver_open():
         asyncio.run(connector.arun(node_labels=[NodeLabel.TABLE], batch_size=10))
 
     driver.close.assert_not_called()
+
+
+def _fake_embeddings_response(**kwargs):
+    # One embedding per input, returned out of order to verify index sorting.
+    inputs = kwargs["input"]
+    data = [SimpleNamespace(index=i, embedding=[float(i)]) for i in range(len(inputs))]
+    return SimpleNamespace(data=list(reversed(data)))
+
+
+def test_create_embeddings_sync_sends_one_request_per_batch():
+    driver = MagicMock()
+    client = MagicMock()
+    client.embeddings.create.side_effect = _fake_embeddings_response
+    connector = OpenAIEmbeddingsConnector(neo4j_driver=driver, client=client)
+
+    nodes = pd.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "node_label": ["Column", "Column", "Column"],
+            "description": ["alpha", "beta", "gamma"],
+        }
+    )
+
+    result = connector.create_embeddings_sync(nodes, batch_size=10)
+
+    # The whole batch is embedded in a single call, with the descriptions as a list.
+    assert client.embeddings.create.call_count == 1
+    assert client.embeddings.create.call_args.kwargs["input"] == ["alpha", "beta", "gamma"]
+    # Results are paired back to ids in input order (index sorting undoes the shuffle).
+    assert list(result["id"]) == ["a", "b", "c"]
+    assert list(result["embedding"]) == [[0.0], [1.0], [2.0]]
+
+
+def test_create_embeddings_async_sends_one_request_per_batch():
+    driver = MagicMock()
+    async_client = MagicMock()
+    async_client.embeddings.create = AsyncMock(side_effect=_fake_embeddings_response)
+    connector = OpenAIEmbeddingsConnector(neo4j_driver=driver, async_client=async_client)
+
+    nodes = pd.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "node_label": ["Column", "Column", "Column"],
+            "description": ["alpha", "beta", "gamma"],
+        }
+    )
+
+    result = asyncio.run(connector.create_embeddings_async(nodes, batch_size=10))
+
+    assert async_client.embeddings.create.call_count == 1
+    assert async_client.embeddings.create.call_args.kwargs["input"] == ["alpha", "beta", "gamma"]
+    assert list(result["id"]) == ["a", "b", "c"]
+    assert list(result["embedding"]) == [[0.0], [1.0], [2.0]]

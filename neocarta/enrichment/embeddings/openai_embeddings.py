@@ -108,3 +108,65 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
         except Exception as e:
             print(e)
             return None
+
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of node descriptions (sync version).
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding per description, in input order.
+        """
+        if self.client is None:
+            raise ConfigError("Sync client is not provided")
+        try:
+            response = self.client.embeddings.create(
+                model=self.embedding_model,
+                input=descriptions,
+                encoding_format="float",
+                dimensions=self.dimensions,
+            )
+            ordered = sorted(response.data, key=lambda item: item.index)
+            return [item.embedding for item in ordered]
+        except Exception as e:
+            print(e)
+            raise
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of node descriptions (async version).
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding per description, in input order.
+        """
+        if self.async_client is None:
+            raise ConfigError("Async client is not provided")
+        try:
+            response = await self.async_client.embeddings.create(
+                model=self.embedding_model,
+                input=descriptions,
+                encoding_format="float",
+                dimensions=self.dimensions,
+            )
+            ordered = sorted(response.data, key=lambda item: item.index)
+            return [item.embedding for item in ordered]
+        except Exception as e:
+            print(e)
+            raise

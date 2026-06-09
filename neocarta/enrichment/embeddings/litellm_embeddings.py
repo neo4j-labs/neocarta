@@ -112,3 +112,59 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         except Exception as e:
             print(e)
             return None
+
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (sync).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
+        """
+        try:
+            response = litellm.embedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            print(e)
+            raise
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (async).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
+        """
+        try:
+            response = await litellm.aembedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            print(e)
+            raise
