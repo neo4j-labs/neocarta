@@ -117,7 +117,8 @@ class Neo4jRDBMSLoader:
                     created,
                     counters.properties_set,
                 )
-            logger.debug("Merge counters for %s: %s", pattern, counters.__dict__)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Merge counters for %s: %s", pattern, counters.__dict__)
         return counters.__dict__
 
     def load_database_nodes(
