@@ -22,10 +22,11 @@ becomes a deployment choice, not a compatibility problem.
 
 ## Question 1: embeddings in the spark data pipeline, after it, or both
 
-The integration branch removed the embed stage from the Spark job. Embeddings
+The integration branch removed the embed stage from the Spark job and Embeddings
 are added afterward by neocarta's existing enrichment layer, the same path
-every other connector uses. That is a clean default, and we would like to keep
-it. The question is whether to also offer an **opt-in flag** to embed during
+every other connector uses. I think we should keep both options.
+
+The question is whether to also offer an **opt-in flag** to embed during
 the Spark job, because for enterprises with large catalogs the in-pipeline
 path is much more performant:
 
@@ -41,7 +42,7 @@ path is much more performant:
 And some customers will simply want the whole flow native to Databricks: one
 job, one platform, nothing running outside the workspace.
 
-The two paths compose well. Enrichment only touches nodes missing an
+The two options work well together. Enrichment only touches nodes missing an
 `embedding`, so in-pipeline embedding pre-pays work and enrichment no-ops.
 The costs of offering both: two embedding implementations to maintain, and
 both must agree on model and dimension or the vector index breaks.
@@ -49,7 +50,7 @@ both must agree on model and dimension or the vector index breaks.
 **Proposed**: enrichment-after stays the default; add `embed_during_ingest`
 as an opt-in setting for large-catalog and Databricks-native deployments.
 
-## Question 2: should we offer an alternative to LiteLLM for Databricks-native shops
+## Question 2: should neocarta offer an alternative to LiteLLM for Databricks-native shops
 
 LiteLLM backs neocarta's embeddings connector and is currently a **base
 dependency**, imported eagerly by the enrichment package. That means every
@@ -58,8 +59,8 @@ pip has no way to exclude a declared dependency. A Databricks-native shop
 running a Spark pipeline with in-pipeline embeddings would carry LiteLLM
 without ever calling it.
 
-We have seen customers becoming more security conscious after the recent
-supply chain attacks, so it is worth weighing the pros and cons here. LiteLLM
+I have seen customers become more security conscious after the recent
+supply chain attacks, so I think it is worth weighing the pros and cons here. LiteLLM
 is widely adopted and genuinely the right tool for the multi-provider default
 path. At the same time, it carries adapters for 100+ providers and a broad
 dependency tree, and Databricks customers in particular may push back on
@@ -102,7 +103,7 @@ LiteLLM behind an extra is worth the packaging break.
 dbxcarta-spark ships two operational features the integration branch did not
 port: a `verify` package that checks the finished graph against the source
 catalog after a run, and a step that persists the run summary to a Delta
-table. We would like to include both. Neither affects the ingest itself:
+table. I think we should include both. Neither affects the ingest itself:
 
 - **Verify runs after the writes finish**, as a separate read-only pass that
   compares the graph against what the catalog said should exist: catalog and
@@ -133,7 +134,7 @@ Two things to validate with a test pass:
 - **Ambient SDK credentials.** Many enterprises will not accept static token
   auth. LiteLLM documents that when no credentials are passed it falls back to
   the Databricks SDK's unified auth chain: cluster-ambient credentials, OAuth
-  M2M service principals, Azure AD. We should test this, since it is the auth
+  M2M service principals, Azure AD. I want to test this, since it is the auth
   model Databricks shops expect.
 - **External model endpoints.** Confirm `databricks/<endpoint>` works the
   same against an external-model endpoint as against a native one.
