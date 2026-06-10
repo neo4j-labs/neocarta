@@ -6,6 +6,7 @@ from pathlib import Path
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
 from ...errors import StateError
 from ...warnings import UnsupportedOsiVersionWarning
 from .export.extract import OsiGraphExtractor
@@ -153,10 +154,7 @@ class OsiConnector:
         # the instance so repeat transforms behave like independent runs.
         self.transformer = OsiIngestTransformer()
         self.transformer.transform(self.extractor.spec)
-        for label, attr in _OSI_COUNT_FIELDS:
-            produced = len(getattr(self.transformer, attr))
-            if produced:
-                logger.info("Transformed %d %s", produced, label)
+        log_transform_counts(logger, self.transformer, _OSI_COUNT_FIELDS)
         self._transformed = True
 
     def load(self) -> None:

@@ -5,6 +5,7 @@ import warnings
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
 from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import QueryLogExtractor
@@ -96,10 +97,7 @@ class QueryLogConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
-        for label, attr in _TRANSFORM_COUNTS:
-            produced = len(getattr(self.transformer, attr))
-            if produced:
-                logger.info("Transformed %d %s", produced, label)
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:

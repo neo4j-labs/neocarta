@@ -5,6 +5,7 @@ import warnings
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
 from ...enums import NodeLabel, RelationshipType
 from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
@@ -131,10 +132,7 @@ class CSVConnector:
         t.transform_to_uses_column_relationships(e.query_column_info)
         t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
         t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
-        for label, attr in _TRANSFORM_COUNTS:
-            produced = len(getattr(t, attr))
-            if produced:
-                logger.info("Transformed %d %s", produced, label)
+        log_transform_counts(logger, t, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:

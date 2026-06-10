@@ -13,6 +13,7 @@ from neocarta._logging import (
     humanize,
     log_stage,
     log_timing,
+    log_transform_counts,
 )
 
 
@@ -53,6 +54,25 @@ def test_row_count_none_and_plain_dict_return_none():
     assert _row_count(None) is None
     # A parsed OSI spec dict carries no row-shaped values.
     assert _row_count({"version": "0.1.1", "name": "x"}) is None
+
+
+def test_log_transform_counts_logs_nonzero_and_skips_empty(caplog):
+    class _Transformer:
+        def __init__(self):
+            self.table_nodes = [1, 2, 3]
+            self.column_nodes = [1, 2]
+            self.value_nodes = []  # empty -> skipped
+
+    fields = (("tables", "table_nodes"), ("columns", "column_nodes"), ("values", "value_nodes"))
+    logger = logging.getLogger(__name__)
+    with caplog.at_level(logging.INFO, logger=__name__):
+        log_transform_counts(logger, _Transformer(), fields)
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert "Transformed 3 tables" in messages
+    assert "Transformed 2 columns" in messages
+    # Zero-count types stay quiet.
+    assert all("values" not in m for m in messages)
 
 
 def test_safe_target_includes_allowlisted_excludes_data_bearing_keys():

@@ -6,6 +6,7 @@ import warnings
 from google.cloud import bigquery
 from neo4j import Driver
 
+from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import BigQuerySchemaExtractor
@@ -131,10 +132,7 @@ class BigQuerySchemaConnector:
             self.extractor.column_references_info
         )
         self.transformer.transform_to_has_value_relationships(self.extractor.column_unique_values)
-        for label, attr in _TRANSFORM_COUNTS:
-            produced = len(getattr(self.transformer, attr))
-            if produced:
-                logger.info("Transformed %d %s", produced, label)
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:

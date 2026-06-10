@@ -29,7 +29,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping
+    from collections.abc import Iterable, Iterator, Mapping
 
     from rich.console import Console
 
@@ -131,13 +131,51 @@ def humanize(method_name: str) -> str:
     return method_name.replace("_", " ").strip().capitalize()
 
 
+def log_transform_counts(
+    logger: logging.Logger,
+    source: Any,
+    fields: Iterable[tuple[str, str]],
+) -> None:
+    """
+    Log per-type produced-object counts read off ``source``.
+
+    For each ``(label, attr)`` pair, logs ``"Transformed N <label>"`` at INFO
+    when ``len(getattr(source, attr))`` is non-zero; zero-count types are
+    skipped so an empty phase stays quiet. Connectors define the ``fields``
+    sequence (which node/relationship lists to report, in order); this shared
+    helper owns the loop so the logging shape stays consistent across them.
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        The connector module's logger.
+    source : object
+        The transformer holding the produced lists (e.g. ``self.transformer``).
+    fields : iterable of (str, str)
+        ``(human_label, attribute_name)`` pairs to count and report.
+    """
+    if not logger.isEnabledFor(logging.INFO):
+        return
+    for label, attr in fields:
+        produced = len(getattr(source, attr))
+        if produced:
+            logger.info("Transformed %d %s", produced, label)
+
+
 def _row_count(result: Any) -> int | None:
     """
     Best-effort row count for an extractor return value.
 
     Returns ``len`` for a pandas ``DataFrame`` (duck-typed via ``shape``) or a
-    list, the summed length for a ``dict`` of such values, and ``None`` when no
-    meaningful count exists (e.g. a parsed OSI spec dict or ``None``).
+    list, the summed length for a ``dict`` of such values (an extractor that
+    pulls several frames at once reports the total rows pulled), and ``None``
+    when no meaningful count exists (e.g. a parsed OSI spec dict or ``None``).
+
+    Note that summing a ``dict`` only makes sense when its frames are the same
+    kind of thing. An extractor whose mapping mixes heterogeneous or derived
+    frames (e.g. queries plus the tables/columns parsed out of them) should
+    opt out with ``count=False`` on :func:`log_stage` rather than emit a
+    meaningless sum.
     """
     if result is None:
         return None

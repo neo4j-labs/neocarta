@@ -6,6 +6,7 @@ import warnings
 from google.cloud import dataplex_v1
 from neo4j import Driver
 
+from ...._logging import log_transform_counts
 from ....errors import StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import DataplexSchemaExtractor
@@ -113,10 +114,7 @@ class DataplexSchemaConnector:
         t.transform_to_has_schema_relationships(e.schema_info)
         t.transform_to_has_table_relationships(e.table_info)
         t.transform_to_has_column_relationships(e.column_info)
-        for label, attr in _TRANSFORM_COUNTS:
-            produced = len(getattr(t, attr))
-            if produced:
-                logger.info("Transformed %d %s", produced, label)
+        log_transform_counts(logger, t, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
