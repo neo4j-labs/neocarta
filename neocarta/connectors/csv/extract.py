@@ -1,5 +1,6 @@
 """CSV Extractor for reading and validating CSV files into a cache."""
 
+import logging
 from pathlib import Path
 from typing import ClassVar
 
@@ -18,6 +19,8 @@ from ..utils.generate_id import (
     generate_value_id,
 )
 from .models import CSVExtractorCache
+
+logger = logging.getLogger(__name__)
 
 # Required columns per entity type
 REQUIRED_COLUMNS: dict[str, list[str]] = {
@@ -299,15 +302,15 @@ class CSVExtractor:
         filename = self.csv_file_map[entity_key]
         df = self._read_csv(filename)
         if df is None:
-            print(f"  Skipping {filename} (file not found)")
+            logger.info("Skipping %s (file not found)", filename)
             return None
         if df.empty:
-            print(f"  Skipping {filename} (file is empty)")
+            logger.info("Skipping %s (file is empty)", filename)
             return None
 
         self._validate_columns(df, entity_key, filename)
         self._cache[cache_key] = df
-        print(f"  Extracted {len(df)} rows from {filename}")
+        logger.info("Extracted %d rows from %s", len(df), filename)
         return df
 
     # ------------------------------------------------------------------
@@ -489,10 +492,10 @@ class CSVExtractor:
         filename = self.csv_file_map.get("column_tagged_with", "column_term_info.csv")
         df = self._read_csv(filename)
         if df is None:
-            print(f"  Skipping {filename} (file not found)")
+            logger.info("Skipping %s (file not found)", filename)
             return None
         if df.empty:
-            print(f"  Skipping {filename} (file is empty)")
+            logger.info("Skipping %s (file is empty)", filename)
             return None
         self._validate_columns(df, "column_tagged_with", filename)
         if "column_id" not in df.columns:
@@ -510,7 +513,7 @@ class CSVExtractor:
                 axis=1,
             )
         self._cache["column_tagged_with_info"] = df
-        print(f"  Extracted {len(df)} rows from {filename}")
+        logger.info("Extracted %d rows from %s", len(df), filename)
         return df
 
     def extract_table_tagged_with_info(self) -> pd.DataFrame | None:
@@ -518,10 +521,10 @@ class CSVExtractor:
         filename = self.csv_file_map.get("table_tagged_with", "table_term_info.csv")
         df = self._read_csv(filename)
         if df is None:
-            print(f"  Skipping {filename} (file not found)")
+            logger.info("Skipping %s (file not found)", filename)
             return None
         if df.empty:
-            print(f"  Skipping {filename} (file is empty)")
+            logger.info("Skipping %s (file is empty)", filename)
             return None
         self._validate_columns(df, "table_tagged_with", filename)
         if "table_id" not in df.columns:
@@ -537,7 +540,7 @@ class CSVExtractor:
                 axis=1,
             )
         self._cache["table_tagged_with_info"] = df
-        print(f"  Extracted {len(df)} rows from {filename}")
+        logger.info("Extracted %d rows from %s", len(df), filename)
         return df
 
     def extract_all(
@@ -585,7 +588,7 @@ class CSVExtractor:
             for name in include_relationships or []:
                 needed.add(REL_ENTITIES[name])
 
-        print(f"Extracting CSV files from {self.csv_directory}...")
+        logger.info("Extracting CSV files from %s", self.csv_directory)
         if "database" in needed:
             self.extract_database_info()
         if "schema" in needed:

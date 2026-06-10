@@ -5,6 +5,8 @@ from typing import Any
 
 from neo4j import Driver
 
+from ...._logging import log_stage
+
 
 class OsiGraphExtractor:
     """
@@ -32,6 +34,7 @@ class OsiGraphExtractor:
     # Public API
     # ------------------------------------------------------------------ #
 
+    @log_stage(count=False)
     def extract(self, semantic_model_name: str) -> dict[str, Any]:
         """
         Read the OSI semantic model with the given ``name`` from Neo4j.

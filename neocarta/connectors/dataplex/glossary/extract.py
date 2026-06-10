@@ -1,11 +1,14 @@
 """Extract Dataplex business glossary terms and catalog-to-glossary entry links."""
 
+import logging
+
 import google.auth
 import google.auth.transport.requests
 import pandas as pd
 import requests
 from google.cloud import dataplex_v1
 
+from ...._logging import log_stage
 from ....errors import StateError
 from ...utils.generate_id import (
     generate_business_term_id,
@@ -14,6 +17,8 @@ from ...utils.generate_id import (
 )
 from ..models import EntryLinkInfoResponse, GlossaryInfoResponse
 from ..utils import parse_business_term_slug, parse_category_slug, parse_glossary_resource_path
+
+logger = logging.getLogger(__name__)
 
 # Standard Dataplex link type for glossary-term tagging. The lookupEntryLinks
 # REST endpoint requires a type filter; this is the only documented one for
@@ -138,6 +143,7 @@ class DataplexGlossaryExtractor:
         )
         return merged[cols]
 
+    @log_stage(count=False)
     def extract(self, include_entry_links: bool = True) -> None:
         """
         Extract all glossary terms and (optionally) their entry links to catalog assets.
@@ -153,6 +159,7 @@ class DataplexGlossaryExtractor:
         if include_entry_links:
             self.extract_entry_links()
 
+    @log_stage
     def extract_glossary_info(self) -> pd.DataFrame:
         """
         Extract all glossary terms from all glossaries in the configured location.
@@ -169,7 +176,7 @@ class DataplexGlossaryExtractor:
         try:
             glossaries = self.glossary_client.list_glossaries(parent=parent)
         except Exception as e:
-            print(f"Error listing glossaries: {e}")
+            logger.warning("Error listing glossaries: %s", e)
             return pd.DataFrame()
 
         for glossary in glossaries:
@@ -179,7 +186,7 @@ class DataplexGlossaryExtractor:
             try:
                 terms = self.glossary_client.list_glossary_terms(parent=glossary.name)
             except Exception as e:
-                print(f"Error listing terms for glossary {glossary_id}: {e}")
+                logger.warning("Error listing terms for glossary %s: %s", glossary_id, e)
                 continue
 
             for term in terms:
@@ -199,6 +206,7 @@ class DataplexGlossaryExtractor:
         self._glossary_info = pd.concat([self._glossary_info, df], ignore_index=True)
         return df
 
+    @log_stage
     def extract_entry_links(self) -> pd.DataFrame:
         """
         Retrieve all entry links between glossary terms and BigQuery assets.
@@ -241,7 +249,7 @@ class DataplexGlossaryExtractor:
             try:
                 links = self._lookup_entry_links_page(session, term_entry)
             except Exception as e:
-                print(f"Error looking up entry links for term '{term_slug}': {e}")
+                logger.warning("Error looking up entry links for term '%s': %s", term_slug, e)
                 continue
 
             for link in links:

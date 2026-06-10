@@ -6,7 +6,12 @@
 
 ### Changed
 
+- Connector and ingest progress is now reported through Python's `logging` (rooted at the `neocarta` logger) instead of bare `print()`. Connectors log each ETL phase (`extract` / `transform` / `load`) with per-type produced-object counts; the Neo4j loader logs each write by its graph pattern plus merge counters (e.g. `Ingested (:Column)-[:TAGGED_WITH]->(:BusinessTerm) — created 12, properties_set 24`); and each extractor method logs a one-line summary (target + row count + elapsed). SQL text and row values are never logged. The bare `print()` calls in the connectors, the ingest layer, and the query-log/SQL-parsing utilities were converted to module loggers (`logging.getLogger(__name__)`), and the error `print()`s in the Dataplex glossary extractor became `logger.warning`. Importing neocarta as a library stays silent (a `NullHandler` is attached to the `neocarta` logger); only the CLI attaches a real handler.
+
 ### Added
+
+- Unified logging configuration in `neocarta._logging`: `configure_logging(level, *, console=...)` configures the `neocarta` package-root logger (attaching a `rich.logging.RichHandler` to the CLI's existing stderr console when given, so `--no-color` is honored and stdout stays clean for `--json`); plus a `log_stage` decorator and `log_timing` context manager used to instrument extractor methods consistently.
+- `--log-level [DEBUG|INFO|WARNING|ERROR]` global CLI option controlling diagnostics verbosity on stderr (default `INFO`). The previously-unused `--debug` flag is now a convenience alias for `--log-level DEBUG`.
 
 ## v0.7.0 
 

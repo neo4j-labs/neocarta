@@ -1,5 +1,6 @@
 """Common ingest functions for Neo4j."""
 
+import logging
 from functools import partial
 
 from neo4j import Driver, RoutingControl
@@ -34,10 +35,14 @@ from ..metadata import upsert_neocarta_graph_node
 from ..utils import (
     _build_node_ingest_query,
     _build_relationship_ingest_query,
+    _node_pattern,
+    _relationship_pattern,
     _validate_properties_list,
     write_neo4j_constraints,
 )
 from .constraints import KEY_CONSTRAINTS_LOOKUP, UNIQUE_CONSTRAINTS_LOOKUP
+
+logger = logging.getLogger(__name__)
 
 
 class Neo4jRDBMSLoader:
@@ -71,15 +76,49 @@ class Neo4jRDBMSLoader:
             database_name=self.database_name,
         )
 
-    def _run_write(self, cypher: str, rows: list[dict]) -> dict:
-        """Execute a write Cypher against the configured database and return counters."""
+    def _run_write(self, cypher: str, rows: list[dict], *, pattern: str | None = None) -> dict:
+        """
+        Execute a write Cypher against the configured database and return counters.
+
+        When ``pattern`` is supplied, the graph pattern written and the Neo4j
+        merge counters are logged (INFO: pattern + created/properties_set;
+        DEBUG: the full counters dict). The pattern string is the only place a
+        label/relationship-type is surfaced — no row data or Cypher text is
+        logged.
+
+        Parameters
+        ----------
+        cypher : str
+            The write Cypher to execute.
+        rows : list[dict]
+            The ``$rows`` parameter for the UNWIND-based ingest query.
+        pattern : str, optional
+            Human-readable graph pattern for the log line, e.g.
+            ``"(:Column)-[:TAGGED_WITH]->(:BusinessTerm)"``.
+
+        Returns:
+        -------
+        dict
+            The Neo4j summary counters.
+        """
         _, summary, _ = self.neo4j_driver.execute_query(
             query_=cypher,
             parameters_={"rows": rows},
             routing_=RoutingControl.WRITE,
             database_=self.database_name,
         )
-        return summary.counters.__dict__
+        counters = summary.counters
+        if pattern is not None:
+            if logger.isEnabledFor(logging.INFO):
+                created = counters.nodes_created or counters.relationships_created
+                logger.info(
+                    "Ingested %s — created %s, properties_set %s",
+                    pattern,
+                    created,
+                    counters.properties_set,
+                )
+            logger.debug("Merge counters for %s: %s", pattern, counters.__dict__)
+        return counters.__dict__
 
     def load_database_nodes(
         self,
@@ -95,14 +134,11 @@ class Neo4jRDBMSLoader:
             self._create_name_range_index(node_label=NodeLabel.DATABASE)
         query = _build_node_ingest_query(NodeLabel.DATABASE, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in database_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in database_nodes],
+            pattern=_node_pattern(NodeLabel.DATABASE),
         )
-
-        return summary.counters.__dict__
 
     def load_schema_nodes(
         self,
@@ -122,13 +158,11 @@ class Neo4jRDBMSLoader:
             self._create_full_text_index(node_labels=[NodeLabel.SCHEMA])
         query = _build_node_ingest_query(NodeLabel.SCHEMA, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in schema_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in schema_nodes],
+            pattern=_node_pattern(NodeLabel.SCHEMA),
         )
-        return summary.counters.__dict__
 
     def load_table_nodes(
         self,
@@ -148,13 +182,11 @@ class Neo4jRDBMSLoader:
             self._create_full_text_index(node_labels=[NodeLabel.TABLE])
         query = _build_node_ingest_query(NodeLabel.TABLE, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in table_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in table_nodes],
+            pattern=_node_pattern(NodeLabel.TABLE),
         )
-        return summary.counters.__dict__
 
     def load_column_nodes(
         self,
@@ -181,13 +213,11 @@ class Neo4jRDBMSLoader:
             self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
         query = _build_node_ingest_query(NodeLabel.COLUMN, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in column_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in column_nodes],
+            pattern=_node_pattern(NodeLabel.COLUMN),
         )
-        return summary.counters.__dict__
 
     def load_value_nodes(
         self,
@@ -201,13 +231,11 @@ class Neo4jRDBMSLoader:
         self._write_node_constraint(node_labels=[NodeLabel.VALUE])
         query = _build_node_ingest_query(NodeLabel.VALUE, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in value_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in value_nodes],
+            pattern=_node_pattern(NodeLabel.VALUE),
         )
-        return summary.counters.__dict__
 
     def load_has_schema_relationships(
         self,
@@ -229,13 +257,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_schema_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_schema_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_SCHEMA, NodeLabel.DATABASE, NodeLabel.SCHEMA
+            ),
         )
-        return summary.counters.__dict__
 
     def load_has_table_relationships(
         self,
@@ -257,13 +285,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_table_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_table_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_TABLE, NodeLabel.SCHEMA, NodeLabel.TABLE
+            ),
         )
-        return summary.counters.__dict__
 
     def load_has_column_relationships(
         self,
@@ -285,13 +313,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_column_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_column_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_COLUMN, NodeLabel.TABLE, NodeLabel.COLUMN
+            ),
         )
-        return summary.counters.__dict__
 
     def load_references_relationships(
         self,
@@ -313,13 +341,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in references_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in references_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.REFERENCES, NodeLabel.COLUMN, NodeLabel.COLUMN
+            ),
         )
-        return summary.counters.__dict__
 
     def load_glossary_nodes(
         self,
@@ -336,13 +364,11 @@ class Neo4jRDBMSLoader:
             self._create_name_range_index(node_label=NodeLabel.GLOSSARY)
         query = _build_node_ingest_query(NodeLabel.GLOSSARY, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in glossary_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in glossary_nodes],
+            pattern=_node_pattern(NodeLabel.GLOSSARY),
         )
-        return summary.counters.__dict__
 
     def load_category_nodes(
         self,
@@ -359,13 +385,11 @@ class Neo4jRDBMSLoader:
             self._create_name_range_index(node_label=NodeLabel.CATEGORY)
         query = _build_node_ingest_query(NodeLabel.CATEGORY, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in category_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in category_nodes],
+            pattern=_node_pattern(NodeLabel.CATEGORY),
         )
-        return summary.counters.__dict__
 
     def load_business_term_nodes(
         self,
@@ -387,13 +411,11 @@ class Neo4jRDBMSLoader:
             NodeLabel.BUSINESS_TERM, overwrite_existing, properties_list
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in business_term_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in business_term_nodes],
+            pattern=_node_pattern(NodeLabel.BUSINESS_TERM),
         )
-        return summary.counters.__dict__
 
     def load_has_category_relationships(
         self,
@@ -415,13 +437,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_category_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_category_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_CATEGORY, NodeLabel.GLOSSARY, NodeLabel.CATEGORY
+            ),
         )
-        return summary.counters.__dict__
 
     def load_has_business_term_relationships(
         self,
@@ -443,13 +465,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_business_term_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_business_term_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_BUSINESS_TERM, NodeLabel.CATEGORY, NodeLabel.BUSINESS_TERM
+            ),
         )
-        return summary.counters.__dict__
 
     def load_column_tagged_with_relationships(
         self,
@@ -471,13 +493,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in tagged_with_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in tagged_with_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.TAGGED_WITH, NodeLabel.COLUMN, NodeLabel.BUSINESS_TERM
+            ),
         )
-        return summary.counters.__dict__
 
     def load_table_tagged_with_relationships(
         self,
@@ -499,13 +521,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in tagged_with_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in tagged_with_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.TAGGED_WITH, NodeLabel.TABLE, NodeLabel.BUSINESS_TERM
+            ),
         )
-        return summary.counters.__dict__
 
     def load_has_value_relationships(
         self,
@@ -527,13 +549,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in has_value_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_value_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_VALUE, NodeLabel.COLUMN, NodeLabel.VALUE
+            ),
         )
-        return summary.counters.__dict__
 
     def load_query_nodes(
         self,
@@ -547,13 +569,11 @@ class Neo4jRDBMSLoader:
         self._write_node_constraint(node_labels=[NodeLabel.QUERY])
         query = _build_node_ingest_query(NodeLabel.QUERY, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in query_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in query_nodes],
+            pattern=_node_pattern(NodeLabel.QUERY),
         )
-        return summary.counters.__dict__
 
     def load_cte_nodes(
         self,
@@ -570,13 +590,11 @@ class Neo4jRDBMSLoader:
             self._create_name_range_index(node_label=NodeLabel.CTE)
         query = _build_node_ingest_query(NodeLabel.CTE, overwrite_existing, properties_list)
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in cte_nodes]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in cte_nodes],
+            pattern=_node_pattern(NodeLabel.CTE),
         )
-        return summary.counters.__dict__
 
     def load_defines_relationships(
         self,
@@ -598,13 +616,11 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in defines_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in defines_relationships],
+            pattern=_relationship_pattern(RelationshipType.DEFINES, NodeLabel.QUERY, NodeLabel.CTE),
         )
-        return summary.counters.__dict__
 
     def load_uses_table_relationships(
         self,
@@ -626,13 +642,13 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in uses_table_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in uses_table_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.USES_TABLE, NodeLabel.QUERY, NodeLabel.TABLE
+            ),
         )
-        return summary.counters.__dict__
 
     def upsert_neocarta_graph_node(self, version: str | None = None) -> NeocartaGraph:
         """
@@ -679,10 +695,10 @@ class Neo4jRDBMSLoader:
             properties_list,
         )
 
-        _, summary, _ = self.neo4j_driver.execute_query(
-            query_=query,
-            parameters_={"rows": [n.model_dump() for n in uses_column_relationships]},
-            routing_=RoutingControl.WRITE,
-            database_=self.database_name,
+        return self._run_write(
+            query,
+            [n.model_dump() for n in uses_column_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.USES_COLUMN, NodeLabel.QUERY, NodeLabel.COLUMN
+            ),
         )
-        return summary.counters.__dict__

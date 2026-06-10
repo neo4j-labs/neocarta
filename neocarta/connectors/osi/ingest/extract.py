@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 import httpx
 import yaml
 
+from ...._logging import log_stage
+
 
 class OsiSpecExtractor:
     """
@@ -23,6 +25,7 @@ class OsiSpecExtractor:
         self.http_timeout = http_timeout
         self.spec: dict[str, Any] | None = None
 
+    @log_stage(count=False)
     def extract(self, spec_source: str | Path) -> dict[str, Any]:
         """
         Read the OSI spec from ``spec_source`` and parse it as YAML.

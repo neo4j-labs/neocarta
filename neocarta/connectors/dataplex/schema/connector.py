@@ -1,5 +1,6 @@
 """Dataplex schema sub-connector."""
 
+import logging
 import warnings
 
 from google.cloud import dataplex_v1
@@ -9,6 +10,16 @@ from ....errors import StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import DataplexSchemaExtractor
 from .transform import DataplexSchemaTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+)
 
 
 class DataplexSchemaConnector:
@@ -69,6 +80,7 @@ class DataplexSchemaConnector:
         dataset_id : str
             The BigQuery dataset ID to extract.
         """
+        logger.info("Extracting Dataplex schema metadata...")
         self._extracted = False
         self._transformed = False
         self.extractor.extract(dataset_id=dataset_id)
@@ -89,6 +101,7 @@ class DataplexSchemaConnector:
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming Dataplex schema metadata...")
         e = self.extractor
         t = self.transformer
 
@@ -100,6 +113,10 @@ class DataplexSchemaConnector:
         t.transform_to_has_schema_relationships(e.schema_info)
         t.transform_to_has_table_relationships(e.table_info)
         t.transform_to_has_column_relationships(e.column_info)
+        for label, attr in _TRANSFORM_COUNTS:
+            produced = len(getattr(t, attr))
+            if produced:
+                logger.info("Transformed %d %s", produced, label)
         self._transformed = True
 
     def load(self) -> None:
@@ -119,18 +136,17 @@ class DataplexSchemaConnector:
             )
         t = self.transformer
 
-        print(self.loader.load_database_nodes(t.database_nodes))
-        print(self.loader.load_schema_nodes(t.schema_nodes))
-        print(self.loader.load_table_nodes(t.table_nodes))
-        print(
-            self.loader.load_column_nodes(
-                t.column_nodes, properties_list=["name", "description", "type"]
-            )
+        logger.info("Loading Dataplex schema metadata into Neo4j...")
+        self.loader.load_database_nodes(t.database_nodes)
+        self.loader.load_schema_nodes(t.schema_nodes)
+        self.loader.load_table_nodes(t.table_nodes)
+        self.loader.load_column_nodes(
+            t.column_nodes, properties_list=["name", "description", "type"]
         )
 
-        print(self.loader.load_has_schema_relationships(t.has_schema_relationships))
-        print(self.loader.load_has_table_relationships(t.has_table_relationships))
-        print(self.loader.load_has_column_relationships(t.has_column_relationships))
+        self.loader.load_has_schema_relationships(t.has_schema_relationships)
+        self.loader.load_has_table_relationships(t.has_table_relationships)
+        self.loader.load_has_column_relationships(t.has_column_relationships)
 
     def ingest(self, dataset_id: str) -> None:
         """
@@ -141,15 +157,12 @@ class DataplexSchemaConnector:
         dataset_id : str
             The BigQuery dataset ID to ingest.
         """
-        print("Extracting schema metadata from Dataplex...")
         self.extract(dataset_id)
-        print("Transforming schema metadata from Dataplex...")
         self.transform()
-        print("Loading schema metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("Dataplex schema connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("Dataplex schema connector completed successfully")
 
     def run(self, dataset_id: str) -> None:
         """

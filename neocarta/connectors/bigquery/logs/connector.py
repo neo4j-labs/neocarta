@@ -1,5 +1,6 @@
 """BigQuery query log connector."""
 
+import logging
 import warnings
 
 from google.cloud import bigquery
@@ -9,6 +10,18 @@ from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from ...query_log.transform import QueryLogTransformer
 from .extract import BigQueryLogsExtractor
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("queries", "query_nodes"),
+    ("CTEs", "cte_nodes"),
+)
 
 
 class BigQueryLogsConnector:
@@ -81,6 +94,7 @@ class BigQueryLogsConnector:
         drop_failed_queries : bool, default True
             Whether to exclude failed queries.
         """
+        logger.info("Extracting BigQuery query logs...")
         self._extracted = False
         self._transformed = False
         self.extractor.extract_query_logs(
@@ -109,6 +123,7 @@ class BigQueryLogsConnector:
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming BigQuery query log metadata...")
 
         # Transform nodes
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
@@ -128,6 +143,10 @@ class BigQueryLogsConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
+        for label, attr in _TRANSFORM_COUNTS:
+            produced = len(getattr(self.transformer, attr))
+            if produced:
+                logger.info("Transformed %d %s", produced, label)
         self._transformed = True
 
     def load(self) -> None:
@@ -145,32 +164,25 @@ class BigQueryLogsConnector:
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 
+        logger.info("Loading BigQuery query log metadata into Neo4j...")
         # Load nodes
-        print(
-            self.loader.load_database_nodes(
-                self.transformer.database_nodes, properties_list=["name", "service", "platform"]
-            )
+        self.loader.load_database_nodes(
+            self.transformer.database_nodes, properties_list=["name", "service", "platform"]
         )
-        print(
-            self.loader.load_schema_nodes(self.transformer.schema_nodes, properties_list=["name"])
-        )
-        print(self.loader.load_table_nodes(self.transformer.table_nodes, properties_list=["name"]))
-        print(
-            self.loader.load_column_nodes(self.transformer.column_nodes, properties_list=["name"])
-        )
-        print(self.loader.load_query_nodes(self.transformer.query_nodes))
-        print(self.loader.load_cte_nodes(self.transformer.cte_nodes))
+        self.loader.load_schema_nodes(self.transformer.schema_nodes, properties_list=["name"])
+        self.loader.load_table_nodes(self.transformer.table_nodes, properties_list=["name"])
+        self.loader.load_column_nodes(self.transformer.column_nodes, properties_list=["name"])
+        self.loader.load_query_nodes(self.transformer.query_nodes)
+        self.loader.load_cte_nodes(self.transformer.cte_nodes)
 
         # Load relationships
-        print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
-        print(self.loader.load_has_table_relationships(self.transformer.has_table_relationships))
-        print(self.loader.load_has_column_relationships(self.transformer.has_column_relationships))
-        print(self.loader.load_references_relationships(self.transformer.references_relationships))
-        print(self.loader.load_uses_table_relationships(self.transformer.uses_table_relationships))
-        print(
-            self.loader.load_uses_column_relationships(self.transformer.uses_column_relationships)
-        )
-        print(self.loader.load_defines_relationships(self.transformer.defines_relationships))
+        self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships)
+        self.loader.load_has_table_relationships(self.transformer.has_table_relationships)
+        self.loader.load_has_column_relationships(self.transformer.has_column_relationships)
+        self.loader.load_references_relationships(self.transformer.references_relationships)
+        self.loader.load_uses_table_relationships(self.transformer.uses_table_relationships)
+        self.loader.load_uses_column_relationships(self.transformer.uses_column_relationships)
+        self.loader.load_defines_relationships(self.transformer.defines_relationships)
 
     def ingest(
         self,
@@ -199,7 +211,6 @@ class BigQueryLogsConnector:
         drop_failed_queries : bool, default True
             Whether to exclude failed queries.
         """
-        print("Extracting query logs from BigQuery...")
         self.extract(
             dataset_id=dataset_id,
             region=region,
@@ -208,13 +219,11 @@ class BigQueryLogsConnector:
             limit=limit,
             drop_failed_queries=drop_failed_queries,
         )
-        print("Transforming query log metadata...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("BigQuery logs connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("BigQuery logs connector completed successfully")
 
     def run(
         self,

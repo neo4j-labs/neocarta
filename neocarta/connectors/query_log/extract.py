@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from ..._logging import log_stage
 from ...errors import ConfigError
 from .models import QueryLogExtractorCache
 from .utils import parse_bigquery_query_log_json, parse_sql_query
@@ -83,6 +84,7 @@ class QueryLogExtractor:
             ["query_id", "column_id"]
         ].drop_duplicates()
 
+    @log_stage
     def extract_info_from_query_log_json(
         self, query_log_file: str, source: str = "bigquery", cache: bool = True
     ) -> dict[str, pd.DataFrame]:

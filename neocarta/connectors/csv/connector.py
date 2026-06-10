@@ -1,5 +1,6 @@
 """CSV Connector for loading metadata from CSV files into Neo4j."""
 
+import logging
 import warnings
 
 from neo4j import Driver
@@ -9,6 +10,21 @@ from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import CSVExtractor
 from .transform import CSVTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("values", "value_nodes"),
+    ("queries", "query_nodes"),
+    ("glossaries", "glossary_nodes"),
+    ("categories", "category_nodes"),
+    ("business terms", "business_term_nodes"),
+)
 
 
 class CSVConnector:
@@ -92,6 +108,7 @@ class CSVConnector:
         e = self.extractor
         t = self.transformer
         self._transformed = False  # cleared until this transform completes
+        logger.info("Transforming CSV metadata...")
 
         t.transform_to_database_nodes(e.database_info)
         t.transform_to_schema_nodes(e.schema_info)
@@ -114,6 +131,10 @@ class CSVConnector:
         t.transform_to_uses_column_relationships(e.query_column_info)
         t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
         t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
+        for label, attr in _TRANSFORM_COUNTS:
+            produced = len(getattr(t, attr))
+            if produced:
+                logger.info("Transformed %d %s", produced, label)
         self._transformed = True
 
     def load(self) -> None:
@@ -134,119 +155,69 @@ class CSVConnector:
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 
-        print("\n=== Loading Nodes ===")
+        logger.info("Loading CSV metadata into Neo4j...")
+        # Nodes (loaded before relationships). Empty lists are skipped so we
+        # don't issue no-op writes; per-pattern counts are logged by the loader.
         if t.database_nodes:
-            print(f"Loading {len(t.database_nodes)} database nodes...")
-            print(
-                self.loader.load_database_nodes(
-                    t.database_nodes, properties_list=t.get_properties("database_nodes")
-                )
+            self.loader.load_database_nodes(
+                t.database_nodes, properties_list=t.get_properties("database_nodes")
             )
         if t.schema_nodes:
-            print(f"Loading {len(t.schema_nodes)} schema nodes...")
-            print(
-                self.loader.load_schema_nodes(
-                    t.schema_nodes, properties_list=t.get_properties("schema_nodes")
-                )
+            self.loader.load_schema_nodes(
+                t.schema_nodes, properties_list=t.get_properties("schema_nodes")
             )
         if t.table_nodes:
-            print(f"Loading {len(t.table_nodes)} table nodes...")
-            print(
-                self.loader.load_table_nodes(
-                    t.table_nodes, properties_list=t.get_properties("table_nodes")
-                )
+            self.loader.load_table_nodes(
+                t.table_nodes, properties_list=t.get_properties("table_nodes")
             )
         if t.column_nodes:
-            print(f"Loading {len(t.column_nodes)} column nodes...")
-            print(
-                self.loader.load_column_nodes(
-                    t.column_nodes, properties_list=t.get_properties("column_nodes")
-                )
+            self.loader.load_column_nodes(
+                t.column_nodes, properties_list=t.get_properties("column_nodes")
             )
         if t.value_nodes:
-            print(f"Loading {len(t.value_nodes)} value nodes...")
-            print(
-                self.loader.load_value_nodes(
-                    t.value_nodes, properties_list=t.get_properties("value_nodes")
-                )
+            self.loader.load_value_nodes(
+                t.value_nodes, properties_list=t.get_properties("value_nodes")
             )
         if t.query_nodes:
-            print(f"Loading {len(t.query_nodes)} query nodes...")
-            print(
-                self.loader.load_query_nodes(
-                    t.query_nodes, properties_list=t.get_properties("query_nodes")
-                )
+            self.loader.load_query_nodes(
+                t.query_nodes, properties_list=t.get_properties("query_nodes")
             )
         if t.glossary_nodes:
-            print(f"Loading {len(t.glossary_nodes)} glossary nodes...")
-            print(
-                self.loader.load_glossary_nodes(
-                    t.glossary_nodes, properties_list=t.get_properties("glossary_nodes")
-                )
+            self.loader.load_glossary_nodes(
+                t.glossary_nodes, properties_list=t.get_properties("glossary_nodes")
             )
         if t.category_nodes:
-            print(f"Loading {len(t.category_nodes)} category nodes...")
-            print(
-                self.loader.load_category_nodes(
-                    t.category_nodes, properties_list=t.get_properties("category_nodes")
-                )
+            self.loader.load_category_nodes(
+                t.category_nodes, properties_list=t.get_properties("category_nodes")
             )
         if t.business_term_nodes:
-            print(f"Loading {len(t.business_term_nodes)} business term nodes...")
-            print(
-                self.loader.load_business_term_nodes(
-                    t.business_term_nodes, properties_list=t.get_properties("business_term_nodes")
-                )
+            self.loader.load_business_term_nodes(
+                t.business_term_nodes, properties_list=t.get_properties("business_term_nodes")
             )
 
-        print("\n=== Loading Relationships ===")
+        # Relationships
         if t.has_schema_relationships:
-            print(f"Loading {len(t.has_schema_relationships)} HAS_SCHEMA relationships...")
-            print(self.loader.load_has_schema_relationships(t.has_schema_relationships))
+            self.loader.load_has_schema_relationships(t.has_schema_relationships)
         if t.has_table_relationships:
-            print(f"Loading {len(t.has_table_relationships)} HAS_TABLE relationships...")
-            print(self.loader.load_has_table_relationships(t.has_table_relationships))
+            self.loader.load_has_table_relationships(t.has_table_relationships)
         if t.has_column_relationships:
-            print(f"Loading {len(t.has_column_relationships)} HAS_COLUMN relationships...")
-            print(self.loader.load_has_column_relationships(t.has_column_relationships))
+            self.loader.load_has_column_relationships(t.has_column_relationships)
         if t.has_value_relationships:
-            print(f"Loading {len(t.has_value_relationships)} HAS_VALUE relationships...")
-            print(self.loader.load_has_value_relationships(t.has_value_relationships))
+            self.loader.load_has_value_relationships(t.has_value_relationships)
         if t.has_category_relationships:
-            print(f"Loading {len(t.has_category_relationships)} HAS_CATEGORY relationships...")
-            print(self.loader.load_has_category_relationships(t.has_category_relationships))
+            self.loader.load_has_category_relationships(t.has_category_relationships)
         if t.has_business_term_relationships:
-            print(
-                f"Loading {len(t.has_business_term_relationships)} HAS_BUSINESS_TERM relationships..."
-            )
-            print(
-                self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
-            )
+            self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
         if t.references_relationships:
-            print(f"Loading {len(t.references_relationships)} REFERENCES relationships...")
-            print(self.loader.load_references_relationships(t.references_relationships))
+            self.loader.load_references_relationships(t.references_relationships)
         if t.uses_table_relationships:
-            print(f"Loading {len(t.uses_table_relationships)} USES_TABLE relationships...")
-            print(self.loader.load_uses_table_relationships(t.uses_table_relationships))
+            self.loader.load_uses_table_relationships(t.uses_table_relationships)
         if t.uses_column_relationships:
-            print(f"Loading {len(t.uses_column_relationships)} USES_COLUMN relationships...")
-            print(self.loader.load_uses_column_relationships(t.uses_column_relationships))
+            self.loader.load_uses_column_relationships(t.uses_column_relationships)
         if t.column_tagged_with_relationships:
-            print(
-                f"Loading {len(t.column_tagged_with_relationships)} column TAGGED_WITH relationships..."
-            )
-            print(
-                self.loader.load_column_tagged_with_relationships(
-                    t.column_tagged_with_relationships
-                )
-            )
+            self.loader.load_column_tagged_with_relationships(t.column_tagged_with_relationships)
         if t.table_tagged_with_relationships:
-            print(
-                f"Loading {len(t.table_tagged_with_relationships)} table TAGGED_WITH relationships..."
-            )
-            print(
-                self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
-            )
+            self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
 
     def ingest(
         self,
@@ -289,15 +260,12 @@ class CSVConnector:
 
         >>> connector.ingest()
         """
-        print("Extracting metadata from CSV files...")
         self.extract(include_nodes=include_nodes, include_relationships=include_relationships)
-        print("Transforming metadata...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("\nCSV connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("CSV connector completed successfully")
 
     def run(
         self,
