@@ -152,7 +152,7 @@ Two things to validate with a test pass:
   The fully qualified path and the column data type make the vector match
   name- and type-shaped questions even when comments are sparse or missing. 
   Decide whether the connector should write that richer text into `description` 
-  at ingest so post-hoc embedding matches dbxcarta quality.
+  at ingest so post-hoc embedding matches dbxcarta.
 - **Connector contract conformance.** The ported connector exposes
   `run(spark)` only. neocarta's `SourceConnectorProtocol` expects
   `extract` / `transform` / `load` / `ingest`. Proposed: map the Spark phases
