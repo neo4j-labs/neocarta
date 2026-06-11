@@ -1,5 +1,6 @@
 """Utilities for computing and storing node embeddings in Neo4j."""
 
+import logging
 from collections.abc import Callable
 from math import ceil
 from typing import Any
@@ -9,6 +10,8 @@ from neo4j import Driver, RoutingControl
 
 from ...enums import NodeLabel
 from ...errors import ConfigError
+
+logger = logging.getLogger(__name__)
 
 
 def get_nodes_to_embed(
@@ -142,9 +145,10 @@ def create_embeddings_in_batches_sync(
     results = []
 
     for batch_idx, i in enumerate(range(0, len(nodes_dataframe), batch_size)):
-        print(
-            f"Processing batch {batch_idx + 1} of {ceil(len(nodes_dataframe) / (batch_size))}  \n",
-            end="\r",
+        logger.debug(
+            "Embedding batch %d/%d",
+            batch_idx + 1,
+            ceil(len(nodes_dataframe) / batch_size),
         )
         if i + batch_size >= len(nodes_dataframe):
             batch = nodes_dataframe.iloc[i:]
@@ -184,9 +188,10 @@ async def create_embeddings_in_batches_async(
     results = []
 
     for batch_idx, i in enumerate(range(0, len(nodes_dataframe), batch_size)):
-        print(
-            f"Processing batch {batch_idx + 1} of {ceil(len(nodes_dataframe) / (batch_size))}  \n",
-            end="\r",
+        logger.debug(
+            "Embedding batch %d/%d",
+            batch_idx + 1,
+            ceil(len(nodes_dataframe) / batch_size),
         )
         if i + batch_size >= len(nodes_dataframe):
             batch = nodes_dataframe.iloc[i:]
@@ -234,4 +239,5 @@ def write_embeddings_to_graph(
         routing_=RoutingControl.WRITE,
     )
 
+    logger.info("Wrote %d embeddings to (:%s)", summary.counters.properties_set, node_label)
     return summary.counters.__dict__
