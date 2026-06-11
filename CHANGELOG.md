@@ -13,6 +13,7 @@
 
 - Unified logging configuration in `neocarta._logging`: `configure_logging(level, *, console=...)` configures the `neocarta` package-root logger (attaching a `rich.logging.RichHandler` to the CLI's existing stderr console when given, so `--no-color` is honored and stdout stays clean for `--json`); plus a `log_stage` decorator and `log_timing` context manager used to instrument extractor methods consistently.
 - `--log-level [DEBUG|INFO|WARNING|ERROR]` global CLI option controlling diagnostics verbosity on stderr (default `INFO`). The previously-unused `--debug` flag is now a convenience alias for `--log-level DEBUG`.
+- CLI connector commands now show a progress spinner on stderr during the long-running stages (`Ingesting ...` while a connector runs, `Generating embeddings...` while embeddings are written, `Exporting OSI semantic model...` on `osi export`), so a slow ingest visibly indicates it is still working. The spinner shares the stderr console with the existing `RichHandler`, so INFO log lines render above it. It is shown only on an interactive terminal: under `--json`/agent mode, CI, or any non-TTY stderr it is a no-op via the new `neocarta._cli.output.cli_status` helper, so machine output and the `--json` stdout contract are unaffected. Closes #170.
 
 ## v0.7.0 
 

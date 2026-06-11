@@ -19,7 +19,7 @@ import click
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import CLIError, cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import _neo4j_driver, _require_neo4j_settings
 
 
@@ -112,15 +112,14 @@ def query_log_ingest(
     # Lazy import: keep the connector dependency off the --help / --dry-run path.
     from ...connectors.query_log import QueryLogConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting query log connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = QueryLogConnector(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.ingest(query_log_file=query_log_file, source=source)
+            with cli_status(stderr, "Ingesting query log..."):
+                connector.ingest(query_log_file=query_log_file, source=source)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 

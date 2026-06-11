@@ -23,7 +23,7 @@ from ...enums import NodeLabel
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _run_embeddings
 
 if TYPE_CHECKING:
@@ -79,17 +79,16 @@ def _run_ingest(
 
     _require_neo4j_settings(settings)
 
-    stderr.print(f"[dim]Starting Dataplex {verb} connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
-            connector = make_connector(driver)
-            connector.ingest(**ingest_kwargs)
+            with cli_status(stderr, f"Ingesting Dataplex {verb} metadata..."):
+                connector = make_connector(driver)
+                connector.ingest(**ingest_kwargs)
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                _run_embeddings(embedder, node_labels)
+                with cli_status(stderr, "Generating embeddings..."):
+                    _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 

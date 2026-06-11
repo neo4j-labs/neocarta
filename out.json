@@ -1,0 +1,8 @@
+{
+  "csv_ingest": {
+    "csv_directory": "datasets/csv",
+    "database": "7fc4287f",
+    "embeddings": false,
+    "status": "succeeded"
+  }
+}
