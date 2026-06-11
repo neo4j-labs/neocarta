@@ -1,10 +1,12 @@
 """OSI (Open Semantic Interchange) connector — bidirectional Neo4j integration."""
 
+import logging
 import warnings
 from pathlib import Path
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
 from ...errors import StateError
 from ...warnings import UnsupportedOsiVersionWarning
 from .export.extract import OsiGraphExtractor
@@ -12,6 +14,26 @@ from .export.transform import OsiExportTransformer
 from .ingest.extract import OsiSpecExtractor
 from .ingest.transform import OsiIngestTransformer
 from .load import OsiNeo4jLoader
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs counted at the end of transform().
+# OsiIngestTransformer exposes node lists as direct instance attributes rather
+# than via transform_to_* methods, so counts are read off these after transform.
+_OSI_COUNT_FIELDS = (
+    ("semantic models", "osi_semantic_model_nodes"),
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("queries", "query_nodes"),
+    ("metrics", "metric_nodes"),
+    ("joins", "join_nodes"),
+    ("expressions", "expression_nodes"),
+    ("AI contexts", "ai_context_nodes"),
+    ("custom extensions", "custom_extension_nodes"),
+    ("business terms", "business_term_nodes"),
+)
 
 
 class OsiConnector:
@@ -103,7 +125,7 @@ class OsiConnector:
                 stacklevel=2,
             )
 
-        print(f"Extracting OSI spec from {spec_source}...")
+        logger.info("Extracting OSI spec from %s", spec_source)
         # Reset downstream lifecycle: any prior transform/load no longer
         # corresponds to the new source.
         self._extracted = False
@@ -127,11 +149,12 @@ class OsiConnector:
                 "call .extract(spec_source) first.",
                 suggestion="Call connector.extract(spec_source) before connector.transform().",
             )
-        print("Transforming OSI spec...")
+        logger.info("Transforming OSI spec...")
         # OsiIngestTransformer accumulates state across .transform() calls; replace
         # the instance so repeat transforms behave like independent runs.
         self.transformer = OsiIngestTransformer()
         self.transformer.transform(self.extractor.spec)
+        log_transform_counts(logger, self.transformer, _OSI_COUNT_FIELDS)
         self._transformed = True
 
     def load(self) -> None:
@@ -148,7 +171,7 @@ class OsiConnector:
                 "OsiConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.transform() before connector.load().",
             )
-        print("Loading OSI semantic model into Neo4j...")
+        logger.info("Loading OSI semantic model into Neo4j...")
         self._load_ingest(self.transformer)
 
     def ingest(self, spec_source: str | Path, *, version: str = "0.1.1") -> None:
@@ -165,9 +188,9 @@ class OsiConnector:
         self.extract(spec_source, version=version)
         self.transform()
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("OSI ingest completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("OSI ingest completed successfully")
 
     # ------------------------------------------------------------------ #
     # Export direction
@@ -184,17 +207,17 @@ class OsiConnector:
         output_path : str | Path
             Destination path for the OSI YAML output.
         """
-        print(f"Extracting OSI semantic model '{semantic_model_name}' from Neo4j...")
+        logger.info("Extracting OSI semantic model '%s' from Neo4j...", semantic_model_name)
         graph_extractor = OsiGraphExtractor(self.neo4j_driver, self.database_name)
         snapshot = graph_extractor.extract(semantic_model_name)
 
-        print("Transforming graph snapshot to OSI spec...")
+        logger.info("Transforming graph snapshot to OSI spec...")
         graph_transformer = OsiExportTransformer()
         graph_transformer.transform(snapshot)
 
-        print(f"Writing OSI YAML to {output_path}...")
+        logger.info("Writing OSI YAML to %s", output_path)
         graph_transformer._to_yaml(output_path)
-        print("OSI export completed successfully!")
+        logger.info("OSI export completed successfully")
 
     # ------------------------------------------------------------------ #
     # Deprecated entrypoint

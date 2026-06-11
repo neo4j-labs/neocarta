@@ -1,10 +1,14 @@
 """Connector for creating OpenAI embeddings."""
 
+import logging
+
 from neo4j import Driver
 from openai import AsyncOpenAI, OpenAI
 
 from ...errors import ConfigError
 from .base import BaseEmbeddingsConnector
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
@@ -76,7 +80,7 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0].embedding
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
 
     async def _create_embedding_async(self, description: str) -> list[float] | None:
@@ -106,7 +110,7 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0].embedding
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
 
     def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
@@ -137,7 +141,7 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             ordered = sorted(response.data, key=lambda item: item.index)
             return [item.embedding for item in ordered]
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             raise
 
     async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
@@ -168,5 +172,5 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             ordered = sorted(response.data, key=lambda item: item.index)
             return [item.embedding for item in ordered]
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             raise

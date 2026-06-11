@@ -1,6 +1,7 @@
 """Utility functions for parsing and processing query log data."""
 
 import json
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +16,8 @@ from neocarta.connectors.utils.generate_id import (
     generate_table_id,
 )
 from neocarta.errors import ConfigError
+
+logger = logging.getLogger(__name__)
 
 
 def parse_bigquery_query_log_json(query_log_file: str) -> pd.DataFrame:
@@ -203,7 +206,7 @@ def parse_sql_query(
 
             # if we can't identify the table a column belongs to, we skip it
             if table_id is None:
-                print(f"Unable to resolve table for column {c.name}. Skipping column.")
+                logger.warning("Unable to resolve table for column %s; skipping column", c.name)
                 continue
 
             column_name = c.name
@@ -309,6 +312,7 @@ def parse_sql_query(
             "cte_info": cte_info,
         }
     except Exception as e:
-        print(f"Error parsing SQL query: {e}")
-        # sometimes it doesn't work
+        # Log only the exception *type* — sqlglot parse errors can echo the
+        # offending SQL (potential PII / schema leakage), which we never log.
+        logger.warning("Error parsing a SQL query (%s); skipping it", type(e).__name__)
         return None

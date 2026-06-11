@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from ..._logging import log_stage
 from ...errors import ConfigError
 from .models import QueryLogExtractorCache
 from .utils import parse_bigquery_query_log_json, parse_sql_query
@@ -83,6 +84,11 @@ class QueryLogExtractor:
             ["query_id", "column_id"]
         ].drop_duplicates()
 
+    # count=False: the returned mapping mixes one pulled frame (query_info) with
+    # frames derived from parsing those queries (table/column/refs/cte), so a
+    # summed row count would be meaningless. Per-type counts are logged at the
+    # transform phase instead.
+    @log_stage(count=False)
     def extract_info_from_query_log_json(
         self, query_log_file: str, source: str = "bigquery", cache: bool = True
     ) -> dict[str, pd.DataFrame]:

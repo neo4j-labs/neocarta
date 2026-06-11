@@ -3,6 +3,7 @@
 import pandas as pd
 from google.cloud import dataplex_v1
 
+from ...._logging import log_stage
 from ....errors import ConfigError
 from ..models import BigQueryMetadataInfoResponse
 
@@ -85,6 +86,7 @@ class DataplexSchemaExtractor:
             subset=["project_id", "dataset_id", "table_id", "column_name"]
         )[cols]
 
+    @log_stage
     def extract(self, dataset_id: str) -> pd.DataFrame:
         """
         Extract BigQuery catalog metadata for all tables in a dataset.
