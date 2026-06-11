@@ -1,14 +1,27 @@
 """BigQuery schema connector."""
 
+import logging
 import warnings
 
 from google.cloud import bigquery
 from neo4j import Driver
 
+from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import BigQuerySchemaExtractor
 from .transform import BigQuerySchemaTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("values", "value_nodes"),
+)
 
 
 class BigQuerySchemaConnector:
@@ -78,6 +91,7 @@ class BigQuerySchemaConnector:
             Dataset id to extract. If omitted, falls back to the (deprecated)
             constructor-provided ``dataset_id``.
         """
+        logger.info("Extracting BigQuery schema metadata...")
         target_dataset = dataset_id if dataset_id is not None else self.dataset_id
         self._extracted = False
         self._transformed = False
@@ -104,6 +118,7 @@ class BigQuerySchemaConnector:
                 suggestion="Call connector.extract(dataset_id=...) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming BigQuery schema metadata...")
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
         self.transformer.transform_to_schema_nodes(self.extractor.schema_info)
         self.transformer.transform_to_table_nodes(self.extractor.table_info)
@@ -117,6 +132,7 @@ class BigQuerySchemaConnector:
             self.extractor.column_references_info
         )
         self.transformer.transform_to_has_value_relationships(self.extractor.column_unique_values)
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
@@ -134,17 +150,18 @@ class BigQuerySchemaConnector:
                 "call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
-        print(self.loader.load_database_nodes(self.transformer.database_nodes))
-        print(self.loader.load_schema_nodes(self.transformer.schema_nodes))
-        print(self.loader.load_table_nodes(self.transformer.table_nodes))
-        print(self.loader.load_column_nodes(self.transformer.column_nodes))
-        print(self.loader.load_value_nodes(self.transformer.value_nodes))
+        logger.info("Loading BigQuery schema metadata into Neo4j...")
+        self.loader.load_database_nodes(self.transformer.database_nodes)
+        self.loader.load_schema_nodes(self.transformer.schema_nodes)
+        self.loader.load_table_nodes(self.transformer.table_nodes)
+        self.loader.load_column_nodes(self.transformer.column_nodes)
+        self.loader.load_value_nodes(self.transformer.value_nodes)
 
-        print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
-        print(self.loader.load_has_table_relationships(self.transformer.has_table_relationships))
-        print(self.loader.load_has_column_relationships(self.transformer.has_column_relationships))
-        print(self.loader.load_references_relationships(self.transformer.references_relationships))
-        print(self.loader.load_has_value_relationships(self.transformer.has_value_relationships))
+        self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships)
+        self.loader.load_has_table_relationships(self.transformer.has_table_relationships)
+        self.loader.load_has_column_relationships(self.transformer.has_column_relationships)
+        self.loader.load_references_relationships(self.transformer.references_relationships)
+        self.loader.load_has_value_relationships(self.transformer.has_value_relationships)
 
     def ingest(self, dataset_id: str | None = None) -> None:
         """
@@ -156,15 +173,12 @@ class BigQuerySchemaConnector:
             Dataset id to ingest. If omitted, falls back to the (deprecated)
             constructor-provided ``dataset_id``.
         """
-        print("Extracting metadata from BigQuery...")
         self.extract(dataset_id)
-        print("Transforming metadata from BigQuery...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("BigQuery connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("BigQuery schema connector completed successfully")
 
     def run(self, dataset_id: str | None = None) -> None:
         """

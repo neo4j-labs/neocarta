@@ -9,6 +9,7 @@ from __future__ import annotations
 import click
 
 from .. import __version__
+from .._logging import configure_logging
 from .agent_context import agent_context
 from .commands.bigquery import bigquery
 from .commands.csv import csv
@@ -27,10 +28,28 @@ from .output import make_consoles
     default=False,
     help="Emit JSON on stdout. Default when stdout is not a TTY.",
 )
-@click.option("--debug", is_flag=True, default=False, help="Verbose diagnostics on stderr.")
+@click.option(
+    "--log-level",
+    type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False),
+    default=None,
+    help="Diagnostics verbosity on stderr. Default: INFO.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Alias for --log-level DEBUG. Verbose diagnostics on stderr.",
+)
 @click.option("--no-color", is_flag=True, default=False, help="Suppress ANSI colors.")
 @click.pass_context
-def cli(ctx: click.Context, *, as_json: bool, debug: bool, no_color: bool) -> None:
+def cli(
+    ctx: click.Context,
+    *,
+    as_json: bool,
+    log_level: str | None,
+    debug: bool,
+    no_color: bool,
+) -> None:
     """Neocarta: build a semantic layer in Neo4j from your data sources.
 
     Run a connector with `neocarta <source> <verb>`, e.g.
@@ -43,8 +62,21 @@ def cli(ctx: click.Context, *, as_json: bool, debug: bool, no_color: bool) -> No
     # stdout-not-a-TTY auto-enables JSON, per AGENTS-CLI §4.2.
     if not as_json and not stdout.is_terminal:
         as_json = True
+
+    # Resolve verbosity: explicit --log-level wins; --debug is a DEBUG alias;
+    # otherwise default to INFO so an ingest shows progress.
+    if log_level is not None:
+        level = log_level.upper()
+    elif debug:
+        level = "DEBUG"
+    else:
+        level = "INFO"
+
+    configure_logging(level, console=stderr)
+
     ctx.obj = {
         "as_json": as_json,
+        "log_level": level,
         "debug": debug,
         "no_color": no_color,
         "stdout": stdout,

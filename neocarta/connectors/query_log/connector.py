@@ -1,13 +1,27 @@
 """Query log connector."""
 
+import logging
 import warnings
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
 from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import QueryLogExtractor
 from .transform import QueryLogTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("queries", "query_nodes"),
+    ("CTEs", "cte_nodes"),
+)
 
 
 class QueryLogConnector:
@@ -41,6 +55,7 @@ class QueryLogConnector:
         source : str, default "bigquery"
             The source of the query log file.
         """
+        logger.info("Extracting query log metadata...")
         self._extracted = False
         self._transformed = False
         self.extractor.extract_info_from_query_log_json(query_log_file, source)
@@ -62,6 +77,7 @@ class QueryLogConnector:
                 suggestion="Call connector.extract(query_log_file) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming query log metadata...")
 
         # transform nodes
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
@@ -81,6 +97,7 @@ class QueryLogConnector:
         self.transformer.transform_to_uses_table_relationships(self.extractor.query_table_info)
         self.transformer.transform_to_uses_column_relationships(self.extractor.query_column_info)
         self.transformer.transform_to_defines_relationships(self.extractor.cte_info)
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
@@ -98,32 +115,25 @@ class QueryLogConnector:
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
 
+        logger.info("Loading query log metadata into Neo4j...")
         # load nodes
-        print(
-            self.loader.load_database_nodes(
-                self.transformer.database_nodes, properties_list=["name", "service", "platform"]
-            )
+        self.loader.load_database_nodes(
+            self.transformer.database_nodes, properties_list=["name", "service", "platform"]
         )
-        print(
-            self.loader.load_schema_nodes(self.transformer.schema_nodes, properties_list=["name"])
-        )
-        print(self.loader.load_table_nodes(self.transformer.table_nodes, properties_list=["name"]))
-        print(
-            self.loader.load_column_nodes(self.transformer.column_nodes, properties_list=["name"])
-        )
-        print(self.loader.load_query_nodes(self.transformer.query_nodes))
-        print(self.loader.load_cte_nodes(self.transformer.cte_nodes))
+        self.loader.load_schema_nodes(self.transformer.schema_nodes, properties_list=["name"])
+        self.loader.load_table_nodes(self.transformer.table_nodes, properties_list=["name"])
+        self.loader.load_column_nodes(self.transformer.column_nodes, properties_list=["name"])
+        self.loader.load_query_nodes(self.transformer.query_nodes)
+        self.loader.load_cte_nodes(self.transformer.cte_nodes)
 
         # load relationships
-        print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
-        print(self.loader.load_has_table_relationships(self.transformer.has_table_relationships))
-        print(self.loader.load_has_column_relationships(self.transformer.has_column_relationships))
-        print(self.loader.load_references_relationships(self.transformer.references_relationships))
-        print(self.loader.load_uses_table_relationships(self.transformer.uses_table_relationships))
-        print(
-            self.loader.load_uses_column_relationships(self.transformer.uses_column_relationships)
-        )
-        print(self.loader.load_defines_relationships(self.transformer.defines_relationships))
+        self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships)
+        self.loader.load_has_table_relationships(self.transformer.has_table_relationships)
+        self.loader.load_has_column_relationships(self.transformer.has_column_relationships)
+        self.loader.load_references_relationships(self.transformer.references_relationships)
+        self.loader.load_uses_table_relationships(self.transformer.uses_table_relationships)
+        self.loader.load_uses_column_relationships(self.transformer.uses_column_relationships)
+        self.loader.load_defines_relationships(self.transformer.defines_relationships)
 
     def ingest(self, query_log_file: str, source: str = "bigquery") -> None:
         """
@@ -136,15 +146,12 @@ class QueryLogConnector:
         source : str, default "bigquery"
             The source of the query log file.
         """
-        print("Extracting metadata from query log...")
         self.extract(query_log_file, source)
-        print("Transforming metadata from query log...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("Query log connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("Query log connector completed successfully")
 
     def run(self, query_log_file: str, source: str = "bigquery") -> None:
         """

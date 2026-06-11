@@ -1,14 +1,27 @@
 """Dataplex glossary sub-connector."""
 
+import logging
 import warnings
 
 from google.cloud import dataplex_v1
 from neo4j import Driver
 
+from ...._logging import log_transform_counts
 from ....errors import StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import DataplexGlossaryExtractor
 from .transform import DataplexGlossaryTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("glossaries", "glossary_nodes"),
+    ("categories", "category_nodes"),
+    ("business terms", "business_term_nodes"),
+    ("column tags", "column_tagged_with_relationships"),
+    ("table tags", "table_tagged_with_relationships"),
+)
 
 
 class DataplexGlossaryConnector:
@@ -79,6 +92,7 @@ class DataplexGlossaryConnector:
             False if the catalog isn't in this Neo4j instance, or to skip the
             REST-API round trips when you only want glossary content.
         """
+        logger.info("Extracting Dataplex glossary metadata...")
         self._extracted = False
         self._transformed = False
         self.extractor.extract(include_entry_links=include_entry_links)
@@ -100,6 +114,7 @@ class DataplexGlossaryConnector:
                 suggestion="Call connector.extract() before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming Dataplex glossary metadata...")
         e = self.extractor
         t = self.transformer
 
@@ -113,6 +128,7 @@ class DataplexGlossaryConnector:
         if self._include_entry_links:
             t.transform_to_column_tagged_with_relationships(e.column_term_info)
             t.transform_to_table_tagged_with_relationships(e.table_term_info)
+        log_transform_counts(logger, t, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
@@ -132,37 +148,26 @@ class DataplexGlossaryConnector:
             )
         t = self.transformer
 
-        print(
-            self.loader.load_glossary_nodes(
-                t.glossary_nodes,
-                properties_list=["name", "description", "resource_path"],
-            )
+        logger.info("Loading Dataplex glossary metadata into Neo4j...")
+        self.loader.load_glossary_nodes(
+            t.glossary_nodes,
+            properties_list=["name", "description", "resource_path"],
         )
-        print(
-            self.loader.load_category_nodes(
-                t.category_nodes,
-                properties_list=["name", "description", "resource_path"],
-            )
+        self.loader.load_category_nodes(
+            t.category_nodes,
+            properties_list=["name", "description", "resource_path"],
         )
-        print(
-            self.loader.load_business_term_nodes(
-                t.business_term_nodes,
-                properties_list=["name", "description", "resource_path"],
-            )
+        self.loader.load_business_term_nodes(
+            t.business_term_nodes,
+            properties_list=["name", "description", "resource_path"],
         )
 
-        print(self.loader.load_has_category_relationships(t.has_category_relationships))
-        print(self.loader.load_has_business_term_relationships(t.has_business_term_relationships))
+        self.loader.load_has_category_relationships(t.has_category_relationships)
+        self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
 
         if self._include_entry_links:
-            print(
-                self.loader.load_column_tagged_with_relationships(
-                    t.column_tagged_with_relationships
-                )
-            )
-            print(
-                self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
-            )
+            self.loader.load_column_tagged_with_relationships(t.column_tagged_with_relationships)
+            self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
 
     def ingest(self, include_entry_links: bool = True) -> None:
         """
@@ -173,15 +178,12 @@ class DataplexGlossaryConnector:
         include_entry_links : bool, default True
             Whether to also ingest catalog↔glossary entry links (TAGGED_WITH).
         """
-        print("Extracting glossary metadata from Dataplex...")
         self.extract(include_entry_links=include_entry_links)
-        print("Transforming glossary metadata from Dataplex...")
         self.transform()
-        print("Loading glossary metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("Dataplex glossary connector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("Dataplex glossary connector completed successfully")
 
     def run(self, include_entry_links: bool = True) -> None:
         """
