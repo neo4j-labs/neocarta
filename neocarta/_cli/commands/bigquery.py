@@ -40,8 +40,8 @@ def bigquery() -> None:
 @click.option(
     "--embeddings/--no-embeddings",
     "embeddings",
-    default=True,
-    help="Generate embeddings for ingested nodes after load (default: enabled).",
+    default=False,
+    help="Generate embeddings for ingested nodes after load (default: disabled).",
 )
 @click.option(
     "--embedding-model",
@@ -82,11 +82,11 @@ def bigquery_schema(
     """Extract BigQuery schema metadata into the Neo4j semantic graph.
 
     Loads Database, Schema, Table, and Column nodes plus their relationships.
-    When --embeddings is enabled (default), description embeddings are
-    generated and written back to the graph. Pass --no-embeddings to skip the
-    embedding step, or --dry-run to print the planned ingestion without touching
-    Neo4j or BigQuery. The project ID and dataset ID can come from --project-id
-    / --dataset-id flags, or from GCP_PROJECT_ID / BIGQUERY_DATASET_ID env vars.
+    Pass --embeddings to generate description embeddings after load and write
+    them back to the graph (off by default). Use --dry-run to print the planned
+    ingestion without touching Neo4j or BigQuery. The project ID and dataset ID
+    can come from --project-id / --dataset-id flags, or from GCP_PROJECT_ID /
+    BIGQUERY_DATASET_ID env vars.
     """
     settings = load_settings()
     project_id = require(

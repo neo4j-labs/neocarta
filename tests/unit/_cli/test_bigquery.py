@@ -63,6 +63,49 @@ def test_schema_dry_run_emits_json_and_skips_clients():
     assert body["embeddings"] is False
 
 
+def test_schema_embeddings_off_by_default():
+    # Embeddings are opt-in: with no --embeddings/--no-embeddings flag the
+    # schema command must default to off, consistent with every other command.
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "bigquery",
+            "schema",
+            "--project-id",
+            "fake-proj",
+            "--dataset-id",
+            "fake_ds",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["bigquery_schema"]["embeddings"] is False
+
+
+def test_schema_embeddings_opt_in():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "bigquery",
+            "schema",
+            "--project-id",
+            "fake-proj",
+            "--dataset-id",
+            "fake_ds",
+            "--embeddings",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["bigquery_schema"]["embeddings"] is True
+
+
 def test_logs_dry_run_emits_json_and_skips_clients():
     runner = CliRunner()
     result = runner.invoke(

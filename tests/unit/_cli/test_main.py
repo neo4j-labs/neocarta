@@ -98,4 +98,7 @@ def test_agent_context_includes_flags_for_bigquery_schema():
     assert "--project-id" in flags
     assert "--dataset-id" in flags
     assert "--embeddings" in flags or "--no-embeddings" in flags
+    # Embeddings are opt-in across all commands; the agent-context contract must
+    # advertise the off default so agents don't assume schema embeds by default.
+    assert flags["--embeddings"]["default"] is False
     assert "--dry-run" in flags
