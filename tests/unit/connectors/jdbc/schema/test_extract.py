@@ -8,6 +8,7 @@ import pytest
 from neocarta.connectors.jdbc.schema.extract import (
     JdbcSchemaExtractor,
     _assert_java_available,
+    _parse_java_major,
     derive_source_database_name,
 )
 from neocarta.errors import ConfigError, ExtractionError, OperationTimeoutError
@@ -138,6 +139,50 @@ def test_assert_java_available_raises_when_version_fails():
         pytest.raises(ConfigError, match="non-zero"),
     ):
         _assert_java_available()
+
+
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ('openjdk version "17.0.19" 2026-04-21', 17),
+        ('openjdk version "11.0.2" 2019-01-15', 11),
+        ('java version "1.8.0_392"', 8),
+        ('openjdk version "21" 2023-09-19', 21),
+        ("no version string here", None),
+    ],
+)
+def test_parse_java_major(output, expected):
+    """Major version is parsed from modern and legacy `java -version` strings."""
+    assert _parse_java_major(output) == expected
+
+
+def test_assert_java_available_rejects_below_11():
+    """A Java runtime older than 11 raises ConfigError."""
+    java8 = MagicMock(returncode=0, stderr='openjdk version "1.8.0_392"', stdout="")
+    with (
+        patch(WHICH, return_value="/usr/bin/java"),
+        patch(SUBPROCESS_RUN, return_value=java8),
+        pytest.raises(ConfigError, match="requires Java 11"),
+    ):
+        _assert_java_available()
+
+
+def test_assert_java_available_accepts_11_plus():
+    """A Java 11+ runtime passes the probe."""
+    java17 = MagicMock(returncode=0, stderr='openjdk version "17.0.19" 2026-04-21', stdout="")
+    with (
+        patch(WHICH, return_value="/usr/bin/java"),
+        patch(SUBPROCESS_RUN, return_value=java17),
+    ):
+        _assert_java_available()  # no raise
+
+
+def test_extract_populates_database_service(extractor_with_cache):
+    """service is derived from the SchemaCrawler product name; platform is unset."""
+    db = extractor_with_cache.database_info
+    assert list(db["database_name"]) == ["neocarta_test"]
+    assert list(db["service"]) == ["PostgreSQL"]
+    assert db["platform"].isna().all()
 
 
 # --------------------------------------------------------------------------- #

@@ -104,6 +104,38 @@ class JdbcSchemaTransformer:
         """
         return self._relationships_cache.get("references_relationships", [])
 
+    def get_database_properties(self) -> list[str]:
+        """Property names to write for Database nodes.
+
+        Omits ``description`` / ``service`` / ``platform`` when unset across all
+        nodes, so they are not written as ``NULL``.
+        """
+        props = ["name"]
+        nodes = self.database_nodes
+        props.extend(
+            field
+            for field in ("description", "service", "platform")
+            if any(getattr(node, field) is not None for node in nodes)
+        )
+        return props
+
+    def get_column_properties(self) -> list[str]:
+        """Property names to write for Column nodes.
+
+        Omits ``is_primary_key`` / ``is_foreign_key`` entirely when no column is a
+        primary/foreign key (i.e. the source defined none), so they aren't written
+        as ``false`` properties; also omits ``description`` when none is present.
+        """
+        props = ["name", "type", "nullable"]
+        nodes = self.column_nodes
+        if any(node.description is not None for node in nodes):
+            props.append("description")
+        if any(node.is_primary_key for node in nodes):
+            props.append("is_primary_key")
+        if any(node.is_foreign_key for node in nodes):
+            props.append("is_foreign_key")
+        return props
+
     def transform_to_database_nodes(
         self, database_info: pd.DataFrame, cache: bool = True
     ) -> list[Database]:
@@ -113,7 +145,8 @@ class JdbcSchemaTransformer:
         Parameters
         ----------
         database_info: pd.DataFrame
-            A Pandas DataFrame with column `database_name`.
+            A Pandas DataFrame with columns `database_name` and optional
+            `platform` / `service`.
         cache: bool = True
             Whether to cache the transform.
 
@@ -127,6 +160,8 @@ class JdbcSchemaTransformer:
                 id=generate_database_id(row.database_name),
                 name=row.database_name,
                 description=None,
+                platform=getattr(row, "platform", None),
+                service=getattr(row, "service", None),
             )
             for _, row in database_info.iterrows()
         ]

@@ -18,9 +18,10 @@ template has full access to the catalog model. A FreeMarker JAR must be on the
 SchemaCrawler classpath — see the README.
 """
 
+import importlib.resources
 import json
 import os
-import pathlib
+import re
 import shutil
 import subprocess
 from typing import Any
@@ -31,7 +32,13 @@ from ....errors import ConfigError, ExtractionError, OperationTimeoutError
 from .models import JdbcSchemaExtractorCache
 
 # Bundled FreeMarker template that renders the JSON catalog this extractor parses.
-_TEMPLATE_PATH = pathlib.Path(__file__).with_name("catalog.json.ftl")
+# Resolved via importlib.resources so it always references THIS package's file
+# (module-scoped, and correct for wheel installs) — never some other file in the
+# project tree.
+_TEMPLATE_PATH = importlib.resources.files(__package__) / "catalog.json.ftl"
+
+# Minimum supported Java major version (a named connector requirement).
+_MIN_JAVA_MAJOR = 11
 
 # Env var name SchemaCrawler reads the DB password from (``--password:env=``).
 # Passing the secret via the environment keeps it off the process argv, where
@@ -44,19 +51,37 @@ _SETUP_HINT = (
 )
 
 
+def _parse_java_major(version_output: str) -> int | None:
+    """Parse the major Java version from ``java -version`` output.
+
+    Handles modern (``version "17.0.19"`` → 17) and legacy
+    (``version "1.8.0_392"`` → 8) version strings. Returns ``None`` if no version
+    can be found.
+    """
+    match = re.search(r'version "(\d+)(?:\.(\d+))?', version_output)
+    if match is None:
+        return None
+    major = int(match.group(1))
+    if major == 1 and match.group(2) is not None:
+        # Legacy ``1.x`` scheme: the real major is the second component.
+        major = int(match.group(2))
+    return major
+
+
 def _assert_java_available() -> None:
-    """Verify a usable Java runtime is on ``PATH``.
+    """Verify a usable Java runtime (>= 11) is on ``PATH``.
 
     Raises:
     ------
     ConfigError
-        If ``java`` is not found on ``PATH`` or ``java -version`` fails.
+        If ``java`` is not found, ``java -version`` fails, the version cannot be
+        determined, or the runtime is older than Java 11.
     """
     if shutil.which("java") is None:
         raise ConfigError(
             "Java runtime not found on PATH; the JDBC connector shells out to "
             "SchemaCrawler, which requires Java.",
-            suggestion=f"Install Java 11+. {_SETUP_HINT}",
+            suggestion=f"Install Java {_MIN_JAVA_MAJOR}+. {_SETUP_HINT}",
         )
 
     version_cmd = ["java", "-version"]
@@ -71,14 +96,30 @@ def _assert_java_available() -> None:
     except (OSError, subprocess.SubprocessError) as exc:
         raise ConfigError(
             f"Failed to invoke 'java -version': {exc}",
-            suggestion=f"Install a working Java 11+ runtime. {_SETUP_HINT}",
+            suggestion=f"Install a working Java {_MIN_JAVA_MAJOR}+ runtime. {_SETUP_HINT}",
         ) from exc
 
     if result.returncode != 0:
         raise ConfigError(
             "'java -version' exited non-zero; no usable Java runtime found.",
-            suggestion=f"Install Java 11+. {_SETUP_HINT}",
+            suggestion=f"Install Java {_MIN_JAVA_MAJOR}+. {_SETUP_HINT}",
             details={"stderr": result.stderr.strip()},
+        )
+
+    # `java -version` prints to stderr; fall back to stdout defensively.
+    version_output = result.stderr or result.stdout
+    major = _parse_java_major(version_output)
+    if major is None:
+        raise ConfigError(
+            "Could not determine the Java version from 'java -version' output.",
+            suggestion=f"Ensure Java {_MIN_JAVA_MAJOR}+ is installed. {_SETUP_HINT}",
+            details={"output": version_output.strip()},
+        )
+    if major < _MIN_JAVA_MAJOR:
+        raise ConfigError(
+            f"Java {major} found, but the JDBC connector requires Java {_MIN_JAVA_MAJOR}+.",
+            suggestion=f"Install Java {_MIN_JAVA_MAJOR}+. {_SETUP_HINT}",
+            details={"detected_major": major},
         )
 
 
@@ -144,8 +185,18 @@ class JdbcSchemaExtractor:
     db_user : str, optional
         Database username. Passed to SchemaCrawler via ``--user=``.
     db_password : str, optional
-        Database password. Passed to SchemaCrawler via the environment (never
-        on the command line).
+        Database password. The connector forwards it to SchemaCrawler via an
+        environment variable (``--password:env=``), never on the process command
+        line. It is a constructor argument (rather than a pre-authenticated client,
+        as the BigQuery/Dataplex connectors use) because JDBC has no shared client
+        object — authentication happens at connection time, per driver.
+    platform : str, optional
+        Hosting platform for the graph ``Database`` node (e.g. ``"AWS_RDS"``).
+        Not derivable from JDBC metadata, so it defaults to ``None``; supply it
+        if known.
+    service : str, optional
+        Database service/engine for the graph ``Database`` node. Defaults to the
+        database product name SchemaCrawler reports (e.g. ``"POSTGRESQL"``).
     timeout : int, default 120
         Maximum seconds to wait for the SchemaCrawler subprocess.
     """
@@ -159,9 +210,11 @@ class JdbcSchemaExtractor:
         source_database_name: str,
         db_user: str | None = None,
         db_password: str | None = None,
+        platform: str | None = None,
+        service: str | None = None,
         timeout: int = 120,
     ) -> None:
-        """Initialize the extractor and verify Java is available."""
+        """Initialize the extractor and verify Java (>= 11) is available."""
         _assert_java_available()
         self.jdbc_url = jdbc_url
         self.jdbc_driver = jdbc_driver
@@ -170,6 +223,8 @@ class JdbcSchemaExtractor:
         self.source_database_name = source_database_name
         self.db_user = db_user
         self.db_password = db_password
+        self.platform = platform
+        self.service = service
         self.timeout = timeout
         self._cache: JdbcSchemaExtractorCache = JdbcSchemaExtractorCache()
 
@@ -298,15 +353,29 @@ class JdbcSchemaExtractor:
             Schema names to include. If omitted, all schemas are extracted.
         """
         catalog = self._run_schemacrawler(schemas)
-        self._cache["database_info"] = self._flatten_database_info()
+        self._cache["database_info"] = self._flatten_database_info(catalog)
         self._cache["schema_info"] = self._flatten_schema_info(catalog)
         self._cache["table_info"] = self._flatten_table_info(catalog)
         self._cache["column_info"] = self._flatten_column_info(catalog)
         self._cache["column_references_info"] = self._flatten_column_references_info(catalog)
 
-    def _flatten_database_info(self) -> pd.DataFrame:
-        """Build the single-row database DataFrame from the source DB name."""
-        return pd.DataFrame([{"database_name": self.source_database_name}])
+    def _flatten_database_info(self, catalog: dict[str, Any]) -> pd.DataFrame:
+        """Build the single-row database DataFrame (name + platform + service).
+
+        ``service`` defaults to SchemaCrawler's reported database product name
+        (e.g. ``PostgreSQL``); ``platform`` is left unset unless supplied. The
+        transformer omits whichever of these is ``None`` from the graph node.
+        """
+        service = self.service or (catalog.get("product") or None)
+        return pd.DataFrame(
+            [
+                {
+                    "database_name": self.source_database_name,
+                    "platform": self.platform,
+                    "service": service,
+                }
+            ]
+        )
 
     def _flatten_schema_info(self, catalog: dict[str, Any]) -> pd.DataFrame:
         """Flatten template schemas into ``database_name, schema_name, description`` rows."""

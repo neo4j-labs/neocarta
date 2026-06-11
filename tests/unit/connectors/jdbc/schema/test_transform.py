@@ -1,12 +1,58 @@
 """Unit tests for the JDBC schema transformer."""
 
+import pandas as pd
+
 
 def test_transform_to_database_nodes(transformer, extractor_with_cache):
-    """The single database row becomes one Database node."""
+    """The single database row becomes one Database node carrying service (uppercased)."""
     nodes = transformer.transform_to_database_nodes(extractor_with_cache.database_info)
     assert len(nodes) == 1
     assert nodes[0].id == "neocarta_test"
     assert nodes[0].name == "neocarta_test"
+    assert nodes[0].service == "POSTGRESQL"  # derived from product name, uppercased by the model
+    assert nodes[0].platform is None
+
+
+def test_get_database_properties_includes_service_omits_unset(transformer, extractor_with_cache):
+    """Database properties include service but omit platform/description when unset."""
+    transformer.transform_to_database_nodes(extractor_with_cache.database_info)
+    props = transformer.get_database_properties()
+    assert "service" in props
+    assert "platform" not in props
+    assert "description" not in props
+
+
+def test_get_column_properties_includes_pk_fk_when_present(transformer, extractor_with_cache):
+    """When the source defines PKs/FKs, both flags are written."""
+    transformer.transform_to_column_nodes(extractor_with_cache.column_info)
+    props = transformer.get_column_properties()
+    assert "is_primary_key" in props
+    assert "is_foreign_key" in props
+
+
+def test_get_column_properties_omits_pk_fk_when_absent(transformer):
+    """When no column is a PK/FK, those flags are left off the node (not written false)."""
+    column_info = pd.DataFrame(
+        [
+            {
+                "database_name": "db",
+                "schema_name": "public",
+                "table_name": "logs",
+                "column_name": "message",
+                "type": "text",
+                "nullable": True,
+                "description": None,
+                "is_primary_key": False,
+                "is_foreign_key": False,
+            }
+        ]
+    )
+    transformer.transform_to_column_nodes(column_info)
+    props = transformer.get_column_properties()
+    assert "is_primary_key" not in props
+    assert "is_foreign_key" not in props
+    assert "description" not in props
+    assert props == ["name", "type", "nullable"]
 
 
 def test_transform_to_schema_nodes_unfiltered(transformer, extractor_with_cache):

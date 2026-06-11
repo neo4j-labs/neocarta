@@ -37,7 +37,7 @@ graph LR
 
 | Node / Relationship | Source | Notes |
 | --- | --- | --- |
-| `Database {id, name}` | parsed from the JDBC URL (or `source_database_name`) | one per ingest |
+| `Database {id, name, service, platform}` | name from the JDBC URL (or `source_database_name`); `service` from SchemaCrawler's DB product name (e.g. `POSTGRESQL`); `platform` only if you pass it | one per ingest |
 | `Schema {id, name, description}` | SchemaCrawler schema (`name`, `remarks`) | |
 | `Table {id, name, description}` | SchemaCrawler table (`name`, `remarks`) | base tables |
 | `Column {id, name, description, type, nullable, is_primary_key, is_foreign_key}` | SchemaCrawler column | flags from `partOfPrimaryKey` / `partOfForeignKey` |
@@ -110,9 +110,9 @@ explicitly.
 This connector requires tooling that **cannot** be installed from the Python
 environment. The host running neocarta must provide:
 
-1. **Java 11+.** The connector checks `java -version` at construction and raises
-   a clear `ConfigError` if Java is missing. Install a JRE/JDK (e.g.
-   [Temurin](https://adoptium.net/)) and ensure `java` is on `PATH`.
+1. **Java 11+.** The connector runs `java -version` at construction and raises a
+   clear `ConfigError` if Java is missing **or older than 11**. Install a JRE/JDK
+   (e.g. [Temurin](https://adoptium.net/)) and ensure `java` is on `PATH`.
 2. **The SchemaCrawler distribution.** Download a SchemaCrawler 16.x release from
    <https://www.schemacrawler.com/downloads.html> and unzip it. Point
    `SCHEMACRAWLER_JAR` at its `_schemacrawler/lib/*` directory — SchemaCrawler is
@@ -160,10 +160,15 @@ SCHEMACRAWLER_JAR=schemacrawler-16.x.x-distribution/_schemacrawler/lib/*
   skips automatically when Java or the JARs are absent.
 - **Metadata only** — no sampled column values (`Value` nodes), and no query-log
   / lineage extraction (a separate future sub-connector).
-- The bundled FreeMarker template was validated against SchemaCrawler 16.27.1.
-  If a markedly different SchemaCrawler version changes the catalog model, adjust
-  [`schema/catalog.json.ftl`](schema/catalog.json.ftl) and the `_flatten_*`
-  helpers in `schema/extract.py` together (the template defines the JSON shape
-  the extractor parses).
+- `service` is auto-derived from SchemaCrawler's database product name; `platform`
+  isn't exposed by JDBC, so it's omitted unless you pass `platform=...` to the
+  connector. `is_primary_key` / `is_foreign_key` are written only when the source
+  actually defines primary/foreign keys — columns in a key-less schema simply
+  omit those properties (rather than storing `false`).
+- The bundled FreeMarker template ([`schema/catalog.json.ftl`](schema/catalog.json.ftl))
+  targets SchemaCrawler 16.x, whose catalog model is stable. It is an internal
+  library file — you don't edit it. If a future SchemaCrawler release changes the
+  catalog model, updating the template and extractor is a maintainer fix; please
+  open an issue.
 ```
 

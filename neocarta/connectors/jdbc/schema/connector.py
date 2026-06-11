@@ -42,8 +42,17 @@ class JdbcSchemaConnector:
     db_user : str, optional
         Database username.
     db_password : str, optional
-        Database password. Passed to SchemaCrawler via the environment, never
-        on the command line.
+        Database password. Forwarded to SchemaCrawler via an environment variable
+        (``--password:env=``), never on the command line. A constructor arg
+        (rather than a pre-authed client, as BigQuery/Dataplex use) because JDBC
+        has no shared client object — auth happens at connection time, per driver.
+    platform : str, optional
+        Hosting platform for the graph ``Database`` node (e.g. ``"AWS_RDS"``).
+        Not derivable from JDBC metadata; defaults to ``None`` (omitted from the
+        node) unless supplied.
+    service : str, optional
+        Database service/engine for the graph ``Database`` node. Defaults to the
+        database product name SchemaCrawler reports (e.g. ``"POSTGRESQL"``).
     timeout : int, default 120
         Maximum seconds to wait for the SchemaCrawler subprocess.
 
@@ -65,6 +74,8 @@ class JdbcSchemaConnector:
         source_database_name: str | None = None,
         db_user: str | None = None,
         db_password: str | None = None,
+        platform: str | None = None,
+        service: str | None = None,
         timeout: int = 120,
     ) -> None:
         """Initialize the JDBC schema connector."""
@@ -89,6 +100,8 @@ class JdbcSchemaConnector:
             source_database_name=resolved_source_db,
             db_user=db_user,
             db_password=db_password,
+            platform=platform,
+            service=service,
             timeout=timeout,
         )
         self.transformer = JdbcSchemaTransformer()
@@ -152,10 +165,20 @@ class JdbcSchemaConnector:
                 "JdbcSchemaConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
-        print(self.loader.load_database_nodes(self.transformer.database_nodes))
+        print(
+            self.loader.load_database_nodes(
+                self.transformer.database_nodes,
+                properties_list=self.transformer.get_database_properties(),
+            )
+        )
         print(self.loader.load_schema_nodes(self.transformer.schema_nodes))
         print(self.loader.load_table_nodes(self.transformer.table_nodes))
-        print(self.loader.load_column_nodes(self.transformer.column_nodes))
+        print(
+            self.loader.load_column_nodes(
+                self.transformer.column_nodes,
+                properties_list=self.transformer.get_column_properties(),
+            )
+        )
 
         print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
         print(self.loader.load_has_table_relationships(self.transformer.has_table_relationships))
