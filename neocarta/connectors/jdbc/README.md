@@ -183,16 +183,24 @@ methods will fail the crawl; the connector surfaces it as a clear `ExtractionErr
 
 ### BigQuery — use the native `BigQuerySchemaConnector` instead
 
-BigQuery is **not supported via JDBC**. The connection succeeds, but neither
-BigQuery JDBC driver implements the `DatabaseMetaData` methods SchemaCrawler needs
-at `detailed` info-level (required for columns, types, and primary/foreign keys),
-so the crawl fails after connecting:
+BigQuery is **not supported via JDBC**. Both available BigQuery JDBC drivers fail
+with SchemaCrawler, but at different stages — one before it can even connect, the
+other after connecting but during the metadata crawl:
 
 - **Google BigQuery JDBC driver** (`com.google.cloud.bigquery.jdbc.BigQueryDriver`):
+  connects successfully (and lists tables at `--info-level=minimum`), but at the
+  `detailed` info-level the connector requires (columns, types, and
+  primary/foreign keys) it does not implement the `DatabaseMetaData` type/column
+  methods SchemaCrawler needs, failing with
   `SQLFeatureNotSupportedException: This method is not implemented` while building
   the type map (`getTypeInfo`).
-- **Simba BigQuery JDBC driver**: fails on an unimplemented metadata method
-  (`getClientInfoProperties()`).
+- **Simba BigQuery JDBC driver** (`com.simba.googlebigquery.jdbc.Driver`): never
+  connects. SchemaCrawler calls `Driver.getPropertyInfo()` during connection setup,
+  and the Simba driver's implementation throws
+  `[Simba][JDBC](11380) Null pointer exception` — an NPE raised inside its own
+  `BQConnection.close()` cleanup (`getBigQueryStorageWriteClient()` on a null
+  client). This happens for any URL, before the crawl begins. (A raw
+  `DriverManager.getConnection()` works; only `getPropertyInfo()` is broken.)
 
 BigQuery has a dedicated **`BigQuerySchemaConnector`** — use that. The JDBC
 connector is a fallback for databases that lack a dedicated connector, and
