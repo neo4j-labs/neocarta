@@ -15,7 +15,7 @@ import click
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import CLIError, cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
     _build_embedder,
@@ -115,20 +115,19 @@ def osi_ingest(
     # Lazy import: keep the connector dependency off the --help / --dry-run path.
     from ...connectors.osi import OsiConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting OSI connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = OsiConnector(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.ingest(spec_source)
+            with cli_status(stderr, "Ingesting OSI semantic model..."):
+                connector.ingest(spec_source)
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=node_labels)
+                with cli_status(stderr, "Generating embeddings..."):
+                    embedder.run(node_labels=node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -225,18 +224,17 @@ def osi_export(
     # Lazy import: keep the connector dependency off the --help / --dry-run path.
     from ...connectors.osi import OsiConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting OSI connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = OsiConnector(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.export(
-                semantic_model_name=semantic_model_name,
-                output_path=output_path,
-            )
+            with cli_status(stderr, "Exporting OSI semantic model..."):
+                connector.export(
+                    semantic_model_name=semantic_model_name,
+                    output_path=output_path,
+                )
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
         except ValueError as exc:

@@ -736,7 +736,7 @@ Plus one introspection verb:
 ```bash
 # Set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY in your shell or .env
 neocarta bigquery schema --project-id my-proj --dataset-id sales
-neocarta bigquery schema --no-embeddings
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
 neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
@@ -859,19 +859,19 @@ The project is organized into the following dependency groups:
 
 ### Adding a New Connector
 
-Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/add-source-connector/connector-contract.md). Read it before designing a connector.
+Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/neocarta-add-source-connector/connector-contract.md). Read it before designing a connector.
 
-The repository ships an `add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
+The repository ships a `neocarta-add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/neocarta-add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
 
 ```bash
 # List connectors and their detected kind (source/format)
-uv run .claude/skills/add-source-connector/scripts/driver.py list
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py list
 
 # Scaffold a new source connector package + conformance test
-uv run .claude/skills/add-source-connector/scripts/driver.py scaffold <name>
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold <name>
 
 # Verify a connector against the contract (static checks + conformance pytest)
-uv run .claude/skills/add-source-connector/scripts/driver.py verify <name>
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py verify <name>
 ```
 
 A scaffolded connector is lint-clean as generated; fill in the `extract` / `transform` / `load` stages, then re-run `verify`. Connector creation and CLI integration are separate PRs.

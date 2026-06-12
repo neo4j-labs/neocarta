@@ -13,9 +13,9 @@ contract:
 
 Run it through the managed environment, e.g.::
 
-    uv run .claude/skills/add-source-connector/scripts/driver.py list
-    uv run .claude/skills/add-source-connector/scripts/driver.py scaffold salesforce
-    uv run .claude/skills/add-source-connector/scripts/driver.py verify salesforce
+    uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py list
+    uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold salesforce
+    uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py verify salesforce
 
 ``<pkg>`` is a path under ``neocarta/connectors/`` — ``salesforce`` for a flat
 single-data-type source, ``salesforce/schema`` for a data-type sub-connector.
@@ -55,7 +55,7 @@ def _class_name_from_pkg(pkg: str) -> str:
 
 
 def _module_id_from_pkg(pkg: str) -> str:
-    """Human-friendly id used in print() lines, e.g. ``salesforce schema``."""
+    """Human-friendly id used in log lines, e.g. ``salesforce schema``."""
     return pkg.strip("/").replace("/", " ").replace("_", " ")
 
 
@@ -86,14 +86,24 @@ def _connector_py(pkg: str, class_name: str, is_format: bool) -> str:
 '''
     return f'''"""{class_name} connector."""
 
+import logging
 import warnings
 
 from neo4j import Driver
 
+from {dots}_logging import log_transform_counts
 from {dots}errors import StateError
 from {dots}ingest.rdbms import Neo4jRDBMSLoader
 from .extract import {class_name[:-9]}Extractor
 from .transform import {class_name[:-9]}Transformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+# log_transform_counts skips zero-count types, so an unfilled tuple stays quiet.
+# TODO: add a pair per produced node / relationship list — e.g. a "tables" label
+# for the "table_nodes" attribute; see csv/connector.py for a full example.
+_TRANSFORM_COUNTS: tuple[tuple[str, str], ...] = ()
 
 
 class {class_name}:
@@ -153,7 +163,9 @@ class {class_name}:
                 suggestion="Call connector.extract(...) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming {mid} metadata...")
         # TODO: drive self.transformer here, reading self.extractor.* caches.
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
@@ -170,7 +182,10 @@ class {class_name}:
                 "{class_name}.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
-        # TODO: print(self.loader.load_*_nodes(self.transformer.*_nodes))
+        logger.info("Loading {mid} metadata into Neo4j...")
+        # TODO: self.loader.load_*_nodes(self.transformer.*_nodes, ...)
+        # The loader logs each write by its graph pattern + merge counts itself,
+        # so don't re-log per-type counts here.
 
     def ingest(self, source: str | None = None) -> None:
         """
@@ -181,15 +196,14 @@ class {class_name}:
         source : str, optional
             Source-specific input forwarded to :meth:`extract`.
         """
-        print("Extracting metadata from {mid}...")
+        # Extract-phase progress is logged by @log_stage on the extractor's
+        # methods; transform() and load() emit their own phase lines.
         self.extract(source)
-        print("Transforming metadata from {mid}...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("{class_name} completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("{class_name} completed successfully")
 {export_method}
     def run(self, source: str | None = None) -> None:
         """
@@ -207,9 +221,12 @@ class {class_name}:
 '''
 
 
-def _extract_py(class_name: str) -> str:
+def _extract_py(pkg: str, class_name: str) -> str:
     base = class_name[:-9]
+    dots = _relative_import_dots(pkg)
     return f'''"""{base} extractor."""
+
+from {dots}_logging import log_stage
 
 
 class {base}Extractor:
@@ -224,12 +241,17 @@ class {base}Extractor:
         """Initialize an empty extractor cache."""
         self._cache: dict = {{}}
 
+    @log_stage
     def extract(self, source: str | None = None) -> None:
         """Read from the source and populate ``self._cache``.
 
-        TODO: replace this stub with concrete ``extract_*_info(...)`` methods
-        that populate ``self._cache``, plus ``@property`` accessors
-        (``table_info``, ``column_info``, ...) for the transformer to read.
+        ``@log_stage`` logs a one-line INFO summary (target + row count +
+        elapsed) for this call; it derives its logger from this module, never
+        logs SQL or row values, and surfaces only allowlisted scalar kwargs as
+        the target. TODO: replace this stub with concrete ``extract_*_info(...)``
+        methods — decorate each with ``@log_stage`` — that populate
+        ``self._cache``, plus ``@property`` accessors (``table_info``,
+        ``column_info``, ...) for the transformer to read.
         """
         raise NotImplementedError(f"{{type(self).__name__}}.extract() not implemented for {{source!r}}")
 '''
@@ -343,7 +365,7 @@ def _conformance_test(pkg: str, class_name: str, is_format: bool) -> str:
     return f'''"""Conformance tests for {class_name}.
 
 Asserts conformance with the public connector standard defined in
-``.claude/skills/add-source-connector/connector-contract.md`` and codified in
+``.claude/skills/neocarta-add-source-connector/connector-contract.md`` and codified in
 ``neocarta.connectors._base``.
 """
 
@@ -435,7 +457,7 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
     files = {
         pkg_dir / "__init__.py": _init_py(class_name),
         pkg_dir / "connector.py": _connector_py(pkg, class_name, is_format),
-        pkg_dir / "extract.py": _extract_py(class_name),
+        pkg_dir / "extract.py": _extract_py(pkg, class_name),
         pkg_dir / "transform.py": _transform_py(pkg, class_name),
         pkg_dir / "README.md": _readme_md(pkg, class_name, is_format),
     }
@@ -473,6 +495,10 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
 # verify
 # --------------------------------------------------------------------------- #
 ID_FSTRING_RE = re.compile(r"""_id\s*=\s*f["']|["']id["']\s*:\s*f["']|\bid=f["']""")
+# Bare print( call — not pprint(, blueprint(, or console.print( (lookbehind rules
+# out a preceding word char or dot). Connectors report progress via the module
+# logger, never print() (contract §16).
+PRINT_RE = re.compile(r"(?<![\w.])print\s*\(")
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -530,7 +556,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             continue
         print(f"  {cls.__name__}: {kind} connector (protocol OK)")
 
-    # 5. id-generation routing — flag inline f-string ids
+    # 5. static line scans — inline f-string ids and stray print()
     for py in sorted(pkg_dir.rglob("*.py")):
         if "__pycache__" in py.parts:
             continue
@@ -539,6 +565,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
                 warns.append(
                     f"{py.relative_to(REPO_ROOT)}:{i}: looks like an inline id f-string — "
                     "route ids through connectors/utils/generate_id.py"
+                )
+            if not line.lstrip().startswith("#") and PRINT_RE.search(line):
+                warns.append(
+                    f"{py.relative_to(REPO_ROOT)}:{i}: uses print() — report progress through "
+                    "the module logger (logging.getLogger(__name__)); see contract §16"
                 )
 
     # 6. report static results
