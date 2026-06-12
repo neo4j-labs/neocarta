@@ -56,3 +56,24 @@ def test_require_secret_raises_on_empty():
 def test_require_secret_returns_value_when_set():
     secret = SecretStr("populated")
     assert require_secret("NEO4J_PASSWORD", secret, env_var="NEO4J_PASSWORD") is secret
+
+
+def test_embedding_env_vars_are_read(monkeypatch):
+    # #187: all three EMBEDDING_* vars must be read from the environment via the
+    # explicit validation_alias on each field.
+    monkeypatch.setenv("EMBEDDING_MODEL", "gemini-embedding-001")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "256")
+    monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "32")
+    settings = CLISettings()
+    assert settings.embedding_model == "gemini-embedding-001"
+    assert settings.embedding_dimensions == 256
+    assert settings.embedding_batch_size == 32
+
+
+def test_embedding_defaults_when_env_absent(monkeypatch):
+    for var in ("EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "EMBEDDING_BATCH_SIZE"):
+        monkeypatch.delenv(var, raising=False)
+    settings = CLISettings()
+    assert settings.embedding_model == "text-embedding-3-small"
+    assert settings.embedding_dimensions is None
+    assert settings.embedding_batch_size == 100

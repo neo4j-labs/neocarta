@@ -28,9 +28,11 @@ Embedding generation and the Text2SQL agent both route through [LiteLLM](https:/
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `EMBEDDING_MODEL` | No | `text-embedding-3-small` | LiteLLM embedding model id (e.g. `text-embedding-3-small`, `gemini-embedding-001`) |
+| `EMBEDDING_DIMENSIONS` | No | auto-detected | Vector dimension for models that support truncation (e.g. OpenAI `text-embedding-3-*`); silently ignored by models that don't. Defaults to the model's native dimension. |
+| `EMBEDDING_BATCH_SIZE` | No | `100` | Nodes embedded per provider request during CLI ingest runs. Not used by the MCP server, which embeds one query at a time. |
 | `AGENT_MODEL` | No | `gpt-4o-mini` | LiteLLM chat model id for the Text2SQL agent (e.g. `gpt-4o-mini`, `gemini-2.0-flash`) |
 
-The embedding vector dimension is auto-detected from the model on first use and the Neo4j vector index is created at that size — no manual dimension config required. **If you switch to a model with a different dimension on an existing graph, drop the existing `*_vector_index` indexes first and re-ingest.**
+The embedding vector dimension is auto-detected from the model on first use and the Neo4j vector index is created at that size — no manual dimension config is required. Set `EMBEDDING_DIMENSIONS` only to request truncation on models that support it; models that don't support it ignore the value and keep their native dimension. `EMBEDDING_BATCH_SIZE` tunes throughput for CLI ingest runs and is not used by the MCP server. **If you switch to a model with a different dimension on an existing graph, drop the existing `*_vector_index` indexes first and re-ingest.**
 
 For advanced setups (LiteLLM Proxy, custom self-hosted endpoints, or distinct keys for embeddings vs. completions), pass overrides programmatically via `LiteLLMEmbeddingsConnector(..., litellm_kwargs={"api_key": "...", "api_base": "..."})`. The standard provider env vars below cover all common cases.
 

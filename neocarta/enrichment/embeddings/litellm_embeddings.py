@@ -23,8 +23,10 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
     The vector dimension is auto-detected from the model on first use (one
     probe call) and the Neo4j vector index is created at that size, so no
     manual dimension config is required. If you need a non-default size,
-    pass an explicit ``dimensions`` to ``litellm_kwargs`` (and the model
-    must support it).
+    pass an explicit ``dimensions`` (and the model must support it). Models
+    that do not support dimension truncation ignore it gracefully via
+    LiteLLM's ``drop_params`` — the probe then reports the model's native
+    dimension, so the index and the stored vectors always agree.
 
     Authentication is read from provider-specific environment variables
     (``OPENAI_API_KEY``, ``GEMINI_API_KEY``, ``COHERE_API_KEY``, ``AZURE_*``,
@@ -37,6 +39,7 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         neo4j_driver: Driver,
         embedding_model: str = "text-embedding-3-small",
         database_name: str = "neo4j",
+        dimensions: int | None = None,
         litellm_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
@@ -52,12 +55,24 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             ``"gemini-embedding-001"``.
         database_name: str
             The name of the Neo4j database to write embeddings to.
+        dimensions: Optional[int]
+            Requested embedding vector dimension, for models that support
+            truncation. When ``None`` the model's native dimension is used.
+            When set, it is forwarded to LiteLLM alongside ``drop_params`` so
+            models that do not support truncation drop it instead of erroring.
         litellm_kwargs: Optional[dict[str, Any]]
             Additional keyword arguments forwarded verbatim to
             ``litellm.embedding`` / ``litellm.aembedding`` — e.g.
-            ``dimensions`` for models that support truncation, or
-            ``api_key`` / ``api_base`` for LiteLLM Proxy / custom endpoints.
+            ``api_key`` / ``api_base`` for LiteLLM Proxy / custom endpoints, or
+            ``additional_drop_params=["dimensions"]`` for OpenAI-compatible
+            endpoints that LiteLLM cannot introspect. Values here take
+            precedence over ``dimensions``.
         """
+        # Intentionally pass dimensions=None to the base so the dimension is
+        # always probed on first use. The probe call carries the kwargs below,
+        # so when ``drop_params`` drops an unsupported ``dimensions`` the probe
+        # reports the model's actual native size and the vector index is
+        # created to match the vectors that are really returned.
         super().__init__(
             neo4j_driver=neo4j_driver,
             embedding_model=embedding_model,
@@ -65,6 +80,9 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             dimensions=None,
         )
         self._call_kwargs: dict[str, Any] = dict(litellm_kwargs) if litellm_kwargs else {}
+        if dimensions is not None:
+            self._call_kwargs.setdefault("dimensions", dimensions)
+            self._call_kwargs.setdefault("drop_params", True)
 
     def _create_embedding_sync(self, description: str) -> list[float] | None:
         """

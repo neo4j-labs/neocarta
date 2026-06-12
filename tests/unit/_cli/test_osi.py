@@ -30,7 +30,14 @@ def test_ingest_help_documents_key_flags():
     result = runner.invoke(cli, ["osi", "ingest", "--help"])
     assert result.exit_code == 0
     output = result.output
-    for token in ("--spec-source", "--embeddings", "--no-embeddings", "--dry-run"):
+    for token in (
+        "--spec-source",
+        "--embeddings",
+        "--no-embeddings",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
+        "--dry-run",
+    ):
         assert token in output, f"--help should document {token}"
 
 
@@ -53,6 +60,31 @@ def test_ingest_dry_run_emits_json_and_skips_clients():
     assert body["dry_run"] is True
     assert body["spec_source"] == _SPEC_SOURCE
     assert body["embeddings"] is False
+
+
+def test_ingest_dry_run_reports_embedding_fields_when_enabled():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "osi",
+            "ingest",
+            "--spec-source",
+            _SPEC_SOURCE,
+            "--embeddings",
+            "--embedding-dimensions",
+            "256",
+            "--embedding-batch-size",
+            "8",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["osi_ingest"]
+    assert body["embeddings"] is True
+    assert body["embedding_dimensions"] == 256
+    assert body["embedding_batch_size"] == 8
 
 
 def test_ingest_missing_spec_source_fails_with_usage_error(monkeypatch):

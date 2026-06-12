@@ -28,7 +28,14 @@ def test_ingest_help_documents_key_flags():
     result = runner.invoke(cli, ["csv", "ingest", "--help"])
     assert result.exit_code == 0
     output = result.output
-    for token in ("--csv-directory", "--embeddings", "--no-embeddings", "--dry-run"):
+    for token in (
+        "--csv-directory",
+        "--embeddings",
+        "--no-embeddings",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
+        "--dry-run",
+    ):
         assert token in output, f"--help should document {token}"
 
 
@@ -51,6 +58,28 @@ def test_ingest_dry_run_emits_json_and_skips_clients():
     assert body["dry_run"] is True
     assert body["csv_directory"] == "datasets/csv"
     assert body["embeddings"] is False
+
+
+def test_ingest_dry_run_reports_embedding_batch_size_when_enabled():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "csv",
+            "ingest",
+            "--csv-directory",
+            "datasets/csv",
+            "--embeddings",
+            "--embedding-batch-size",
+            "8",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["csv_ingest"]
+    assert body["embeddings"] is True
+    assert body["embedding_batch_size"] == 8
 
 
 def test_ingest_missing_csv_directory_fails_with_usage_error(monkeypatch):

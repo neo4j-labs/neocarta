@@ -18,7 +18,14 @@ def test_schema_help_documents_key_flags():
     result = runner.invoke(cli, ["bigquery", "schema", "--help"])
     assert result.exit_code == 0
     output = result.output
-    for token in ("--project-id", "--dataset-id", "--no-embeddings", "--dry-run"):
+    for token in (
+        "--project-id",
+        "--dataset-id",
+        "--no-embeddings",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
+        "--dry-run",
+    ):
         assert token in output, f"--help should document {token}"
 
 
@@ -34,6 +41,9 @@ def test_logs_help_documents_key_flags():
         "--end-date",
         "--limit",
         "--include-failed-queries",
+        "--embedding-model",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
     ):
         assert token in output, f"--help should document {token}"
 
@@ -130,6 +140,60 @@ def test_logs_dry_run_emits_json_and_skips_clients():
     assert body["dry_run"] is True
     assert body["limit"] == 42
     assert body["drop_failed_queries"] is False
+
+
+def test_schema_dry_run_reports_embedding_batch_size_and_dimensions():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "bigquery",
+            "schema",
+            "--project-id",
+            "fake-proj",
+            "--dataset-id",
+            "fake_ds",
+            "--embeddings",
+            "--embedding-dimensions",
+            "256",
+            "--embedding-batch-size",
+            "8",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["bigquery_schema"]
+    assert body["embeddings"] is True
+    assert body["embedding_dimensions"] == 256
+    assert body["embedding_batch_size"] == 8
+
+
+def test_logs_dry_run_reports_embedding_fields_when_enabled():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "bigquery",
+            "logs",
+            "--project-id",
+            "fake-proj",
+            "--dataset-id",
+            "fake_ds",
+            "--embeddings",
+            "--embedding-model",
+            "gemini-embedding-001",
+            "--embedding-batch-size",
+            "16",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["bigquery_logs"]
+    assert body["embeddings"] is True
+    assert body["embedding_model"] == "gemini-embedding-001"
+    assert body["embedding_batch_size"] == 16
 
 
 def test_schema_missing_project_id_fails_with_usage_error(monkeypatch):

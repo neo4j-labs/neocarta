@@ -30,4 +30,5 @@ def create_embedder(
         neo4j_driver=neo4j_driver,  # type: ignore[arg-type]
         embedding_model=mcp_server_settings.embedding_model,
         database_name=database_name,
+        dimensions=mcp_server_settings.embedding_dimensions,
     )

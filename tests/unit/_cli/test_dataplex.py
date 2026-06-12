@@ -37,6 +37,8 @@ def test_schema_help_documents_key_flags():
         "--dataset-id",
         "--embeddings",
         "--no-embeddings",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
         "--dry-run",
     ):
         assert token in result.output, f"--help should document {token}"
@@ -54,6 +56,8 @@ def test_glossary_help_documents_key_flags_and_omits_dataset():
         "--no-entry-links",
         "--embeddings",
         "--no-embeddings",
+        "--embedding-dimensions",
+        "--embedding-batch-size",
         "--dry-run",
     ):
         assert token in result.output, f"--help should document {token}"
@@ -117,6 +121,34 @@ def test_glossary_dry_run_emits_json_and_needs_no_dataset():
     assert body["entry_links"] is True
     assert body["embeddings"] is False
     assert "dataset_id" not in body
+
+
+def test_schema_dry_run_reports_embedding_batch_size_when_enabled():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "dataplex",
+            "schema",
+            "--project-id",
+            "fake-proj",
+            "--project-number",
+            "123456",
+            "--dataplex-location",
+            "us",
+            "--dataset-id",
+            "demo_ds",
+            "--embeddings",
+            "--embedding-batch-size",
+            "8",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["dataplex_schema"]
+    assert body["embeddings"] is True
+    assert body["embedding_batch_size"] == 8
 
 
 # --------------------------------------------------------------------------- #
