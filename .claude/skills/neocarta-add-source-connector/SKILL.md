@@ -62,9 +62,10 @@ stage methods with the state-guard + deprecation-shim wiring already correct),
 as-is** — you then fill the `TODO`s in extract/transform/load.
 
 `verify` reports import + protocol conformance (`source` vs `format`, via
-`issubclass`), `__all__` minimalism, `README.md` presence, inline-id-f-string
-warnings, then runs the connector's `test_conformance.py`. It exits non-zero on
-any FAIL. Warnings (e.g. an id f-string) don't fail the run but should be fixed.
+`issubclass`), `__all__` minimalism, `README.md` presence, inline-id-f-string and
+stray-`print()` warnings, then runs the connector's `test_conformance.py`. It exits
+non-zero on any FAIL. Warnings (e.g. an id f-string or a `print()`) don't fail the
+run but should be fixed.
 
 ### Typical workflow
 
@@ -130,7 +131,7 @@ lives in
   `@log_stage`, fill `_TRANSFORM_COUNTS` so `log_transform_counts` reports per-type
   counts, and let the loader log its own per-pattern write counts. Never log SQL,
   row values, or secrets — counts, labels, targets, and elapsed only. The scaffold
-  generates this wiring; `verify` does not flag stray `print()`, so don't add any.
+  generates this wiring, and `verify` warns on any stray `print()`.
 
 ## Troubleshooting
 

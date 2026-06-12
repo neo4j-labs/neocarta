@@ -495,6 +495,10 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
 # verify
 # --------------------------------------------------------------------------- #
 ID_FSTRING_RE = re.compile(r"""_id\s*=\s*f["']|["']id["']\s*:\s*f["']|\bid=f["']""")
+# Bare print( call — not pprint(, blueprint(, or console.print( (lookbehind rules
+# out a preceding word char or dot). Connectors report progress via the module
+# logger, never print() (contract §16).
+PRINT_RE = re.compile(r"(?<![\w.])print\s*\(")
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -552,7 +556,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             continue
         print(f"  {cls.__name__}: {kind} connector (protocol OK)")
 
-    # 5. id-generation routing — flag inline f-string ids
+    # 5. static line scans — inline f-string ids and stray print()
     for py in sorted(pkg_dir.rglob("*.py")):
         if "__pycache__" in py.parts:
             continue
@@ -561,6 +565,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
                 warns.append(
                     f"{py.relative_to(REPO_ROOT)}:{i}: looks like an inline id f-string — "
                     "route ids through connectors/utils/generate_id.py"
+                )
+            if not line.lstrip().startswith("#") and PRINT_RE.search(line):
+                warns.append(
+                    f"{py.relative_to(REPO_ROOT)}:{i}: uses print() — report progress through "
+                    "the module logger (logging.getLogger(__name__)); see contract §16"
                 )
 
     # 6. report static results

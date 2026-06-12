@@ -353,4 +353,5 @@ provider/parse error, log the exception *type*, not its message
 The scaffold wires this up: generated extractors decorate `extract()` with
 `@log_stage`, and the generated connector defines `_TRANSFORM_COUNTS`, calls
 `log_transform_counts`, and logs each phase through the module logger — no
-`print()`. `verify` does not yet flag stray `print()`, so don't introduce any.
+`print()`. `verify` warns on any stray `print()` in connector code, so don't
+introduce any.
