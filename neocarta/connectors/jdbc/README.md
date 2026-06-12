@@ -170,5 +170,31 @@ SCHEMACRAWLER_JAR=schemacrawler-16.x.x-distribution/_schemacrawler/lib/*
   library file — you don't edit it. If a future SchemaCrawler release changes the
   catalog model, updating the template and extractor is a maintainer fix; please
   open an issue.
-```
+
+## Not supported
+
+This connector works with databases whose JDBC driver implements the
+`DatabaseMetaData` schema/type/column methods SchemaCrawler needs at
+`--info-level=detailed` — in practice, the databases SchemaCrawler officially
+supports (PostgreSQL, MySQL/MariaDB, SQL Server, Oracle, IBM DB2, SQLite,
+HyperSQL). Validated here: **PostgreSQL** (integration test), plus **MySQL,
+MariaDB, SQLite, and H2** locally. A driver that connects but omits those metadata
+methods will fail the crawl; the connector surfaces it as a clear `ExtractionError`.
+
+### BigQuery — use the native `BigQuerySchemaConnector` instead
+
+BigQuery is **not supported via JDBC**. The connection succeeds, but neither
+BigQuery JDBC driver implements the `DatabaseMetaData` methods SchemaCrawler needs
+at `detailed` info-level (required for columns, types, and primary/foreign keys),
+so the crawl fails after connecting:
+
+- **Google BigQuery JDBC driver** (`com.google.cloud.bigquery.jdbc.BigQueryDriver`):
+  `SQLFeatureNotSupportedException: This method is not implemented` while building
+  the type map (`getTypeInfo`).
+- **Simba BigQuery JDBC driver**: fails on an unimplemented metadata method
+  (`getClientInfoProperties()`).
+
+BigQuery has a dedicated **`BigQuerySchemaConnector`** — use that. The JDBC
+connector is a fallback for databases that lack a dedicated connector, and
+BigQuery is outside SchemaCrawler's officially-supported set.
 
