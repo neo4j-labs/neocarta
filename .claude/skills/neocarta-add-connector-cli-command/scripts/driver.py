@@ -57,18 +57,14 @@ def _connector_classes(pkg: str) -> list[str]:
     """Exported ``*Connector`` class names for ``neocarta.connectors.<pkg>``."""
     try:
         module = importlib.import_module(f"neocarta.connectors.{pkg}")
-    except Exception:  # noqa: BLE001 — best-effort introspection for the gap map
+    except Exception:  # best-effort introspection for the gap map
         return []
     return [n for n in getattr(module, "__all__", []) if n.endswith("Connector")]
 
 
 def _existing_command_stems() -> set[str]:
     """Module stems under ``_cli/commands/`` that are connector groups."""
-    return {
-        p.stem
-        for p in COMMANDS_DIR.glob("*.py")
-        if p.stem not in SKIP_COMMAND_STEMS
-    }
+    return {p.stem for p in COMMANDS_DIR.glob("*.py") if p.stem not in SKIP_COMMAND_STEMS}
 
 
 # --------------------------------------------------------------------------- #
@@ -419,7 +415,9 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
     verbs = args.verb or ["ingest"]
 
     classes = _connector_classes(connector_pkg)
-    connector_cls = args.connector_class or (classes[0] if classes else f"{func.capitalize()}Connector")
+    connector_cls = args.connector_class or (
+        classes[0] if classes else f"{func.capitalize()}Connector"
+    )
     if not classes:
         print(
             f"  WARN: neocarta.connectors.{connector_pkg} exports no *Connector "
@@ -470,7 +468,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     # 1. module imports + group object present
     try:
         module = importlib.import_module(f"neocarta._cli.commands.{func}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"FAIL: cannot import neocarta._cli.commands.{func}: {type(exc).__name__}: {exc}")
         return 1
     group = getattr(module, func, None)
@@ -532,7 +530,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 # list
 # --------------------------------------------------------------------------- #
-def cmd_list(args: argparse.Namespace) -> int:  # noqa: ARG001
+def cmd_list(args: argparse.Namespace) -> int:
     """List every connector and whether it has a CLI command (gap map)."""
     have = _existing_command_stems()
     print(f"{'connector':14} {'CLI command?':14} exported connector class(es)")
