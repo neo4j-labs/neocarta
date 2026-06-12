@@ -736,7 +736,7 @@ Plus one introspection verb:
 ```bash
 # Set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY in your shell or .env
 neocarta bigquery schema --project-id my-proj --dataset-id sales
-neocarta bigquery schema --no-embeddings
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
 neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales

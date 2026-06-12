@@ -48,12 +48,12 @@ Secrets are env-only and never logged.
 
 ### `neocarta bigquery schema`
 
-Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `Column` nodes plus their relationships into the Neocarta graph. When `--embeddings` is enabled (default), description embeddings are generated and written back.
+Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `Column` nodes plus their relationships into the Neocarta graph. When `--embeddings` is passed, description embeddings are generated and written back (off by default).
 
 - **Flags:**
   - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
   - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
-  - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: enabled.
+  - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: disabled.
   - `--embedding-model TEXT` — OpenAI embedding model (default: `text-embedding-3-small`).
   - `--embedding-dimensions INT` — Embedding vector dimensions (default: `768`).
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or BigQuery.
@@ -62,7 +62,7 @@ Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `
 
 ```bash
 neocarta bigquery schema --project-id acme-data --dataset-id sales
-neocarta bigquery schema --no-embeddings
+neocarta bigquery schema --project-id acme-data --dataset-id sales --embeddings
 BIGQUERY_DATASET_ID=sales neocarta bigquery schema --json
 ```
 
