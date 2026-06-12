@@ -52,6 +52,7 @@ def main(schemas: list[str] | None = None, with_embeddings: bool = True) -> None
         embeddings_connector.run(node_labels=node_labels)
 
     print("Connector completed successfully!")
+    neo4j_driver.close()
 
 
 if __name__ == "__main__":
