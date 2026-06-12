@@ -1,0 +1,208 @@
+# JDBC connector
+
+Extracts schema metadata from any JDBC-compatible database (PostgreSQL, MySQL,
+Oracle, SQL Server, Redshift, …) and loads it into the neocarta semantic graph.
+The Java↔Python bridge is a **subprocess** call to the
+[SchemaCrawler](https://www.schemacrawler.com/) CLI: neocarta runs SchemaCrawler
+with a bundled **FreeMarker template** that renders the catalog as compact JSON
+(tables, columns, primary keys, and foreign keys), captures it on stdout, and
+transforms it into graph nodes and relationships. This reuses a battle-tested
+Java schema-extraction library that supports 20+ databases instead of
+hand-rolling an extractor per dialect.
+
+> **Why a template, not `--command=serialize`?** SchemaCrawler's `serialize`
+> JSON output omits tables and foreign keys (verified on 16.27.1), so it cannot
+> produce `REFERENCES`. SchemaCrawler's `template` command has full access to the
+> catalog model, so the bundled [`schema/catalog.json.ftl`](schema/catalog.json.ftl)
+> emits exactly the fields below — at the cost of one extra JAR (FreeMarker) on
+> the classpath.
+
+## Connector type
+
+**Source connector** (ingest only). Today it ships a single data-type
+sub-connector, `JdbcSchemaConnector` (`jdbc/schema/`), which extracts catalog
+structure. A future query-log sub-connector would live alongside it at
+`jdbc/logs/` (out of scope here — query-log extraction varies too much by
+database).
+
+## Data model
+
+```mermaid
+graph LR
+    Database -- HAS_SCHEMA --> Schema
+    Schema -- HAS_TABLE --> Table
+    Table -- HAS_COLUMN --> Column
+    Column -- REFERENCES --> Column
+```
+
+| Node / Relationship | Source | Notes |
+| --- | --- | --- |
+| `Database {id, name, service, platform}` | name from the JDBC URL (or `source_database_name`); `service` from SchemaCrawler's DB product name (e.g. `POSTGRESQL`); `platform` only if you pass it | one per ingest |
+| `Schema {id, name, description}` | SchemaCrawler schema (`name`, `remarks`) | |
+| `Table {id, name, description}` | SchemaCrawler table (`name`, `remarks`) | base tables |
+| `Column {id, name, description, type, nullable, is_primary_key, is_foreign_key}` | SchemaCrawler column | flags from `partOfPrimaryKey` / `partOfForeignKey` |
+| `(:Column)-[:REFERENCES]->(:Column)` | SchemaCrawler imported foreign keys | source FK column → referenced PK column |
+
+SchemaCrawler reads **metadata only**, so this connector does not produce
+`Value` nodes (sampled column values).
+
+## Usage
+
+```python
+import os
+
+from neo4j import GraphDatabase
+
+from neocarta.connectors.jdbc import JdbcSchemaConnector
+
+neo4j_driver = GraphDatabase.driver(
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
+)
+
+connector = JdbcSchemaConnector(
+    jdbc_url=os.getenv("JDBC_URL"),               # jdbc:postgresql://host:5432/mydb
+    jdbc_driver=os.getenv("JDBC_DRIVER"),         # org.postgresql.Driver
+    jdbc_driver_jar=os.getenv("JDBC_DRIVER_JAR"), # lib/postgresql-42.7.3.jar
+    schemacrawler_jar=os.getenv("SCHEMACRAWLER_JAR"),  # …/_schemacrawler/lib/*
+    neo4j_driver=neo4j_driver,
+    database_name=os.getenv("NEO4J_DATABASE", "neo4j"),
+    db_user=os.getenv("JDBC_USER"),
+    db_password=os.getenv("JDBC_PASSWORD"),
+)
+
+# Restrict to specific schemas; omit `schemas` to extract all of them.
+connector.ingest(schemas=["public", "analytics"])
+```
+
+### Environment variables
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `JDBC_URL` | `jdbc:postgresql://localhost:5432/mydb` | connection URL |
+| `JDBC_DRIVER` | `org.postgresql.Driver` | JDBC driver class |
+| `JDBC_DRIVER_JAR` | `lib/postgresql-42.7.3.jar` | path to the JDBC driver JAR |
+| `SCHEMACRAWLER_JAR` | `path/to/_schemacrawler/lib/*` | SchemaCrawler distribution `lib/*` classpath (**must include a FreeMarker JAR**) |
+| `JDBC_USER` | `postgres` | database user (optional) |
+| `JDBC_PASSWORD` | `secret` | database password (optional) |
+
+### Filtering
+
+`ingest(schemas=[...])` (forwarded to `extract`) scopes which schemas
+SchemaCrawler reads. The names are combined into a regex alternation for
+SchemaCrawler's `--schemas=<regex>`. Omit the argument to extract every schema.
+
+The `db_password` is passed to SchemaCrawler through the environment
+(`--password:env=`), never on the command line, so it does not appear in the
+host process list.
+
+### Source database name
+
+The `Database` node name (and the root segment of every entity id) is parsed
+from the JDBC URL's path component (e.g. `mydb` from
+`jdbc:postgresql://host:5432/mydb`). For URL shapes without a path-based name —
+Oracle SID URLs (`jdbc:oracle:thin:@host:1521:ORCL`) or SQL Server
+(`jdbc:sqlserver://host;databaseName=mydb`) — pass `source_database_name=...`
+explicitly.
+
+## Source-specific setup
+
+This connector requires tooling that **cannot** be installed from the Python
+environment. The host running neocarta must provide:
+
+1. **Java 11+.** The connector runs `java -version` at construction and raises a
+   clear `ConfigError` if Java is missing **or older than 11**. Install a JRE/JDK
+   (e.g. [Temurin](https://adoptium.net/)) and ensure `java` is on `PATH`.
+2. **The SchemaCrawler distribution.** Download a SchemaCrawler 16.x release from
+   <https://www.schemacrawler.com/downloads.html> and unzip it. Point
+   `SCHEMACRAWLER_JAR` at its `_schemacrawler/lib/*` directory — SchemaCrawler is
+   a multi-JAR distribution, so the classpath uses the `lib/*` wildcard (Java
+   expands it; it is passed literally, not shell-globbed), **not** a single
+   "fat JAR".
+3. **A FreeMarker JAR** on that classpath. The connector renders its catalog via
+   SchemaCrawler's `template` command, which needs a templating engine;
+   SchemaCrawler bundles only the scripting glue (`schemacrawler-scripting`), not
+   the engine. Download `freemarker.jar`
+   ([Maven Central](https://repo1.maven.org/maven2/org/freemarker/freemarker/))
+   and drop it into the SchemaCrawler `_schemacrawler/lib/` directory so the
+   `lib/*` classpath picks it up.
+4. **A JDBC driver JAR for your database.** Driver JARs are vendor-supplied and
+   licensed separately, so they are not bundled. Download the driver for your
+   dialect and point `JDBC_DRIVER_JAR` at it.
+
+The FreeMarker template itself ships with the connector
+([`schema/catalog.json.ftl`](schema/catalog.json.ftl)) — you do not supply it.
+
+### PostgreSQL
+
+```bash
+# JDBC driver: https://jdbc.postgresql.org/download/
+JDBC_URL=jdbc:postgresql://localhost:5432/mydb
+JDBC_DRIVER=org.postgresql.Driver
+JDBC_DRIVER_JAR=lib/postgresql-42.7.3.jar
+SCHEMACRAWLER_JAR=schemacrawler-16.x.x-distribution/_schemacrawler/lib/*
+```
+
+### MySQL
+
+```bash
+# JDBC driver (Connector/J): https://dev.mysql.com/downloads/connector/j/
+JDBC_URL=jdbc:mysql://localhost:3306/mydb
+JDBC_DRIVER=com.mysql.cj.jdbc.Driver
+JDBC_DRIVER_JAR=lib/mysql-connector-j-8.4.0.jar
+SCHEMACRAWLER_JAR=schemacrawler-16.x.x-distribution/_schemacrawler/lib/*
+```
+
+## Known issues / limitations
+
+- **Java + JARs are host prerequisites**, not Python dependencies. They are not
+  installed by `uv sync` and are not provisioned in CI; the integration test
+  skips automatically when Java or the JARs are absent.
+- **Metadata only** — no sampled column values (`Value` nodes), and no query-log
+  / lineage extraction (a separate future sub-connector).
+- `service` is auto-derived from SchemaCrawler's database product name; `platform`
+  isn't exposed by JDBC, so it's omitted unless you pass `platform=...` to the
+  connector. `is_primary_key` / `is_foreign_key` are written only when the source
+  actually defines primary/foreign keys — columns in a key-less schema simply
+  omit those properties (rather than storing `false`).
+- The bundled FreeMarker template ([`schema/catalog.json.ftl`](schema/catalog.json.ftl))
+  targets SchemaCrawler 16.x, whose catalog model is stable. It is an internal
+  library file — you don't edit it. If a future SchemaCrawler release changes the
+  catalog model, updating the template and extractor is a maintainer fix; please
+  open an issue.
+
+## Not supported
+
+This connector works with databases whose JDBC driver implements the
+`DatabaseMetaData` schema/type/column methods SchemaCrawler needs at
+`--info-level=detailed` — in practice, the databases SchemaCrawler officially
+supports (PostgreSQL, MySQL/MariaDB, SQL Server, Oracle, IBM DB2, SQLite,
+HyperSQL). Validated here: **PostgreSQL** (integration test), plus **MySQL,
+MariaDB, SQLite, and H2** locally. A driver that connects but omits those metadata
+methods will fail the crawl; the connector surfaces it as a clear `ExtractionError`.
+
+### BigQuery — use the native `BigQuerySchemaConnector` instead
+
+BigQuery is **not supported via JDBC**. Both available BigQuery JDBC drivers fail
+with SchemaCrawler, but at different stages — one before it can even connect, the
+other after connecting but during the metadata crawl:
+
+- **Google BigQuery JDBC driver** (`com.google.cloud.bigquery.jdbc.BigQueryDriver`):
+  connects successfully (and lists tables at `--info-level=minimum`), but at the
+  `detailed` info-level the connector requires (columns, types, and
+  primary/foreign keys) it does not implement the `DatabaseMetaData` type/column
+  methods SchemaCrawler needs, failing with
+  `SQLFeatureNotSupportedException: This method is not implemented` while building
+  the type map (`getTypeInfo`).
+- **Simba BigQuery JDBC driver** (`com.simba.googlebigquery.jdbc.Driver`): never
+  connects. SchemaCrawler calls `Driver.getPropertyInfo()` during connection setup,
+  and the Simba driver's implementation throws
+  `[Simba][JDBC](11380) Null pointer exception` — an NPE raised inside its own
+  `BQConnection.close()` cleanup (`getBigQueryStorageWriteClient()` on a null
+  client). This happens for any URL, before the crawl begins. (A raw
+  `DriverManager.getConnection()` works; only `getPropertyInfo()` is broken.)
+
+BigQuery has a dedicated **`BigQuerySchemaConnector`** — use that. The JDBC
+connector is a fallback for databases that lack a dedicated connector, and
+BigQuery is outside SchemaCrawler's officially-supported set.
+
