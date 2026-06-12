@@ -8,12 +8,16 @@ contract in ``.local/build-cli/AGENTS-CLI.md`` §4.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
 
 
 def _default_color_system() -> str | None:
@@ -55,6 +59,36 @@ def make_consoles(no_color: bool = False) -> tuple[Console, Console]:
 def stdout_is_tty() -> bool:
     """Return True when stdout is attached to an interactive terminal."""
     return sys.stdout.isatty()
+
+
+def cli_status(console: Console, message: str) -> AbstractContextManager[Any]:
+    """
+    Return a transient Rich status spinner on ``console``, or a no-op.
+
+    A spinner is a progress affordance for interactive terminals only. When
+    ``console`` is not a TTY — JSON/agent mode, CI, or piped diagnostics — a
+    :func:`contextlib.nullcontext` is returned so machine output and captured
+    logs stay clean. The spinner renders on stderr and never touches stdout, so
+    the result/JSON contract is unaffected even when only stdout is redirected.
+    INFO log records routed through the same stderr console by the CLI's
+    :class:`rich.logging.RichHandler` render above the live spinner.
+
+    Parameters
+    ----------
+    console : rich.console.Console
+        The CLI's stderr console (from ``ctx.obj["stderr"]``).
+    message : str
+        The status text shown next to the spinner, e.g. ``"Ingesting ..."``.
+
+    Returns:
+    -------
+    contextlib.AbstractContextManager
+        A :class:`rich.status.Status` when ``console`` is a terminal, otherwise
+        a :func:`contextlib.nullcontext`.
+    """
+    if not console.is_terminal:
+        return contextlib.nullcontext()
+    return console.status(message, spinner="dots")
 
 
 def emit_json(payload: dict[str, Any]) -> None:

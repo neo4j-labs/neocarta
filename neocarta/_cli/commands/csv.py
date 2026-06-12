@@ -13,7 +13,7 @@ import click
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
     _build_embedder,
@@ -123,8 +123,6 @@ def csv_ingest(
     # Lazy import: keep the connector dependency off the --help / --dry-run path.
     from ...connectors.csv import CSVConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting CSV connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = CSVConnector(
@@ -132,12 +130,13 @@ def csv_ingest(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.ingest()
+            with cli_status(stderr, "Ingesting CSV metadata..."):
+                connector.ingest()
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                _run_embeddings(embedder, node_labels)
+                with cli_status(stderr, "Generating embeddings..."):
+                    _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
