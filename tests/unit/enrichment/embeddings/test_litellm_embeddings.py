@@ -86,3 +86,22 @@ def test_non_dimensions_error_is_not_retried():
     assert vector is None
     assert len(calls) == 1  # no retry for non-dimensions errors
     assert connector._call_kwargs["dimensions"] == 256  # left intact
+
+
+def test_unrelated_dimension_error_is_not_retried():
+    # An error that merely mentions "dimension" (without an unsupported/not-support
+    # phrase) must NOT be misread as a truncation rejection — it propagates, so
+    # 'dimensions' is left intact and the call is made only once.
+    connector = LiteLLMEmbeddingsConnector(neo4j_driver=MagicMock(), dimensions=256)
+    calls = []
+
+    def fake(model, **kwargs):
+        calls.append(1)
+        raise RuntimeError("Vector dimension mismatch: expected 1536")
+
+    with patch(_EMBED, side_effect=fake):
+        vector = connector._create_embedding_sync("hello")
+
+    assert vector is None
+    assert len(calls) == 1  # not retried
+    assert connector._call_kwargs["dimensions"] == 256  # left intact

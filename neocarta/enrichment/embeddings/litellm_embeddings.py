@@ -92,9 +92,15 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
         LiteLLM raises ``UnsupportedParamsError`` for models it knows can't
         truncate (e.g. OpenAI ``text-embedding-ada-002``); its per-call
         ``drop_params`` is not honored on the embeddings path, so we detect and
-        handle the rejection ourselves.
+        handle the rejection ourselves. The message fallback is deliberately
+        narrow — it requires both "dimension" and an "unsupported"/"not support"
+        phrase — so unrelated errors that merely mention a dimension (e.g. a
+        vector index "dimension mismatch") propagate instead of being retried.
         """
-        return type(exc).__name__ == "UnsupportedParamsError" or "dimension" in str(exc).lower()
+        if type(exc).__name__ == "UnsupportedParamsError":
+            return True
+        msg = str(exc).lower()
+        return "dimension" in msg and ("unsupported" in msg or "not support" in msg)
 
     def _embed_sync(self, inputs: list[str]) -> Any:
         """Call ``litellm.embedding``; drop ``dimensions`` and retry once if rejected.
