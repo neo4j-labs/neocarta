@@ -1,17 +1,17 @@
 ---
-name: add-source-connector
+name: neocarta-add-source-connector
 description: Scaffold, build, and verify a neocarta source or format connector against the connector contract. Use when asked to add/create/scaffold/write a new connector (BigQuery, Dataplex, query log, CSV, OSI, etc.), port a data source into neocarta, or check that a connector conforms to the standard.
 ---
 
 Build a new connector under `neocarta/connectors/` that satisfies the connector
 contract. This file is the **operational loop** for authoring one; the full prose
 standard lives in
-[connector-contract.md](.claude/skills/add-source-connector/connector-contract.md)
+[connector-contract.md](.claude/skills/neocarta-add-source-connector/connector-contract.md)
 (read it before designing a connector). The contract is also made executable in
 [neocarta/connectors/_base.py](neocarta/connectors/_base.py) (runtime-checkable
 `SourceConnectorProtocol` / `FormatConnectorProtocol`) and enforced per-connector
 by a `test_conformance.py`. Drive the whole loop with the driver:
-`.claude/skills/add-source-connector/scripts/driver.py`, run through `uv`.
+`.claude/skills/neocarta-add-source-connector/scripts/driver.py`, run through `uv`.
 
 All paths below are relative to the repo root.
 
@@ -37,19 +37,19 @@ Docker — the suite spins up a Neo4j testcontainer (`tests/integration/conftest
 
 ```bash
 # See every connector and its detected kind (source/format):
-uv run .claude/skills/add-source-connector/scripts/driver.py list
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py list
 
 # Scaffold a new flat source connector (creates package + conformance test):
-uv run .claude/skills/add-source-connector/scripts/driver.py scaffold salesforce
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold salesforce
 
 # A data-type sub-connector (sub-folder under a parent source):
-uv run .claude/skills/add-source-connector/scripts/driver.py scaffold salesforce/schema
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold salesforce/schema
 
 # A format connector (adds the export() orchestrator):
-uv run .claude/skills/add-source-connector/scripts/driver.py scaffold acme_yaml --format
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold acme_yaml --format
 
 # Verify any connector against the contract (static checks + conformance pytest):
-uv run .claude/skills/add-source-connector/scripts/driver.py verify salesforce
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py verify salesforce
 ```
 
 `<pkg>` is a path under `neocarta/connectors/`. `--class-name` overrides the
@@ -62,18 +62,21 @@ stage methods with the state-guard + deprecation-shim wiring already correct),
 as-is** — you then fill the `TODO`s in extract/transform/load.
 
 `verify` reports import + protocol conformance (`source` vs `format`, via
-`issubclass`), `__all__` minimalism, `README.md` presence, inline-id-f-string
-warnings, then runs the connector's `test_conformance.py`. It exits non-zero on
-any FAIL. Warnings (e.g. an id f-string) don't fail the run but should be fixed.
+`issubclass`), `__all__` minimalism, `README.md` presence, inline-id-f-string and
+stray-`print()` warnings, then runs the connector's `test_conformance.py`. It exits
+non-zero on any FAIL. Warnings (e.g. an id f-string or a `print()`) don't fail the
+run but should be fixed.
 
 ### Typical workflow
 
 1. `scaffold` the package (flat, sub-connector, or `--format`).
 2. Implement `extract.py` (populate the extractor cache, expose `@property`
-   accessors), `transform.py` (build `data_model` objects via `generate_id`
-   helpers), and the `load()` body (call `self.loader.load_*` for your node /
-   relationship types).
-3. Fill in the `README.md` (see [contract §12](.claude/skills/add-source-connector/connector-contract.md#12-required-readme)).
+   accessors, decorate `extract_*_info` methods with `@log_stage`), `transform.py`
+   (build `data_model` objects via `generate_id` helpers), and the `load()` body
+   (call `self.loader.load_*` for your node / relationship types). Fill
+   `_TRANSFORM_COUNTS` so `log_transform_counts` reports per-type counts — see
+   logging conventions in [contract §16](.claude/skills/neocarta-add-source-connector/connector-contract.md#16-logging).
+3. Fill in the `README.md` (see [contract §12](.claude/skills/neocarta-add-source-connector/connector-contract.md#12-required-readme)).
 4. `verify` until green. Add behavior-specific unit tests beyond conformance.
 5. Run the full unit suite + ruff (see Test), update `CHANGELOG.md`.
 
@@ -99,7 +102,7 @@ The full standard — connector kinds, directory layout, the public stage API,
 constructor-vs-method config, filtering, versioning, errors/warnings, loader
 scoping, lifecycle, `__init__` exports, the required README, and id generation —
 lives in
-[connector-contract.md](.claude/skills/add-source-connector/connector-contract.md).
+[connector-contract.md](.claude/skills/neocarta-add-source-connector/connector-contract.md).
 **Read it before designing a connector.** `_base.py` and every
 `test_conformance.py` cite it as the canonical reference.
 
@@ -123,6 +126,12 @@ lives in
   format-connector only.
 - **Don't re-export internals**: keeping `*Extractor`/`*Transformer`/`*Loader` out
   of `__all__` is enforced by both `verify` and the conformance test.
+- **Log, don't `print()`** (§16): progress goes through the module logger
+  (`logging.getLogger(__name__)`). Decorate the real `extract_*_info` methods with
+  `@log_stage`, fill `_TRANSFORM_COUNTS` so `log_transform_counts` reports per-type
+  counts, and let the loader log its own per-pattern write counts. Never log SQL,
+  row values, or secrets — counts, labels, targets, and elapsed only. The scaffold
+  generates this wiring, and `verify` warns on any stray `print()`.
 
 ## Troubleshooting
 

@@ -6,7 +6,7 @@ and maintaining existing ones. It is made executable by
 `neocarta/connectors/_base.py` (the runtime-checkable `SourceConnectorProtocol` /
 `FormatConnectorProtocol`) and enforced per-connector by a `test_conformance.py`.
 
-This is the reference companion to the `add-source-connector` skill's `SKILL.md`,
+This is the reference companion to the `neocarta-add-source-connector` skill's `SKILL.md`,
 which covers the operational loop (scaffold / verify / implement). All paths below
 are relative to the repo root.
 
@@ -253,8 +253,10 @@ Both `.ingest()` and `.export()`:
 - Call the three stages in order.
 - `.ingest()` calls `loader.upsert_neocarta_graph_node()` at the end (records that
   neocarta has touched this graph). Export does not.
-- Do user-facing progress logging (the existing `print("Extracting...")` style —
-  `print()` for now; logging upgrade is out of scope).
+- Emit user-facing progress through the module logger (§16), never `print()`. The
+  extractor's `@log_stage`-decorated methods cover the extract phase; `.transform()`
+  and `.load()` each log a phase line, `.transform()` ends with
+  `log_transform_counts(...)`, and `.ingest()` logs the final "completed" line.
 
 ## 11. `__init__.py` exports
 
@@ -309,3 +311,47 @@ pipeline. The scaffold generates this correctly.
 | Exposes `.export()` | No | Yes (when round-trip is meaningful) |
 | Exposes `SUPPORTED_VERSIONS` / `version` | No | Optional |
 | Examples | BigQuery, Dataplex, query log | CSV, OSI |
+
+## 16. Logging
+
+Connectors report progress through Python's `logging`, rooted at the `neocarta`
+package logger — never `print()`. Importing neocarta as a library stays silent (a
+`NullHandler` is attached to the `neocarta` logger in `neocarta/__init__.py`); only
+a host that opts in — chiefly the CLI, via `configure_logging()` — attaches a real
+handler. The shared helpers live in
+[neocarta/_logging.py](neocarta/_logging.py):
+
+- **Per-module loggers.** Each module that logs does
+  `logger = logging.getLogger(__name__)`, giving the
+  `neocarta.connectors.<source>.<datatype>.<module>` hierarchy for free. An
+  extractor module whose logging is entirely `@log_stage` needs no module logger —
+  the decorator derives one from the wrapped method's module.
+- **`@log_stage`** decorates extractor methods (e.g. `extract_*_info`) to log a
+  one-line INFO summary: humanized method name + optional target + row count +
+  elapsed. It never logs SQL or row values, and surfaces only an allowlist of safe
+  scalar kwargs (`dataset_id`, `table_name`, `region`, `filename`, …) as the
+  target. Pass `@log_stage(count=False)` when the return value has no meaningful
+  row count (e.g. an OSI spec dict).
+- **`log_transform_counts(logger, transformer, fields)`** logs `"Transformed N
+  <label>"` per produced type at the end of `.transform()`. `fields` is a tuple of
+  `(human_label, transformer_attribute)` pairs the connector declares as a module
+  constant (`_TRANSFORM_COUNTS`); zero-count types are skipped so an empty phase
+  stays quiet.
+- **`log_timing(logger, label, *, target=None)`** is a context-manager escape hatch
+  for code paths `@log_stage` doesn't fit (e.g. a helper with early-return
+  branches).
+- **The loader logs its own writes** by graph pattern plus merge counters (e.g.
+  `Ingested (:Column)-[:TAGGED_WITH]->(:BusinessTerm) — created 12, properties_set
+  24`). Don't re-log per-type load counts inside `.load()`.
+
+**Never log data values.** SQL text, row values, full provider error bodies, API
+keys, and description / embedding payloads must not reach the log — log counts,
+labels, dimensions, and targets (allowlisted scalars) only. When catching a
+provider/parse error, log the exception *type*, not its message
+(`logger.warning("Embedding request failed (%s)", type(exc).__name__)`).
+
+The scaffold wires this up: generated extractors decorate `extract()` with
+`@log_stage`, and the generated connector defines `_TRANSFORM_COUNTS`, calls
+`log_transform_counts`, and logs each phase through the module logger — no
+`print()`. `verify` warns on any stray `print()` in connector code, so don't
+introduce any.

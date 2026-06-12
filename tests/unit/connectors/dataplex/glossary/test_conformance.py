@@ -1,7 +1,7 @@
 """Conformance tests for DataplexGlossaryConnector.
 
 Asserts conformance with the public connector standard defined in
-``.claude/skills/add-source-connector/connector-contract.md`` and codified in
+``.claude/skills/neocarta-add-source-connector/connector-contract.md`` and codified in
 ``neocarta.connectors._base``.
 """
 
