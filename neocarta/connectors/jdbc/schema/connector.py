@@ -1,13 +1,25 @@
 """JDBC schema connector."""
 
+import logging
 import warnings
 
 from neo4j import Driver
 
+from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import JdbcSchemaExtractor, derive_source_database_name
 from .transform import JdbcSchemaTransformer
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+)
 
 
 class JdbcSchemaConnector:
@@ -118,6 +130,7 @@ class JdbcSchemaConnector:
         schemas : list of str, optional
             Schema names to include. If omitted, all schemas are extracted.
         """
+        logger.info("Extracting JDBC schema metadata...")
         self._extracted = False
         self._transformed = False
         self.extractor.extract(schemas)
@@ -138,6 +151,7 @@ class JdbcSchemaConnector:
                 suggestion="Call connector.extract(...) before connector.transform().",
             )
         self._transformed = False
+        logger.info("Transforming JDBC schema metadata...")
         self.transformer.transform_to_database_nodes(self.extractor.database_info)
         self.transformer.transform_to_schema_nodes(self.extractor.schema_info)
         self.transformer.transform_to_table_nodes(self.extractor.table_info)
@@ -149,6 +163,7 @@ class JdbcSchemaConnector:
         self.transformer.transform_to_references_relationships(
             self.extractor.column_references_info
         )
+        log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 
     def load(self) -> None:
@@ -165,25 +180,22 @@ class JdbcSchemaConnector:
                 "JdbcSchemaConnector.load() called before transform(); call .transform() first.",
                 suggestion="Call connector.extract() and connector.transform() first.",
             )
-        print(
-            self.loader.load_database_nodes(
-                self.transformer.database_nodes,
-                properties_list=self.transformer.get_database_properties(),
-            )
+        logger.info("Loading JDBC schema metadata into Neo4j...")
+        self.loader.load_database_nodes(
+            self.transformer.database_nodes,
+            properties_list=self.transformer.get_database_properties(),
         )
-        print(self.loader.load_schema_nodes(self.transformer.schema_nodes))
-        print(self.loader.load_table_nodes(self.transformer.table_nodes))
-        print(
-            self.loader.load_column_nodes(
-                self.transformer.column_nodes,
-                properties_list=self.transformer.get_column_properties(),
-            )
+        self.loader.load_schema_nodes(self.transformer.schema_nodes)
+        self.loader.load_table_nodes(self.transformer.table_nodes)
+        self.loader.load_column_nodes(
+            self.transformer.column_nodes,
+            properties_list=self.transformer.get_column_properties(),
         )
 
-        print(self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships))
-        print(self.loader.load_has_table_relationships(self.transformer.has_table_relationships))
-        print(self.loader.load_has_column_relationships(self.transformer.has_column_relationships))
-        print(self.loader.load_references_relationships(self.transformer.references_relationships))
+        self.loader.load_has_schema_relationships(self.transformer.has_schema_relationships)
+        self.loader.load_has_table_relationships(self.transformer.has_table_relationships)
+        self.loader.load_has_column_relationships(self.transformer.has_column_relationships)
+        self.loader.load_references_relationships(self.transformer.references_relationships)
 
     def ingest(self, schemas: list[str] | None = None) -> None:
         """
@@ -194,15 +206,12 @@ class JdbcSchemaConnector:
         schemas : list of str, optional
             Schema names to include. If omitted, all schemas are extracted.
         """
-        print("Extracting metadata from JDBC source via SchemaCrawler...")
         self.extract(schemas)
-        print("Transforming metadata...")
         self.transform()
-        print("Loading metadata into Neo4j...")
         self.load()
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("JdbcSchemaConnector completed successfully!")
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("JDBC schema connector completed successfully")
 
     def run(self, schemas: list[str] | None = None) -> None:
         """

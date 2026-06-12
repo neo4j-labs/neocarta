@@ -28,6 +28,7 @@ from typing import Any
 
 import pandas as pd
 
+from ...._logging import log_stage
 from ....errors import ConfigError, ExtractionError, OperationTimeoutError
 from .models import JdbcSchemaExtractorCache
 
@@ -344,6 +345,7 @@ class JdbcSchemaExtractor:
                 details={"error": str(exc), "stderr": result.stderr.strip()},
             ) from exc
 
+    @log_stage
     def extract(self, schemas: list[str] | None = None) -> None:
         """Run SchemaCrawler once and populate every cache DataFrame.
 
