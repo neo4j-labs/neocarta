@@ -1,14 +1,14 @@
 """Neo4j I/O for the Databricks connector.
 
-The single home for the connector's Neo4j output: the connection config, the
-constraint/index bootstrap (reusing neocarta's shared `ingest` helpers), node
-and relationship writes via the Neo4j Spark Connector, the scoped stale-Value
-cleanup, and the post-load count probes.
+The single home for the connector's Neo4j data output: the connection config,
+node and relationship writes via the Neo4j Spark Connector, the scoped
+stale-Value cleanup, and the post-load count probes. Constraint and index DDL
+lives in the sibling :mod:`indexes` module.
 
 Writes go through the Neo4j Spark Connector (distributed, from executors), not
 the in-process driver — that is why this connector does not use
-`neocarta.ingest.rdbms.Neo4jRDBMSLoader`. The constraint/index bootstrap, stale
-cleanup, and counts are small driver-side Cypher operations.
+`neocarta.ingest.rdbms.Neo4jRDBMSLoader`. The stale cleanup and counts are small
+driver-side Cypher operations.
 """
 
 from __future__ import annotations
@@ -29,19 +29,7 @@ if TYPE_CHECKING:
     from neo4j import Driver
     from pyspark.sql import DataFrame
 
-    from neocarta.connectors.databricks.settings import SparkIngestSettings
-
 logger = logging.getLogger(__name__)
-
-# Labels eligible for a `{label}_vector_index`. Value is excluded: neocarta
-# defines no Value vector index (Values are reached via HAS_VALUE traversal,
-# never vector search), matching the shared `create_vector_index` helper.
-_VECTOR_INDEX_LABELS = (
-    NodeLabel.DATABASE,
-    NodeLabel.SCHEMA,
-    NodeLabel.TABLE,
-    NodeLabel.COLUMN,
-)
 
 _FORMAT = "org.neo4j.spark.DataSource"
 
@@ -70,67 +58,6 @@ def _single_count(result: Any) -> int:
     if record is None:
         raise RuntimeError("Neo4j count query returned no rows")
     return int(record["cnt"])
-
-
-def bootstrap_constraints(driver: Driver) -> None:
-    """Create id constraints and the connector's lookup indexes.
-
-    Id-uniqueness constraints reuse neocarta's shared
-    :func:`neocarta.ingest.utils.write_neo4j_constraints`, which picks NODE KEY
-    (enterprise) or UNIQUE (community) constraints per the server edition. Two
-    connector-specific range indexes back hot lookups: Column ``type`` and the
-    Value ``last_run`` run-stamp (the scoped stale-Value delete keys on it).
-    Vector indexes are not created here — embeddings are produced after ingest
-    by neocarta's enrichment layer, which owns its own indexes.
-    """
-    from neocarta.ingest.indexes import create_range_index
-    from neocarta.ingest.rdbms.constraints import (
-        KEY_CONSTRAINTS_LOOKUP,
-        UNIQUE_CONSTRAINTS_LOOKUP,
-    )
-    from neocarta.ingest.utils import write_neo4j_constraints
-
-    write_neo4j_constraints(
-        driver,
-        list(MANAGED_NODE_LABELS),
-        KEY_CONSTRAINTS_LOOKUP,
-        UNIQUE_CONSTRAINTS_LOOKUP,
-    )
-    create_range_index(driver, NodeLabel.COLUMN.value, "type")
-    create_range_index(driver, NodeLabel.VALUE.value, "last_run")
-    logger.info("[databricks] neo4j constraints and indexes bootstrapped")
-
-
-def create_vector_indexes(driver: Driver, settings: SparkIngestSettings) -> None:
-    """Create per-label `{label}_vector_index` cosine indexes for inline mode.
-
-    Called only when inline embeddings are enabled. One cosine vector index per
-    label whose embedding flag is on, at `embedding_dimension`, reusing
-    neocarta's shared :func:`neocarta.ingest.indexes.create_vector_index` so the
-    index name matches what the MCP server queries by. Value is never embedded
-    or indexed (see ``_VECTOR_INDEX_LABELS``).
-
-    Each mode owns its index config: inline creates these at its configured
-    dimension; external mode leaves vector indexes to the enrichment layer.
-    Mixing modes on one graph requires rebuilding the index, since it is fixed
-    at one dimension.
-    """
-    from neocarta.ingest.indexes import create_vector_index
-
-    flags = {
-        NodeLabel.DATABASE: settings.include_embeddings_databases,
-        NodeLabel.SCHEMA: settings.include_embeddings_schemas,
-        NodeLabel.TABLE: settings.include_embeddings_tables,
-        NodeLabel.COLUMN: settings.include_embeddings_columns,
-    }
-    for label in _VECTOR_INDEX_LABELS:
-        if flags[label]:
-            create_vector_index(driver, label.value, settings.embedding_dimension)
-            logger.info(
-                "[databricks] created %s_vector_index (dim=%d, cosine)",
-                label.value.lower(),
-                settings.embedding_dimension,
-            )
 
 
 def delete_stale_values(
@@ -228,8 +155,6 @@ def write_rel(
 __all__ = [
     "REFERENCES_PROPERTIES",
     "Neo4jConfig",
-    "bootstrap_constraints",
-    "create_vector_indexes",
     "delete_stale_values",
     "query_counts",
     "write_node",

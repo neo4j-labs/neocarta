@@ -10,9 +10,10 @@ Thin coordinator for the schema-ingest run. Its job is limited to:
 Embeddings have two modes. External (default): no vectors are produced here and
 neocarta's enrichment layer adds them afterward. Inline (when any
 `include_embeddings_*` flag is on): the node-write path embeds each batch
-in-cluster via ai_query and creates the per-label vector indexes. Inferred
-(heuristic) foreign keys live in `neocarta.enrichment.foreign_keys`. This module
-ingests catalog facts only.
+in-cluster via ai_query. Both modes create the per-label vector indexes at the
+configured `embedding_dimension` (inline for the enabled labels, external for
+all four). Inferred (heuristic) foreign keys live in
+`neocarta.enrichment.foreign_keys`. This module ingests catalog facts only.
 """
 
 from __future__ import annotations
@@ -36,10 +37,12 @@ from neocarta.connectors.databricks.ingest.fk.discovery import (
     FKDiscoveryResult,
     run_fk_discovery,
 )
-from neocarta.connectors.databricks.ingest.load.neo4j_io import (
-    Neo4jConfig,
+from neocarta.connectors.databricks.ingest.load.indexes import (
     bootstrap_constraints,
     create_vector_indexes,
+)
+from neocarta.connectors.databricks.ingest.load.neo4j_io import (
+    Neo4jConfig,
     delete_stale_values,
     query_counts,
     write_node,
@@ -246,7 +249,7 @@ def _run(
             inline = settings.any_embeddings_enabled()
             if inline:
                 _log_embedding_consistency_warning(settings)
-                create_vector_indexes(driver, settings)
+            create_vector_indexes(driver, settings, inline=inline)
 
             extract_result = extract(spark, settings, schema_list, summary)
 

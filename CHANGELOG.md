@@ -7,6 +7,8 @@
 
 ### Changed
 
+- Move the Databricks connector's Neo4j constraint/index DDL out of `ingest/load/neo4j_io.py` into a new `ingest/load/indexes.py` module (`bootstrap_constraints`, `create_vector_indexes`), leaving `neo4j_io.py` to own only the data writes. Both embedding modes now create the per-label `{label}_vector_index` cosine indexes during the Spark job at `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION` (previously only inline created them). External mode creates an index for all four eligible labels (Database, Schema, Table, Column); inline creates one only for each label whose embedding flag is on. Because the index is created with `IF NOT EXISTS` and fixed at one dimension, `EMBEDDING_DIMENSION` is now the single source of truth and must, in external mode, match the dimension the `neocarta.enrichment` model produces. Value nodes are never indexed. See `neocarta/connectors/databricks/README.md`.
+
 ### Added
 
 - Add `examples/databricks/graph_text2sql.py`: a Databricks notebook that demonstrates graph-retrieval Text2SQL over a Databricks-ingested neocarta graph. It embeds a natural-language question with the same `ai_query` model-serving endpoint used at ingest, runs a Neo4j `table_vector_index` vector search to find the relevant tables (catalog, schema, columns, sampled values), assembles a schema context, asks a Databricks foundation-model endpoint to generate Spark SQL against only those tables, and executes it. The retrieval Cypher is inline (a readable, single-strategy version of `neocarta/_mcp/cypher/vector_search.py`) and uses the Neo4j Python driver, so the notebook runs on serverless or classic compute.

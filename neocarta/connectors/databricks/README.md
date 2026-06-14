@@ -4,6 +4,51 @@ Builds the neocarta semantic graph from Databricks Unity Catalog. The connector
 extracts schema facts (databases, schemas, tables, columns), declared foreign
 keys, and optional sampled column values, then writes them into Neo4j.
 
+## Quick start
+
+Neocarta is one distribution. The base package gives you the library and CLI;
+the Databricks Spark ingest is an optional extra on top of it. There are two
+ways to get it, depending on whether you are running off-cluster or on a
+Databricks cluster.
+
+### Install from PyPI (off-cluster / local development)
+
+```bash
+# Base neocarta library and CLI
+pip install neocarta
+
+# Add the Databricks Spark extra (pulls in pyspark) to run the connector
+pip install "neocarta[databricks-spark]"
+```
+
+`databricks-sdk` ships in the base install, so the only thing the extra adds is
+the heavy Spark dependency needed to actually run the ingest job.
+
+### Build a wheel from source (deploy to a cluster)
+
+The schema ingest runs as a Spark wheel job on a Databricks cluster, so the
+connector is delivered as a wheel staged on a UC Volume. Build it from the repo
+with `uv`:
+
+```bash
+# In the neocarta repo root
+uv build
+# produces dist/neocarta-<version>-py3-none-any.whl
+```
+
+Copy that single `.whl` to a UC Volume (workspace uploader, `databricks fs cp`,
+or the Volumes UI) and point the notebook's `%pip install` at it, then add the
+`[databricks-spark]` extra on the cluster:
+
+```python
+%pip install "/Volumes/<catalog>/<schema>/<volume>/neocarta-<version>-py3-none-any.whl[databricks-spark]"
+```
+
+The Neo4j Spark Connector JAR is a separate, JVM-level cluster library; attach
+it once at the cluster level, not via pip. See
+[`examples/databricks/inline_embed_ingest.py`](../../../examples/databricks/inline_embed_ingest.py)
+for an end-to-end notebook.
+
 ## Execution model
 
 Unlike the in-process connectors (BigQuery, CSV, Dataplex), the schema ingest
@@ -28,12 +73,18 @@ Vectors can be produced in two ways. Both are fully supported, first-class
 modes. External is the default behavior only because the inline flags default
 to off.
 
+Both modes create the per-label `{label}_vector_index` cosine indexes during
+the Spark job, at `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION`. External creates an
+index for all four eligible labels (Database, Schema, Table, Column); inline
+creates one only for each label whose embedding flag is on. Value nodes are
+never indexed.
+
 ### External mode (default)
 
 The Spark job writes Database, Schema, Table, and Column nodes with no
-`embedding` property and creates no vector indexes. A separate run of
-`neocarta.enrichment` adds the vectors afterward. This is a two-step flow, and
-neocarta ships a CLI verb for the second step. See
+`embedding` property, and creates the four vector indexes at the configured
+dimension. A separate run of `neocarta.enrichment` adds the vectors afterward.
+This is a two-step flow, and neocarta ships a CLI verb for the second step. See
 [Two-step external flow](#two-step-external-flow) below.
 
 ### Inline mode
@@ -63,16 +114,20 @@ an OpenAI model), or want to re-embed without re-running the Spark job.
 
 ### Model and dimension consistency
 
-Each mode owns its own vector-index configuration. Inline mode defaults to the
-Databricks `databricks-gte-large-en` endpoint at 1024 dimensions. External mode
-uses whatever `neocarta.enrichment` is pointed at, for example OpenAI
-`text-embedding-3-small`. These produce different vectors at different
-dimensions, so two rules apply:
+Both modes create the vector index at `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION`,
+so that setting is the single source of truth for the index dimension. The index
+is created with `IF NOT EXISTS` and is fixed at one dimension. Inline mode
+defaults to the Databricks `databricks-gte-large-en` endpoint at 1024
+dimensions. External mode uses whatever `neocarta.enrichment` is pointed at, for
+example OpenAI `text-embedding-3-small` at 1536 dimensions, so two rules apply:
 
+- In external mode, set `EMBEDDING_DIMENSION` to match the dimension the
+  enrichment model produces. The Spark job creates the index at that dimension;
+  enrichment then writes vectors into it. A mismatch leaves a wrong-dimension
+  index that silently breaks vector search.
 - You cannot mix modes against the same graph without rebuilding the vector
-  index. The index is created at one fixed dimension.
-- If the graph holds data from more than one neocarta datasource, the inline
-  embedding model and dimension must match what the rest of neocarta uses, or
+  index, and if the graph holds data from more than one neocarta datasource, the
+  embedding model and dimension must match what the rest of neocarta uses or
   vector search across sources is inconsistent. The inline path logs a warning
   at startup so the operator notices this.
 
