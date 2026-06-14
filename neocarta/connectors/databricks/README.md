@@ -13,9 +13,10 @@ Databricks cluster.
 
 ### Build a wheel from source (deploy to a cluster)
 
-The schema ingest runs as a Spark wheel job on a Databricks cluster, so the
-connector is delivered as a wheel staged on a UC Volume. Build it from the repo
-root with `make`:
+Building and staging this wheel is the step that updates a cluster so it can run
+the neocarta Databricks Spark ingest. The schema ingest runs as a Spark wheel
+job on a Databricks cluster, so the connector is delivered as a wheel staged on a
+UC Volume. Build it from the repo root with `make`:
 
 ```bash
 # In the neocarta repo root
@@ -57,6 +58,62 @@ pip install "neocarta[databricks-spark]"
 
 `databricks-sdk` ships in the base install, so the only thing the extra adds is
 the heavy Spark dependency needed to actually run the ingest job.
+
+### Examples
+
+[`examples/databricks/README.md`](../../../examples/databricks/README.md) covers
+two runnable ways to drive the connector against Unity Catalog:
+
+- **Local submit** (`submit_finance_genie.py`): a `uv` script that stages the
+  connector wheel and submits the ingest job to a cluster.
+- **Notebooks** (`inline_embed_ingest.py`, `graph_text2sql.py`): interactive
+  ingest and queries inside a Databricks workspace.
+
+### Run external embedding with the neocarta CLI
+
+After the Spark ingest job builds the graph, embed the node descriptions with
+OpenAI and write the vectors back using the neocarta CLI:
+
+```bash
+neocarta databricks embed
+# or override the model and dimensions:
+neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 768
+```
+
+- Embeds Database, Schema, Table, and Column descriptions.
+- Requires `OPENAI_API_KEY`.
+- `--dry-run` prints the planned run without touching Neo4j.
+- `--json` produces machine-readable output.
+
+See [Two-step external flow](#two-step-external-flow) for the full external mode
+walkthrough.
+
+### Set up the OpenAI external embedding endpoint
+
+`scripts/setup_openai_external_model_endpoint.py` registers a Databricks Mosaic
+AI External Model serving endpoint that proxies OpenAI `text-embedding-3-small`
+(1536-dim). Run it so the Databricks connector embeds with the same OpenAI
+embedding model as the rest of neocarta, keeping vector search consistent across
+datasources in one graph. Key points:
+
+- It makes inline embedding mode call OpenAI instead of a native Databricks
+  model, matching an OpenAI-based neocarta graph.
+- It is a standalone `uv` script with PEP 723 inline dependencies, so it runs
+  without installing neocarta.
+
+Store the OpenAI key in a Databricks secret scope first, then run the script:
+
+```bash
+databricks secrets create-scope neocarta-openai
+databricks secrets put-secret neocarta-openai OPENAI_API_KEY
+
+uv run scripts/setup_openai_external_model_endpoint.py --profile <profile>
+```
+
+The script creates the endpoint and probes it through `ai_query` to assert the
+returned vector dimension. See
+[Registering the OpenAI endpoint (manual step)](#registering-the-openai-endpoint-manual-step)
+for the full flag list and details.
 
 ## Execution model
 
