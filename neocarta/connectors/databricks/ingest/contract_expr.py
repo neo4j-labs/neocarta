@@ -2,8 +2,8 @@
 
 Spark-side counterparts of `neocarta.connectors.databricks.contract.generate_id` and
 `generate_value_id`. The Python and SQL implementations must agree
-byte-for-byte; `neocarta.connectors.databricks.verify.catalog._check_id_normalization`
-enforces this.
+byte-for-byte; this agreement is maintained by keeping the two normalizations in
+lockstep (there is no separate runtime check enforcing it).
 """
 
 from __future__ import annotations
