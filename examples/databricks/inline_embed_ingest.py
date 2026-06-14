@@ -99,6 +99,10 @@ NEO4J_PASSWORD = "<password>"
 # references, so the notebook only names the endpoint and ai_query calls it.
 EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
 EMBEDDING_DIMENSION = 1536
+# Set to False to run external mode: ingest only, no inline embeddings (vectors
+# are added later by `neocarta databricks embed`). When False, EMBEDDING_ENDPOINT,
+# EMBEDDING_DIMENSION, and EMBEDDING_STAGING_VOLUME below are unused.
+INCLUDE_EMBEDDINGS = True
 # Writable UC Volume subpath for the transient per-batch ai_query materialization.
 # This MUST be /Volumes/<catalog>/<schema>/<volume>/<subdir> — five path
 # segments. <volume> is an existing UC Volume; <subdir> is a directory the
@@ -143,10 +147,11 @@ from neocarta.connectors.databricks.settings import SparkIngestSettings
 settings = SparkIngestSettings(
     catalog=CATALOG,
     schemas=SCHEMAS,
-    # Turn on inline embeddings for Table and Column nodes (the labels neocarta
-    # retrieval embeds). Value nodes are never embedded in either mode.
-    include_embeddings_tables=True,
-    include_embeddings_columns=True,
+    # Inline embeddings for Table and Column nodes (the labels neocarta retrieval
+    # embeds), gated by INCLUDE_EMBEDDINGS above. Value nodes are never embedded
+    # in either mode.
+    include_embeddings_tables=INCLUDE_EMBEDDINGS,
+    include_embeddings_columns=INCLUDE_EMBEDDINGS,
     embedding_endpoint=EMBEDDING_ENDPOINT,
     embedding_dimension=EMBEDDING_DIMENSION,
     embedding_staging_volume=EMBEDDING_STAGING_VOLUME,
