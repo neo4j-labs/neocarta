@@ -95,7 +95,7 @@ NEO4J_PASSWORD = "<password>"
 # OpenAI key is not set here: it lives in the Databricks secret the endpoint
 # references, so the notebook only names the endpoint and ai_query calls it.
 EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
-EMBEDDING_DIMENSION = "1536"
+EMBEDDING_DIMENSION = 1536
 # Writable UC Volume subpath for the transient per-batch ai_query materialization.
 EMBEDDING_STAGING_VOLUME = "/Volumes/<catalog>/<schema>/<volume>/embed_staging"
 
@@ -112,46 +112,40 @@ EMBEDDING_STAGING_VOLUME = "/Volumes/<catalog>/<schema>/<volume>/embed_staging"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Configure the run (environment variables)
+# MAGIC ## Build the settings and run the ingest
 # MAGIC
-# MAGIC The connector reads its configuration from `NEOCARTA_DATABRICKS_*`
-# MAGIC environment variables. Setting the `INCLUDE_EMBEDDINGS_*` flags here is what
-# MAGIC turns on **inline mode**. Leaving them off (the default) would produce an
-# MAGIC un-embedded graph (external mode) instead.
-
-# COMMAND ----------
-
-import os
-
-os.environ["NEOCARTA_DATABRICKS_CATALOG"] = CATALOG
-os.environ["NEOCARTA_DATABRICKS_SCHEMAS"] = SCHEMAS
-
-# Turn on inline embeddings for Table and Column nodes (the labels neocarta
-# retrieval embeds). Value nodes are never embedded in either mode.
-os.environ["NEOCARTA_DATABRICKS_INCLUDE_EMBEDDINGS_TABLES"] = "true"
-os.environ["NEOCARTA_DATABRICKS_INCLUDE_EMBEDDINGS_COLUMNS"] = "true"
-
-os.environ["NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT"] = EMBEDDING_ENDPOINT
-os.environ["NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION"] = EMBEDDING_DIMENSION
-os.environ["NEOCARTA_DATABRICKS_EMBEDDING_STAGING_VOLUME"] = EMBEDDING_STAGING_VOLUME
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Run the ingest
+# MAGIC This notebook configures the connector by constructing `SparkIngestSettings`
+# MAGIC directly and passing it (with the Neo4j connection) into `run_ingest`. The
+# MAGIC `include_embeddings_*` flags are what turn on **inline mode**; leaving them
+# MAGIC off (the default) would produce an un-embedded graph (external mode)
+# MAGIC instead. Field validation runs at construction, so a bad value fails here
+# MAGIC rather than mid-run.
 # MAGIC
-# MAGIC Builds settings from the environment variables above, passes the Neo4j
-# MAGIC connection explicitly, and runs the full ingest. The inline embedding step
-# MAGIC happens inside the node-write loop. Returns a `RunSummary`.
+# MAGIC A deployed job configures the same connector from `NEOCARTA_DATABRICKS_*`
+# MAGIC environment variables rather than explicit kwargs. See the deployed-job
+# MAGIC example for that flow.
 
 # COMMAND ----------
 
 from neocarta.connectors.databricks.ingest.load.neo4j_io import Neo4jConfig
 from neocarta.connectors.databricks.run import run_ingest
+from neocarta.connectors.databricks.settings import SparkIngestSettings
+
+settings = SparkIngestSettings(
+    catalog=CATALOG,
+    schemas=SCHEMAS,
+    # Turn on inline embeddings for Table and Column nodes (the labels neocarta
+    # retrieval embeds). Value nodes are never embedded in either mode.
+    include_embeddings_tables=True,
+    include_embeddings_columns=True,
+    embedding_endpoint=EMBEDDING_ENDPOINT,
+    embedding_dimension=EMBEDDING_DIMENSION,
+    embedding_staging_volume=EMBEDDING_STAGING_VOLUME,
+)
 
 neo4j = Neo4jConfig(uri=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD)
 
-summary = run_ingest(neo4j=neo4j)
+summary = run_ingest(settings=settings, neo4j=neo4j)
 
 # COMMAND ----------
 
