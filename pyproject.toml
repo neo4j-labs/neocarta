@@ -74,6 +74,11 @@ databricks-spark = [
 [project.scripts]
 neocarta = "neocarta._cli:main"
 neocarta-mcp = "neocarta._mcp.server:run"
+# Databricks Spark ingest is a wheel-job entry point, not a CLI verb: it writes
+# through the Neo4j Spark Connector and must run on a cluster. Registering it as
+# a console script lets a wheel-job launcher resolve and invoke run_ingest() by
+# name from the installed neocarta distribution.
+neocarta-databricks-ingest = "neocarta.connectors.databricks.run:run_ingest"
 
 [dependency-groups]
 # Development tools
@@ -193,6 +198,16 @@ ignore = [
 ]
 "eval/retrievers/bigquery_schema_retriever.py" = [
     "PLC0415", # Lazy import to avoid circular dependency with eval package
+]
+# Databricks example notebooks are source-format (`.py`) Databricks notebooks,
+# not normal modules: `# MAGIC`/`# COMMAND` are cell markers (not dead code),
+# imports live in the cell that uses them (not the file top), there is no module
+# docstring, and credentials are fill-in placeholders the operator replaces.
+"examples/databricks/*.py" = [
+    "D100",    # Notebook source has no module docstring
+    "E402",    # Cells import where used, not all at the file top
+    "ERA001",  # `# MAGIC` / `# COMMAND` are Databricks notebook markers
+    "S105",    # Placeholder credentials the operator fills in
 ]
 # Ported Databricks connector + FK-enrichment source. Missing-docstring
 # presence rules (D1xx) and the PySpark `functions as F` alias (N812) are

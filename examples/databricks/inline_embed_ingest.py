@@ -57,7 +57,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install /Volumes/<catalog>/<schema>/<volume>/wheels/neocarta-0.6.0-py3-none-any.whl[databricks-spark]
+# MAGIC %pip install "/Volumes/<catalog>/<schema>/<volume>/wheels/neocarta-0.6.0-py3-none-any.whl[databricks-spark]"
 
 # COMMAND ----------
 
