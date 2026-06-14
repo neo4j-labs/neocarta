@@ -82,8 +82,24 @@ EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
 # Databricks foundation-model endpoint used to generate the SQL.
 LLM_ENDPOINT = "databricks-claude-sonnet-4-6"
 
-# The natural-language question to answer.
-QUESTION = "Which customers placed the most orders last month?"
+# The natural-language question to answer. Swap in any of the alternates below.
+#
+# These target the finance-genie schema: accounts, merchants, transactions,
+# account_links (account-to-account transfers), and account_labels (ground-truth
+# fraud flags).
+#
+# Note: the sample data spans 2024, so questions with relative dates ("last
+# month", "this year") resolve to empty ranges and return no rows. The questions
+# here use absolute dates or no date filter at all.
+QUESTION = "Which account types have the most fraud-labeled accounts?"
+
+# Other questions to try (assign one to QUESTION above):
+#   "What are the top 10 accounts by total transaction amount?"
+#   "Which merchant categories received the highest total transaction amounts?"
+#   "What is the average account balance by account type and region?"
+#   "Which fraud-labeled accounts sent the most outgoing transfers to other accounts?"
+#   "How many transactions occurred in each hour of the day?"
+#   "What is the total transaction volume by region in 2024?"
 
 # Retrieval knobs: how many table candidates the vector index returns, and how
 # many tables to keep as SQL-generation context.
