@@ -83,25 +83,34 @@ Mosaic AI External Models endpoint that proxies OpenAI `text-embedding-3-small`
 
 ### Registering the OpenAI endpoint (manual step)
 
-Registering the External Models endpoint is a one-time manual step done outside
-the connector run. The repo ships a helper, `scripts/setup_openai_endpoint.py`,
-that automates it.
+Inline mode embeds by calling `ai_query('<endpoint>', ...)` against a Databricks
+serving endpoint. To run that on OpenAI rather than a native Databricks model,
+register an "External Model" serving endpoint. "External Model" is the Databricks
+Mosaic AI term for a serving endpoint that proxies an outside provider; the one
+here proxies OpenAI `text-embedding-3-small` (1536-dim) and is then callable with
+`ai_query` exactly like a native endpoint. This is a one-time manual step done
+outside the connector run, and the repo ships a helper,
+`scripts/setup_openai_external_model_endpoint.py`, that automates it. The helper
+is a standalone `uv` script (PEP 723 inline dependencies), so it runs without
+installing neocarta.
 
-1. Store the OpenAI key in a Databricks secret scope. The connector references
-   the secret, so the key value never leaves Databricks:
+1. Store the OpenAI key in a Databricks secret scope. The endpoint references the
+   secret and authenticates to OpenAI itself at query time, so the key value
+   never leaves Databricks and never appears in the connector run or the ingest
+   notebook:
 
    ```bash
    databricks secrets create-scope neocarta-openai
    databricks secrets put-secret neocarta-openai OPENAI_API_KEY
    ```
 
-2. Create and verify the endpoint. The script creates the External Models
+2. Create and verify the endpoint. The script creates the External Model serving
    endpoint that proxies OpenAI `text-embedding-3-small` (1536-dim), then probes
    it through the same `ai_query` path the connector uses to assert the returned
    vector dimension:
 
    ```bash
-   uv run scripts/setup_openai_endpoint.py --profile <profile>
+   uv run scripts/setup_openai_external_model_endpoint.py --profile <profile>
    ```
 
    Pass `--skip-verify` to create the endpoint without the dimension probe, or

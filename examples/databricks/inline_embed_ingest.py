@@ -28,8 +28,15 @@
 # MAGIC - The **Neo4j Spark Connector** JAR attached to the cluster as a library
 # MAGIC   (a JVM library, attached once at the cluster level, not pip-installed).
 # MAGIC - A reachable **Neo4j** instance (URI, username, password).
-# MAGIC - A Databricks **model-serving endpoint** for embeddings. The default is
-# MAGIC   `databricks-gte-large-en` (1024 dimensions).
+# MAGIC - A Databricks **model-serving endpoint** for embeddings. This notebook
+# MAGIC   uses an OpenAI-backed **External Model** endpoint named
+# MAGIC   `openai-text-embedding-3-small` (1536 dimensions). Create it first by
+# MAGIC   following the "Registering the OpenAI endpoint (manual step)" section of
+# MAGIC   `neocarta/connectors/databricks/README.md`. The OpenAI key is supplied
+# MAGIC   there as a Databricks secret the endpoint reads; it is never set in this
+# MAGIC   notebook. To use a native Databricks model instead, point
+# MAGIC   `EMBEDDING_ENDPOINT` at it (for example `databricks-gte-large-en`, 1024
+# MAGIC   dimensions) and set `EMBEDDING_DIMENSION` to match.
 # MAGIC - The neocarta **connector wheel staged on a UC Volume** (see below).
 # MAGIC - A writable **UC Volume** path for the transient per-batch embedding
 # MAGIC   staging (`EMBEDDING_STAGING_VOLUME`).
@@ -83,9 +90,12 @@ NEO4J_URI = "neo4j+s://<host>:7687"
 NEO4J_USERNAME = "neo4j"
 NEO4J_PASSWORD = "<password>"
 
-# Inline embedding configuration.
-EMBEDDING_ENDPOINT = "databricks-gte-large-en"
-EMBEDDING_DIMENSION = "1024"
+# Inline embedding configuration. This names the OpenAI-backed External Model
+# serving endpoint created per the connector README (see Prerequisites). The
+# OpenAI key is not set here: it lives in the Databricks secret the endpoint
+# references, so the notebook only names the endpoint and ai_query calls it.
+EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
+EMBEDDING_DIMENSION = "1536"
 # Writable UC Volume subpath for the transient per-batch ai_query materialization.
 EMBEDDING_STAGING_VOLUME = "/Volumes/<catalog>/<schema>/<volume>/embed_staging"
 
@@ -167,9 +177,10 @@ print(json.dumps(summary.to_dict(), indent=2))
 # MAGIC   `{Label}_vector_index` (for example `Table_vector_index`,
 # MAGIC   `Column_vector_index`) at the configured dimension. These are the indexes
 # MAGIC   the MCP server queries.
-# MAGIC - **Model/dimension consistency:** inline defaults to the 1024-dimension
-# MAGIC   `databricks-gte-large-en` endpoint. If this graph holds data from more
-# MAGIC   than one neocarta datasource, the inline model and dimension must match
-# MAGIC   what the rest of neocarta uses, or cross-source vector search is
-# MAGIC   inconsistent. You cannot mix inline and external embeddings on one graph
-# MAGIC   without rebuilding the vector index. See the connector README.
+# MAGIC - **Model/dimension consistency:** this notebook embeds with the
+# MAGIC   1536-dimension OpenAI `openai-text-embedding-3-small` endpoint, which
+# MAGIC   lines up with an OpenAI-based neocarta graph. If this graph holds data
+# MAGIC   from more than one neocarta datasource, the inline model and dimension
+# MAGIC   must match what the rest of neocarta uses, or cross-source vector search
+# MAGIC   is inconsistent. You cannot mix inline and external embeddings on one
+# MAGIC   graph without rebuilding the vector index. See the connector README.

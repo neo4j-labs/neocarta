@@ -5,22 +5,31 @@
 #     "python-dotenv>=1.0",
 # ]
 # ///
-"""Create and verify a Databricks External-Models embedding endpoint for OpenAI.
+"""Create a Databricks External Model serving endpoint that proxies OpenAI.
 
-The Databricks connector's inline embedding mode runs
-``ai_query('<endpoint>', ...)`` natively in Spark against a Databricks
-model-serving endpoint. To make inline embeddings match an OpenAI-based neocarta
-graph, you register a Databricks Mosaic AI "External Models" endpoint that
-proxies OpenAI ``text-embedding-3-small`` (1536 dimensions) and point
-``NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT`` at it. See the "Model and dimension
-consistency" section of ``neocarta/connectors/databricks/README.md``.
+"External Model" is the Databricks Mosaic AI Model Serving term for a serving
+endpoint that proxies an outside provider. This script registers one that proxies
+OpenAI ``text-embedding-3-small`` (1536 dimensions) and exposes it under an
+ordinary Databricks serving-endpoint name, callable with
+``ai_query('<endpoint>', text)`` from SQL or Spark just like a native Databricks
+model.
 
-This script automates that registration:
+The Databricks connector's inline embedding mode calls
+``ai_query('<endpoint>', ...)`` against a serving endpoint. Pointing
+``NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT`` at the endpoint this script creates is
+what makes inline embeddings run on OpenAI instead of a native Databricks model,
+so they match an OpenAI-based neocarta graph. See the "Registering the OpenAI
+endpoint (manual step)" section of ``neocarta/connectors/databricks/README.md``.
 
-* It creates the External-Models endpoint, reading the OpenAI key from a
-  Databricks secret (the key value is never read locally, only referenced).
-* It then probes the endpoint through the same ``ai_query`` SQL path the
-  connector uses and asserts the returned vector dimension.
+What it does:
+
+* Creates the External Model serving endpoint (provider OpenAI, task
+  ``llm/v1/embeddings``), reading the OpenAI key from a Databricks secret. The
+  key value is never read locally. The endpoint stores a reference to the secret
+  and authenticates to OpenAI itself at query time, so the key never appears in
+  the connector run or the ingest notebook.
+* Probes the endpoint through the same ``ai_query`` SQL path the connector uses
+  and asserts the returned vector dimension.
 
 Provision the OpenAI secret first, for example::
 
@@ -29,16 +38,16 @@ Provision the OpenAI secret first, for example::
 
 Usage::
 
-    uv run scripts/setup_openai_endpoint.py --profile <profile>
+    uv run scripts/setup_openai_external_model_endpoint.py --profile <profile>
 
     # custom names / explicit warehouse for the probe
-    uv run scripts/setup_openai_endpoint.py -p <profile> \
+    uv run scripts/setup_openai_external_model_endpoint.py -p <profile> \
         --endpoint-name openai-text-embedding-3-small \
         --secret-scope neocarta-openai --secret-key OPENAI_API_KEY \
         --warehouse-id 1234567890abcdef
 
     # create only, skip the SQL dimension probe
-    uv run scripts/setup_openai_endpoint.py -p <profile> --skip-verify
+    uv run scripts/setup_openai_external_model_endpoint.py -p <profile> --skip-verify
 """
 
 from __future__ import annotations
