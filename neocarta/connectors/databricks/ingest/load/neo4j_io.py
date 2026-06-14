@@ -29,7 +29,19 @@ if TYPE_CHECKING:
     from neo4j import Driver
     from pyspark.sql import DataFrame
 
+    from neocarta.connectors.databricks.settings import SparkIngestSettings
+
 logger = logging.getLogger(__name__)
+
+# Labels eligible for a `{label}_vector_index`. Value is excluded: neocarta
+# defines no Value vector index (Values are reached via HAS_VALUE traversal,
+# never vector search), matching the shared `create_vector_index` helper.
+_VECTOR_INDEX_LABELS = (
+    NodeLabel.DATABASE,
+    NodeLabel.SCHEMA,
+    NodeLabel.TABLE,
+    NodeLabel.COLUMN,
+)
 
 _FORMAT = "org.neo4j.spark.DataSource"
 
@@ -87,6 +99,39 @@ def bootstrap_constraints(driver: Driver) -> None:
     create_range_index(driver, NodeLabel.COLUMN.value, "type")
     create_range_index(driver, NodeLabel.VALUE.value, "last_run")
     logger.info("[databricks] neo4j constraints and indexes bootstrapped")
+
+
+def create_vector_indexes(driver: Driver, settings: SparkIngestSettings) -> None:
+    """Create per-label `{label}_vector_index` cosine indexes for inline mode.
+
+    Called only when inline embeddings are enabled. One cosine vector index per
+    label whose embedding flag is on, at `embedding_dimension`, reusing
+    neocarta's shared :func:`neocarta.ingest.indexes.create_vector_index` so the
+    index name matches what the MCP server queries by. Value is never indexed
+    (see ``_VECTOR_INDEX_LABELS``); its flag embeds Value nodes but creates no
+    index.
+
+    Each mode owns its index config: inline creates these at its configured
+    dimension; external mode leaves vector indexes to the enrichment layer.
+    Mixing modes on one graph requires rebuilding the index, since it is fixed
+    at one dimension.
+    """
+    from neocarta.ingest.indexes import create_vector_index
+
+    flags = {
+        NodeLabel.DATABASE: settings.include_embeddings_databases,
+        NodeLabel.SCHEMA: settings.include_embeddings_schemas,
+        NodeLabel.TABLE: settings.include_embeddings_tables,
+        NodeLabel.COLUMN: settings.include_embeddings_columns,
+    }
+    for label in _VECTOR_INDEX_LABELS:
+        if flags[label]:
+            create_vector_index(driver, label.value, settings.embedding_dimension)
+            logger.info(
+                "[databricks] created %s_vector_index (dim=%d, cosine)",
+                label.value.lower(),
+                settings.embedding_dimension,
+            )
 
 
 def delete_stale_values(
@@ -185,6 +230,7 @@ __all__ = [
     "REFERENCES_PROPERTIES",
     "Neo4jConfig",
     "bootstrap_constraints",
+    "create_vector_indexes",
     "delete_stale_values",
     "query_counts",
     "write_node",

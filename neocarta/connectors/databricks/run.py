@@ -7,9 +7,12 @@ Thin coordinator for the schema-ingest run. Its job is limited to:
      write relationships.
   4. Return the in-memory RunSummary.
 
-Embeddings are intentionally not produced here: vectors are added afterward by
-neocarta's enrichment layer. Inferred (heuristic) foreign keys live in
-`neocarta.enrichment.foreign_keys`. This module ingests catalog facts only.
+Embeddings have two modes. External (default): no vectors are produced here and
+neocarta's enrichment layer adds them afterward. Inline (when any
+`include_embeddings_*` flag is on): the node-write path embeds each batch
+in-cluster via ai_query and creates the per-label vector indexes. Inferred
+(heuristic) foreign keys live in `neocarta.enrichment.foreign_keys`. This module
+ingests catalog facts only.
 """
 
 from __future__ import annotations
@@ -33,13 +36,22 @@ from neocarta.connectors.databricks.ingest.fk.discovery import (
 from neocarta.connectors.databricks.ingest.load.neo4j_io import (
     Neo4jConfig,
     bootstrap_constraints,
+    create_vector_indexes,
     delete_stale_values,
     query_counts,
     write_node,
     write_rel,
 )
 from neocarta.connectors.databricks.ingest.preflight import preflight
-from neocarta.connectors.databricks.ingest.summary import RunSummary
+from neocarta.connectors.databricks.ingest.summary import EmbeddingCounts, RunSummary
+from neocarta.connectors.databricks.ingest.transform.embed_stage import (
+    embedded_batch,
+    finalize_embedding_summary,
+)
+from neocarta.connectors.databricks.ingest.transform.staging import (
+    resolve_ledger_path,
+    resolve_transient_root,
+)
 from neocarta.connectors.databricks.ingest.transform.value_stage import (
     ValueResult,
     transform_sample_values,
@@ -91,13 +103,32 @@ def run_ingest(
 def _build_summary(
     run_id: str, settings: SparkIngestSettings, schema_list: list[str]
 ) -> RunSummary:
-    """Create the run summary shell before any Spark or Neo4j work begins."""
+    """Create the run summary shell before any Spark or Neo4j work begins.
+
+    In inline mode the embedding configuration (model, per-batch failure-count
+    gate, and per-label flags) is recorded up front so the emitted summary reflects the
+    requested config even if no rows are eligible for a label. External mode
+    leaves the default empty `EmbeddingCounts` (all-null embedding view).
+    """
+    embeddings = EmbeddingCounts()
+    if settings.any_embeddings_enabled():
+        embeddings = EmbeddingCounts(
+            model=settings.embedding_endpoint,
+            failure_max=settings.embedding_failure_max,
+            flags={
+                NodeLabel.TABLE: settings.include_embeddings_tables,
+                NodeLabel.COLUMN: settings.include_embeddings_columns,
+                NodeLabel.SCHEMA: settings.include_embeddings_schemas,
+                NodeLabel.DATABASE: settings.include_embeddings_databases,
+            },
+        )
     return RunSummary(
         run_id=run_id,
         job_name="databricks",
         contract_version=CONTRACT_VERSION,
         catalog=settings.catalog,
         schemas=schema_list,
+        embeddings=embeddings,
     )
 
 
@@ -156,6 +187,10 @@ def _run(
     try:
         with GraphDatabase.driver(neo4j.uri, auth=(neo4j.username, neo4j.password)) as driver:
             bootstrap_constraints(driver)
+            inline = settings.any_embeddings_enabled()
+            if inline:
+                _log_embedding_consistency_warning(settings)
+                create_vector_indexes(driver, settings)
 
             extract_result = extract(spark, settings, schema_list, summary)
 
@@ -163,7 +198,14 @@ def _run(
             # ready to write alongside the Column nodes.
             values = transform_sample_values(spark, settings, schema_list, extract_result, summary)
 
-            _write_nodes(neo4j, extract_result, values, summary)
+            # Inline mode embeds each batch once and writes through the failure
+            # gate; external mode writes the built frames directly (the
+            # `embedding` property is simply absent and added later by enrichment).
+            if inline:
+                _embed_and_write_nodes(spark, neo4j, settings, extract_result, values, summary)
+                finalize_embedding_summary(summary)
+            else:
+                _write_nodes(neo4j, extract_result, values, summary)
 
             # Scoped stale-Value cleanup after this run's Values are written.
             if values is not None:
@@ -215,18 +257,215 @@ def _write_nodes(
     produced here; the `embedding` property is simply absent and added later by
     neocarta enrichment.
     """
-    from pyspark.sql.functions import lit
-
     write_node(_project(extract_result.database_df, NodeLabel.DATABASE), neo4j, NodeLabel.DATABASE)
     write_node(_project(extract_result.schema_node_df, NodeLabel.SCHEMA), neo4j, NodeLabel.SCHEMA)
     write_node(_project(extract_result.table_node_df, NodeLabel.TABLE), neo4j, NodeLabel.TABLE)
     write_node(_project(extract_result.column_node_df, NodeLabel.COLUMN), neo4j, NodeLabel.COLUMN)
+    _write_value_nodes(neo4j, values, summary)
 
-    if values is not None and values.value_node_df is not None:
-        # Stamp every Value with this run's start so the post-run scoped delete
-        # can drop any Value a prior run left behind.
-        value_df = values.value_node_df.withColumn("last_run", lit(summary.started_at))
-        write_node(_project(value_df, NodeLabel.VALUE), neo4j, NodeLabel.VALUE)
+
+def _write_value_nodes(
+    neo4j: Neo4jConfig,
+    values: ValueResult | None,
+    summary: RunSummary,
+) -> None:
+    """Write sampled Value nodes (never embedded) with this run's stamp.
+
+    Value nodes are never embedded — no neocarta path embeds them and they are
+    reached by HAS_VALUE traversal, not vector search — so both modes write them
+    identically here. Every Value is stamped with this run's start so the
+    post-run scoped delete can drop any Value a prior run left behind.
+    """
+    if values is None or values.value_node_df is None:
+        return
+    from pyspark.sql.functions import lit
+
+    value_df = values.value_node_df.withColumn("last_run", lit(summary.started_at))
+    write_node(_project(value_df, NodeLabel.VALUE), neo4j, NodeLabel.VALUE)
+
+
+def _log_embedding_consistency_warning(settings: SparkIngestSettings) -> None:
+    """Warn, on every inline run, about the model/dimension consistency rules.
+
+    The vector index is created at one fixed dimension, so modes cannot be mixed
+    on one graph without rebuilding it, and a graph spanning multiple neocarta
+    datasources must embed with the same model/dimension as the rest of neocarta
+    or cross-source vector search is inconsistent.
+    """
+    logger.warning(
+        "[neocarta] inline embeddings ENABLED: endpoint=%s dimension=%d."
+        " The vector index is fixed at this dimension, so external and inline"
+        " modes cannot be mixed on one graph without rebuilding it; if this graph"
+        " spans multiple neocarta datasources the model and dimension must match"
+        " the rest of neocarta or cross-source vector search will be inconsistent.",
+        settings.embedding_endpoint,
+        settings.embedding_dimension,
+    )
+
+
+def _embed_and_write_nodes(
+    spark: SparkSession,
+    neo4j: Neo4jConfig,
+    settings: SparkIngestSettings,
+    extract_result: ExtractResult,
+    values: ValueResult | None,
+    summary: RunSummary,
+) -> None:
+    """Inline-mode node writes: embed each batch once, gate, then write.
+
+    Table/Column nodes are batched by table range so no whole-catalog staging
+    table is materialized; Database/Schema are catalog/schema-scale and
+    embed-and-write once. Each batch freezes its single ai_query pass to a
+    transient Delta path (deleted as soon as it is written). A label whose flag
+    is off still goes through here but writes directly without embedding; the
+    builder-attached `embedding_text` column is projected off in both arms.
+    Value nodes are never embedded, so they write through the same un-embedded
+    path as external mode.
+    """
+    transient_root = resolve_transient_root(settings)
+    ledger_path = resolve_ledger_path(settings)
+
+    _embed_and_write_node_chunks(
+        spark,
+        neo4j,
+        settings,
+        extract_result,
+        ledger_path,
+        transient_root,
+        summary,
+    )
+    _write_label_nodes(
+        extract_result.database_df,
+        NodeLabel.DATABASE,
+        neo4j,
+        settings,
+        ledger_path,
+        transient_root,
+        "all",
+        summary,
+        settings.include_embeddings_databases,
+    )
+    _write_label_nodes(
+        extract_result.schema_node_df,
+        NodeLabel.SCHEMA,
+        neo4j,
+        settings,
+        ledger_path,
+        transient_root,
+        "all",
+        summary,
+        settings.include_embeddings_schemas,
+    )
+    _write_value_nodes(neo4j, values, summary)
+
+
+def _embed_and_write_node_chunks(
+    spark: SparkSession,
+    neo4j: Neo4jConfig,
+    settings: SparkIngestSettings,
+    extract_result: ExtractResult,
+    ledger_path: str,
+    transient_root: str,
+    summary: RunSummary,
+) -> None:
+    """Embed + write Table and Column nodes batched by table range.
+
+    The bounded list of distinct `(table_catalog, table_schema, table_name)`
+    triples is collected to the driver (O(tables) tiny identifiers, not the
+    catalog-scale columns) and chunked by `embedding_batch_tables`. Each chunk
+    filters the already-built Table/Column node frames on their declared
+    `catalog`/`schema`/(table) properties via a broadcast left-semi join, embeds
+    once into a transient per-(chunk, label) materialization, gates on the
+    per-batch failure count, and writes straight to Neo4j (MERGE on id; a re-run
+    heals a partial run). Value nodes are never embedded and are written
+    separately by `_write_value_nodes`.
+    """
+    from pyspark.sql.functions import broadcast
+
+    table_flag = settings.include_embeddings_tables
+    column_flag = settings.include_embeddings_columns
+    batch_size = settings.embedding_batch_tables
+
+    rows = (
+        extract_result.tables_df.select("table_catalog", "table_schema", "table_name")
+        .distinct()
+        .collect()
+    )
+    triples = [(r["table_catalog"], r["table_schema"], r["table_name"]) for r in rows]
+
+    def _filter_to_chunk(df: DataFrame, keys: DataFrame, table_col: str) -> DataFrame:
+        cond = (
+            (df["catalog"] == keys["_k_cat"])
+            & (df["schema"] == keys["_k_sch"])
+            & (df[table_col] == keys["_k_tab"])
+        )
+        return df.join(keys, cond, "left_semi")
+
+    for start in range(0, len(triples), batch_size):
+        idx = start // batch_size
+        chunk = triples[start : start + batch_size]
+        tag = f"b{idx}"
+        logger.info("[neocarta] embedding batch %s: %d table(s)", tag, len(chunk))
+        # Build the broadcast key frame once per chunk and reuse it for the
+        # Table/Column/Value semi-joins (createDataFrame is a driver action).
+        keys = broadcast(spark.createDataFrame(chunk, ["_k_cat", "_k_sch", "_k_tab"]))
+        _write_label_nodes(
+            _filter_to_chunk(extract_result.table_node_df, keys, "name"),
+            NodeLabel.TABLE,
+            neo4j,
+            settings,
+            ledger_path,
+            transient_root,
+            tag,
+            summary,
+            table_flag,
+        )
+        _write_label_nodes(
+            _filter_to_chunk(extract_result.column_node_df, keys, "table"),
+            NodeLabel.COLUMN,
+            neo4j,
+            settings,
+            ledger_path,
+            transient_root,
+            tag,
+            summary,
+            column_flag,
+        )
+
+
+def _write_label_nodes(
+    df: DataFrame,
+    label: NodeLabel,
+    neo4j: Neo4jConfig,
+    settings: SparkIngestSettings,
+    ledger_path: str,
+    transient_root: str,
+    batch_tag: str,
+    summary: RunSummary,
+    embed_enabled: bool,
+) -> None:
+    """Write one label's node frame to Neo4j, embedding-once when enabled.
+
+    When `embed_enabled`, the frame is embedded and frozen to a transient
+    per-(batch, label) Delta path inside `embedded_batch`: the per-batch
+    failure-count gate and this MERGE write both read that single ai_query pass,
+    and the transient is deleted as soon as the batch is written. When embedding
+    is off the built frame is projected and written directly. `_project` is the
+    fail-closed boundary in both arms.
+    """
+    if embed_enabled:
+        with embedded_batch(
+            df,
+            label,
+            settings,
+            ledger_path,
+            transient_root,
+            batch_tag,
+            summary,
+        ) as staged:
+            write_node(_project(staged, label), neo4j, label)
+    else:
+        write_node(_project(df, label), neo4j, label)
 
 
 def _stale_value_cleanup(

@@ -2,7 +2,9 @@
 
 ## Where this work happens
 
-All of this work is done **directly on the `add-databricks-connector-from-dbxcarta` branch**. That branch already holds the migrated connector at `neocarta/connectors/databricks/` that every phase below edits. Do **not** create a new branch — commit changes onto `add-databricks-connector-from-dbxcarta` itself. The inline embedding source being ported (`embeddings.py`, `embed_stage.py`, `staging.py`, `ledger.py`, `setup-openai-endpoint.py`, and the Spark tests) lives under `dbxcarta/` and is brought into the connector on that same branch.
+All of this work is done **directly on the `add-databricks-connector-from-dbxcarta` branch**, and **every new or changed file lands inside the `neocarta/connectors/databricks/` directory** (plus that connector's test tree). That branch already holds the migrated connector at `neocarta/connectors/databricks/` that every phase below edits. Do **not** create a new branch — commit changes onto `add-databricks-connector-from-dbxcarta` itself. The single goal of this plan is to update that one connector to add embeddings; nothing outside `neocarta/connectors/databricks/` (and its tests) should change.
+
+**Where the embedding code comes from, and how to copy it.** The inline embedding source (`embeddings.py`, `embed_stage.py`, `staging.py`, `ledger.py`, the `EmbeddingCounts`/`RunSummary` shape, the `run.py` write loop, the `neo4j_io.py` index creation, the settings/contract/preflight additions, and the Spark tests) is **not present on this branch** — it was dropped during the migration and now lives only on the separate **`dbxcarta` branch**, under `dbxcarta/dbxcarta-spark/src/dbxcarta/spark/` (tests under `dbxcarta/tests/spark/embeddings/` and `dbxcarta/tests/spark/ledger/`). Read each source file from that branch with `git show dbxcarta:<path>` and write the adapted version directly into `neocarta/connectors/databricks/`. This is the cleanest method because every file needs renaming, re-pathing, and import re-pointing anyway; `git checkout dbxcarta -- <path>` is avoided because it would restore files at their original `dbxcarta/dbxcarta-spark/...` paths and stage them, forcing an extra move. The `setup-openai-endpoint.py` helper script also lives on the `dbxcarta` branch and is copied the same way.
 
 Order of work: implement Phases 1, 2, and 3 on the branch, then Phase 3.5 (write a handoff/test document describing what was done and what still needs live testing), then run live verification against the branch. **All live verification (external and inline end-to-end runs) is this single post-3.5 pass** — the per-phase "verify end to end" notes are deferred to it, because they require a live Databricks cluster and Neo4j. Phases 1-3 ship code plus unit/smoke tests only.
 
@@ -139,28 +141,69 @@ These are independent of embeddings. The pipeline cannot be exercised cleanly wi
 
 **Phase 1 validation:** `make test-databricks` → 34 passed (13 connector + 21 FK rules). Default-group run (no PySpark) of the same dirs + smoke → 45 passed. `ruff check` clean on all changed files. `ruff format` clean. `neocarta databricks embed --help` / `--dry-run --json` verified.
 
-### Phase 2: Add the embedding settings and contract surface
-- Add the embedding settings and the cross-field validator to `settings.py`.
-- Add `EMBEDDING_TEXT_EXPR`, the `embedding` property, and the default endpoint to `contract.py`.
-- Update the node builders to attach `embedding_text`.
-- Add the embedding preflight check.
-- These changes are inert while all flags are off, so external mode keeps working.
+### Phase 2: Add the embedding settings and contract surface — ✅ COMPLETE
 
-### Phase 3: Port the inline embedding pipeline
-- Add the `EmbeddingCounts` dataclass + `embeddings` field to the connector's `RunSummary` (`ingest/summary.py`) first, since `embed_stage.py` accumulates into it.
-- Port `embeddings.py`, `embed_stage.py`, and `staging.py` into `ingest/transform/`.
-- Add the batched embed-and-write loop in `run.py`, gated by the flags.
-- Create the per-label vector indexes in `neo4j_io.py` when inline mode is on, at the configured dimension. Each mode owns this config.
-- Emit a warning when inline is enabled, stating the configured model/dimension and that it must match the rest of neocarta when the graph spans multiple datasources, and that modes cannot be mixed on one graph without rebuilding the index.
-- Port `ledger.py` **inert** alongside `embed_stage.py` so the embed stage imports cleanly with the ledger branch present but flag-off. Its settings wiring and tests are Phase 4; do not delete the ledger calls from `embedded_batch`.
-- Port the embedding unit tests.
+All files in this phase live under `neocarta/connectors/databricks/`; the source for each is read from the `dbxcarta` branch with `git show dbxcarta:<path>` (see "Where the embedding code comes from" above).
+
+**How settings are added (native integration, no new file).** The connector already manages its own configuration in `neocarta/connectors/databricks/settings.py`: a single `SparkIngestSettings(BaseSettings)` class built on `pydantic_settings.BaseSettings`, with `model_config = SettingsConfigDict(env_prefix="NEOCARTA_DATABRICKS_")`, bare field names (`include_values`, `sample_limit`, …), and `@field_validator` methods. This is the established neocarta pattern for this connector. The embedding settings are therefore **added as new fields on that existing class**, not as a new settings module: each ported `DBXCARTA_*` setting becomes a bare field read from `NEOCARTA_DATABRICKS_*` (`include_embeddings_tables`, `embedding_endpoint`, `embedding_dimension`, `embedding_failure_max`, …), and the cross-field/endpoint validators become `@field_validator`/`@model_validator` methods on the same class. No `DBXCARTA_*` env var or `dbxcarta_*` field name survives.
+
+- [x] Add the embedding settings (the five per-label flags, endpoint, dimension, batch size, failure-max gate) and the cross-field validator (`include_embeddings_values` requires `include_values`) as new fields/validators on `SparkIngestSettings` in `settings.py`. Source: `dbxcarta` branch `…/spark/settings.py`.
+  - Added `include_embeddings_{tables,columns,values,schemas,databases}` (all `False`), `embedding_endpoint` (defaults to `DEFAULT_EMBEDDING_ENDPOINT`), `embedding_dimension` (1024), `embedding_batch_tables` (200), `embedding_failure_max` (0), all read from `NEOCARTA_DATABRICKS_*`. Validators ported and renamed: `_validate_embedding_batch_tables` (>= 1), `_validate_embedding_failure_max` (>= 0), `_validate_embedding_endpoint` (re-points to the connector's `validate_serving_endpoint_name`), and the `@model_validator` `_validate_feature_coherence` (value embeddings require `include_values`). **Ledger fields are NOT added here — correctly deferred to Phase 4.**
+  - **Added (small, not literally in the plan):** an `any_embeddings_enabled()` helper on `SparkIngestSettings` (mirrors the existing `resolved_catalogs()`/`layer_map()` helpers). It is the single external/inline switch consumed by the new preflight check and by run.py in Phase 3, replacing the source's inlined `any([...])`.
+- [x] Add `EMBEDDING_TEXT_EXPR`, the `embedding` property, and the default endpoint to `contract.py`. Source: `dbxcarta` branch `…/spark/contract.py`.
+  - Added `DEFAULT_EMBEDDING_ENDPOINT = "databricks-gte-large-en"` and the `EMBEDDING_TEXT_EXPR` map (one expr per managed label, catalog-leading for Table/Column/Schema). **The `embedding` property was already present** — the migrated connector derives `NODE_PROPERTIES` from the Pydantic models, and every core model (plus `DatabricksValue`) already declares `embedding`, so no contract change was needed for it. A test now pins this.
+- [x] Update the node builders in `ingest/schema_graph.py` and `ingest/transform/sample_values.py` to attach `embedding_text`. Source: `dbxcarta` branch `…/spark/ingest/schema_graph.py` and `…/spark/ingest/transform/sample_values.py`.
+  - All four `schema_graph` builders and the `sample_values` Value builder now attach a transient `embedding_text` column. The `run.py:_project` write boundary already strips any column not in `NODE_PROPERTIES`, so attaching it unconditionally is inert in external mode (verified by a test).
+- [x] Add the embedding preflight check to `ingest/preflight.py`. Source: `dbxcarta` branch `…/spark/ingest/preflight.py`.
+  - Added `_assert_embedding_endpoint`, gated on `settings.any_embeddings_enabled()`: it sends a trivial `ai_query` and fails the run if the endpoint is unreachable, errors, or returns a vector whose length ≠ `embedding_dimension`. Only the embedding check was ported; the source's summary-volume/table provisioning is not part of this migrated connector and stays out of scope.
+- [x] These changes are inert while all flags are off, so external mode keeps working. (Confirmed: default-group + databricks-group suites pass with flags off; `_project` strips `embedding_text`.)
+- **Tests added:** `test_settings.py` +7 (embedding validators, coherence, `any_embeddings_enabled`, external-default), `test_contract.py` +5 (`EMBEDDING_TEXT_EXPR` coverage/transience, `embedding` declared per label, default endpoint). **New Spark-logic file** `test_schema_graph.py` (6 tests, `importorskip` guarded) verifies the builders actually attach `embedding_text` against a local SparkSession — this is the first Spark-logic test (Phase 1 deferred them to "Phase 3/4"); added here because it directly validates this phase's builder change and is faithful (real Spark, no mocks).
+
+**Phase 2 validation:** `make test-databricks` equivalent (`tests/unit/connectors/databricks` + `tests/unit/enrichment/foreign_keys`, `--group databricks`) → 51 passed. Default-group (no PySpark) of the connector tests + smoke → 41 passed (Spark-logic module skipped cleanly). `ruff check` + `ruff format` clean on all changed files. Live endpoint-reachability preflight is exercised in the single post-3.5 live pass.
+
+### Phase 3: Port the inline embedding pipeline — ✅ COMPLETE
+
+All files in this phase live under `neocarta/connectors/databricks/` (and its test tree); the source for each is read from the `dbxcarta` branch with `git show dbxcarta:<path>` (see "Where the embedding code comes from" above). Apply the Phase-0 renames and re-point the `validate_serving_endpoint_name` import to the connector's existing `_platform/identifiers.py`.
+
+**Drift resolved (user-approved before implementation).** Two settings the plan assumed survived the migration did not, and both are required to port inline faithfully:
+- *Staging volume.* The transient per-batch Delta materialization (`staging.py`) needs a writable UC Volume path, which `dbxcarta` derived from the now-dropped `DBXCARTA_SUMMARY_VOLUME` (the whole `summary_io` machinery was dropped and is **not** restored — it served the unmigrated `verify`/`materialize`/`client` jobs, not embeddings). Added a single new setting `NEOCARTA_DATABRICKS_EMBEDDING_STAGING_VOLUME` (the transient root directly), validated as a `/Volumes/<cat>/<schema>/<vol>/<subdir>` subpath **only when inline is on** (external mode never reads it).
+- *Ledger fields.* `embed_stage`/`staging` read `ledger_enabled`/`ledger_path` at runtime; added them as plain `False`/`""` fields now (no validators/tests) so the inert ledger branch runs with the flag off. Validators + tests remain Phase 4.
+
+- [x] Add the `EmbeddingCounts` dataclass + `embeddings` field to the connector's `RunSummary` (`ingest/summary.py`) first, since `embed_stage.py` accumulates into it. Source: `dbxcarta` branch `…/spark/ingest/summary.py`.
+  - Ported `EmbeddingCounts` (per-label model/threshold/flags/attempts/successes/failure-rate/ledger-hits with `as_*_map` flatteners) and added the `embeddings` field (default-empty). `to_dict()` now emits the flat `embedding_*` keys; external-mode runs carry an all-null embedding view.
+- [x] Port `embeddings.py`, `embed_stage.py`, and `staging.py` into `ingest/transform/`. Source: `dbxcarta` branch `…/spark/ingest/transform/{embeddings,embed_stage,staging}.py`.
+  - `embeddings.py` re-points `validate_serving_endpoint_name` to `_platform/identifiers.py`. `staging.py` re-points `uc_volume_parent` there, and `resolve_transient_root` now returns `embedding_staging_volume` directly (no summary-volume sibling math). `embed_stage.py` renamed all settings refs and the failure-gate error message to the `NEOCARTA_DATABRICKS_*` convention. Log prefixes `[dbxcarta]` → `[neocarta]`.
+- [x] Add the batched embed-and-write loop in `run.py`, gated by the flags. Source: `dbxcarta` branch `…/spark/run.py`.
+  - External mode keeps the existing single-pass `_write_nodes` unchanged. Inline mode (`any_embeddings_enabled()`) routes through ported `_embed_and_write_nodes` → `_embed_and_write_node_chunks` (Table/Column batched by table range) + `_write_label_nodes`; Database/Schema embed-and-write once; Value nodes write un-embedded via `_write_value_nodes`. `finalize_embedding_summary` runs after. `_build_summary` records the embedding config in inline mode. (Value embedding was removed in the Phase 3 quality review — see below.)
+- [x] Create the per-label vector indexes in `neo4j_io.py` when inline mode is on, at the configured dimension. Each mode owns this config.
+  - Added `create_vector_indexes(driver, settings)` reusing neocarta's shared `neocarta.ingest.indexes.create_vector_index` (native integration; produces the `{label}_vector_index` cosine name the MCP server expects). Value excluded, matching the source. Called from `run.py` right after `bootstrap_constraints` in inline mode.
+- [x] Emit a warning when inline is enabled (model/dimension; must match the rest of neocarta across datasources; no mixing modes without rebuilding the index). Added `_log_embedding_consistency_warning` in `run.py`.
+- [x] Port `ledger.py` **inert** alongside `embed_stage.py`. Ported with `[neocarta]` log prefixes; the `embedded_batch`/`_embed_with_ledger` ledger branches are present but gated on `settings.ledger_enabled` (default False). Settings wiring + tests remain Phase 4.
+- [x] Port the embedding unit tests from `dbxcarta/tests/spark/embeddings/` into the connector test tree.
+  - Ported `test_transform_unit.py` → `tests/unit/connectors/databricks/test_embeddings.py` (14 Spark-logic tests: `_validate_embedding` paths, failure stats, per-batch gate, ledger split hit/miss, sha256 hash), `importorskip`-guarded. Renamed the gate stub field/error match to the new convention. Existing `test_settings.py` updated (inline cases now pass a staging volume) + 3 new staging-volume validator tests.
 - *Live verification deferred:* inline-mode end-to-end testing against a catalog with a real serving endpoint (one label at a time, covering both the default Databricks `databricks-gte-large-en` endpoint and the OpenAI external-model endpoint from `setup-openai-endpoint.py`) needs a live cluster and is part of the single post-3.5 live pass, not this phase. Phase 3 ships code + unit tests only.
 
-### Phase 4: Optional ledger cache
+**Phase 3 validation:** `make test-databricks` equivalent (`tests/unit/connectors/databricks` + `tests/unit/enrichment/foreign_keys`, `--group databricks`) → 65 passed. Default-group full unit suite → 494 passed (no regressions; Spark-logic modules skip cleanly). `ruff check` + `ruff format` clean on all changed files.
+
+**Phase 3 quality review (post-implementation, user-approved fixes).** Reviewed the whole inline path end-to-end (builders → embed stage → projection → Neo4j write) and verified correctness. Three findings actioned:
+- *Removed Value embedding.* Investigation confirmed no neocarta path embeds Value nodes — the enrichment layer embeds only Table/Column (its docstrings: "must be one of: Database, Table, Column") and `_VECTOR_INDEX_LABELS` never indexed Value. So the inline-only `include_embeddings_values` flag embedded vectors that were never indexed and unsupported everywhere else. Removed it fully: the setting + its `any_embeddings_enabled`/coherence wiring (`settings.py`), the `EmbeddingCounts` flag entry and the per-chunk Value embed branch (`run.py`), the `EMBEDDING_TEXT_EXPR[VALUE]` entry (`contract.py`), and the dead `embedding_text` column on the Value frame (`sample_values.py`). Value nodes now write through one shared `_write_value_nodes` helper (un-embedded, run-stamped) in both modes. Value keeps its declared `embedding` graph property (the contract-wide "every label declares embedding, may be absent" rule is unchanged).
+- *Normalized log prefixes.* The ported transform modules used `[neocarta]`; their package siblings (`sample_values`, `value_stage`, `extract`, `neo4j_io`, …) use `[databricks]`. Changed the 6 occurrences in `embed_stage.py`/`staging.py`/`ledger.py` to `[databricks]`. (`run.py` was already all-`[neocarta]` pre-Phase-3 — left as-is, internally consistent; out of Phase 3 scope.)
+- *Added pure-Python tests.* New `test_embedding_summary.py` (default `test-unit` group, no Spark) covers `finalize_embedding_summary` rate arithmetic, `EmbeddingCounts.as_*_map`, `RunSummary.to_dict` embedding keys (external null view + inline populated), and `resolve_transient_root`/`resolve_ledger_path` path resolution. Updated `test_contract.py` (embedding-text map now covers embeddable labels only) and removed the obsolete value-embedding coherence test from `test_settings.py`.
+
+**Post-review validation:** default-group full unit suite → 501 passed; `--group databricks` connector suite → 51 passed; `ruff check` + `ruff format` clean.
+
+### Phase 4: Optional ledger cache — ✅ COMPLETE
 `ledger.py` was already ported inert in Phase 3 so `embed_stage.py` could import it; Phase 4 turns it on as a supported option.
-- Add the renamed `NEOCARTA_DATABRICKS_LEDGER_*` settings (`ledger_enabled`, `ledger_path`) and their validators.
-- Confirm the ledger branch in `embedded_batch` is exercised once the flag is on (the call sites already exist from Phase 3).
-- Port the ledger tests from `dbxcarta/tests/spark/ledger/`.
+- [x] Add the renamed `NEOCARTA_DATABRICKS_LEDGER_*` settings (`ledger_enabled`, `ledger_path`) and their validators.
+  - The `ledger_enabled`/`ledger_path` fields already existed (added inert in Phase 3). Added the `_validate_ledger_path` field validator (the faithful rename of the source's `_validate_optional_volume_subpath`): blank stays blank (derive a staging-volume sibling at runtime via `resolve_ledger_path`), and a set path must be a `/Volumes/<cat>/<schema>/<vol>/<subdir>` subpath, validated by the connector's `validate_uc_volume_subpath` with the `NEOCARTA_DATABRICKS_LEDGER_PATH` label and trailing slash trimmed. Updated the field comment to describe the live feature instead of "ported inert". **No new coherence check was added** — the dbxcarta source has none (a `ledger_enabled=True` with embeddings off is inert, not an error), so adding one would be drift; `ledger_enabled` stays a plain bool exactly as in the source.
+- [x] Confirm the ledger branch in `embedded_batch` is exercised once the flag is on (the call sites already exist from Phase 3).
+  - Confirmed by reading the wired path: `run.py:_embed_and_write_nodes` computes `resolve_ledger_path(settings)` and passes it through `_write_label_nodes`/`_embed_and_write_node_chunks` into `embedded_batch`, which calls `_embed_with_ledger` (ledger read + `split_by_ledger`) and `upsert_ledger`, both gated on `settings.ledger_enabled`. The hit/miss join logic is unit-tested (`test_embeddings.py` `split_by_ledger` tests, ported in Phase 3). The full `embedded_batch` round-trip (Delta MERGE upsert + `ai_query` on misses) needs Delta + a serving endpoint and stays in the single post-3.5 live pass, exactly as it was integration-only in dbxcarta.
+- [x] Port the ledger tests from `dbxcarta/tests/spark/ledger/`.
+  - `test_staging.py` → `tests/unit/connectors/databricks/test_staging.py` (pure-Python, default group): the two `_is_missing_path_error` tests (FileNotFoundException text matches; permission error propagates).
+  - `test_read_ledger.py` → `tests/unit/connectors/databricks/test_ledger.py` (Spark-logic, `importorskip`-guarded): the `read_ledger` missing-path test, kept `@pytest.mark.skip(reason="requires Delta JAR on local Spark classpath")` exactly as in the source (the local-Spark suite has no Delta JAR). The non-skipped ledger split coverage already lives in `test_embeddings.py`.
+  - Added 4 pure-Python `ledger_path` validator tests to `test_settings.py` (off-by-default blank path, explicit path trailing-slash trim, non-`/Volumes` rejection, `..` traversal rejection).
+
+**Phase 4 validation:** `--group databricks` (`tests/unit/connectors/databricks` + `tests/unit/enrichment/foreign_keys`) → 78 passed, 1 skipped (the Delta-JAR `read_ledger` skip). Default-group full unit suite → 507 passed, 1 skipped (+6 pure-Python tests vs Phase 3's 501). `ruff check` + `ruff format` clean on all changed files. Live ledger round-trip (Delta MERGE + ai_query) is part of the single post-3.5 live pass.
 
 **What the ledger cache is:** a cross-run cache that lets the pipeline skip the `ai_query` embedding call for nodes that have not changed since the last run. Each embedded node stores the SHA-256 hash of the exact text that was embedded. The ledger keeps a small Delta table per label holding `id`, that text hash, the resulting vector, the model name, and a timestamp. On the next run, before calling `ai_query`, the pipeline joins against the ledger: a node is a "hit" when its id, model, and text hash all match, in which case the stored vector is reused and no embedding call is made. Only "misses" go to `ai_query`. After a successful batch the new vectors are merged back into the ledger.
 
@@ -173,6 +216,70 @@ The point of it is cost and speed. Embedding calls cost money and time, and most
 - Document both modes as equals in the connector README, including a "which mode to pick" section and the two-step external flow (Spark ingest job, then the CLI embedding command).
 - Update `CHANGELOG.md`.
 - Run `make fmt`, `make lint`, and the full test suite.
+
+### Phase 6: Build and version the connector wheel (neocarta side)
+
+**Goal:** produce the single handoff artifact from `cli.md` — a versioned neocarta wheel that carries the connector and declares the `databricks-spark` extra. This phase is entirely in the neocarta repo and needs no cluster. The external dbxcarta project consuming the wheel is Phase 7; publishing to an index is Phase 8.
+
+**This phase is independent of the inline-embedding phases (3/4/5).** The connector is already packaged on the branch, and `uv build` already emits a wheel that bundles `neocarta/connectors/databricks/` and declares the `databricks-spark` extra, so Phase 6 can be exercised first. Settled decisions:
+- The extra is named `databricks-spark` (no rename); the install target is `neocarta[databricks-spark]`.
+- The test version stays at the current `0.6.0`; the bump to `0.8.0` is a publish-time step in Phase 8.
+
+**Work:**
+- Confirm `uv build` produces `dist/neocarta-<version>-py3-none-any.whl` plus the sdist. (Verified: the wheel bundles the connector and declares `Provides-Extra: databricks-spark` and `Requires-Dist: pyspark>=3.5; extra == 'databricks-spark'`.)
+- Add a clean-room install check. In a fresh virtualenv, `pip install "neocarta[databricks-spark] @ file://…/dist/neocarta-<version>-py3-none-any.whl"`, import `DatabricksSparkSchemaConnector`, and run the smoke suite plus the `databricks` unit group against the installed wheel rather than editable source. This catches packaging gaps (a module or data file missing from the wheel) that the editable tree hides.
+- Pin the connector's runtime dependencies to the versions the pipeline was tested against (`cli.md` "In Neocarta"), so the wheel resolves the same way locally and on a cluster. **This is now a confirmed gap:** the clean-room install above resolved `pyspark 4.1.2` from the unpinned `pyspark>=3.5` floor, not the 3.5.x line the pipeline was tested on. Pin before the Phase 8 publish. This pinned set is also what Phase 7 needs for the cluster `pinned_closure`.
+
+**Run it locally right now (no cluster needed).** These steps work today on the branch at version `0.6.0`:
+
+```bash
+# 1. Build the wheel + sdist into ./dist
+uv build
+
+# 2. Inspect the artifact: connector bundled + extra declared
+unzip -l dist/neocarta-0.6.0-py3-none-any.whl | grep -c "connectors/databricks"   # -> 22
+unzip -p dist/neocarta-0.6.0-py3-none-any.whl "*/METADATA" \
+  | grep -iE "Provides-Extra: databricks-spark|Requires-Dist: pyspark"
+
+# 3. Clean-room install from the wheel (not editable source) and import-check
+python3 -m venv /tmp/wheeltest
+/tmp/wheeltest/bin/pip install "neocarta[databricks-spark] @ file://$(pwd)/dist/neocarta-0.6.0-py3-none-any.whl"
+/tmp/wheeltest/bin/python -c "from neocarta.connectors.databricks import DatabricksSparkSchemaConnector; print('ok')"
+/tmp/wheeltest/bin/python -c "import pyspark; print(pyspark.__version__)"
+```
+
+Step 3 downloads pyspark (large), so the first install takes a few minutes.
+
+**Status and progress (Phase 6):**
+- ✅ **Wheel build verified.** `uv build` emits `dist/neocarta-0.6.0-py3-none-any.whl`; it bundles all 22 `neocarta/connectors/databricks/` modules and declares `Provides-Extra: databricks-spark` + `Requires-Dist: pyspark>=3.5; extra == 'databricks-spark'`.
+- ✅ **Clean-room install verified.** Fresh-venv install of `neocarta[databricks-spark]` from the wheel imports `DatabricksSparkSchemaConnector` and resolves pyspark (got 4.1.2).
+- ⬜ **Pin runtime dependencies** (pyspark and the rest) to tested versions, since the clean-room install proved the floor resolves to an untested pyspark 4.x. Do before Phase 8; this set feeds the Phase 7 `pinned_closure`.
+- ⬜ **Add the clean-room install + `databricks` unit group + smoke run as a repeatable check** (script or Make target), so the packaging test is not a one-off manual run.
+
+### Phase 7: Repoint the dbxcarta operator tooling onto the neocarta wheel (external repo)
+
+**Goal:** make the external dbxcarta project consume the prebuilt neocarta wheel for the ingest path instead of building `dbxcarta-spark` from local source. This is the `cli.md` split. All work is in the external repo `/Users/ryanknight/projects/databricks/dbxcarta` (its own branch and PR), and it ends in the on-cluster ingest run. No package index yet: the wheel source is a local path or `--find-links` against neocarta's `dist/`. Parameterizing the wheel source as "local path now, index-by-version later" is what keeps Phase 8 small.
+
+**Why this is its own phase (grounded in the dbxcarta code):** the repoint is five distinct pieces, not a one-line source swap. The cluster bootstrap installs the application wheel with `--force-reinstall --no-deps` and installs dependencies separately from a pre-resolved `pinned_closure`, so dependencies do not ride in from the wheel's metadata.
+
+**Work (external repo):**
+- **Fetch instead of build.** Change `dbxcarta-submit`'s `_handle_publish_wheels` so the *ingest* entrypoint stages the prebuilt neocarta wheel (local path / `--find-links`) instead of `uv build`-ing `dbxcarta-spark`. This is the `databricks_job_runner` `publish_wheel_stable` / `find_latest_wheel` seam, which today builds from `project_dir/dist` local source. The *client* entrypoint stays as-is.
+- **Rebuild the `pinned_closure`.** Because the cluster installs `--no-deps`, regenerate the ingest job's pinned dependency closure to be the neocarta connector's closure (pyspark, neo4j, pydantic-settings, databricks-sdk, ...) rather than dbxcarta-spark's. This consumes the pinned set from Phase 6.
+- **Drop the core-bundling path for ingest.** `_core_bundled_into` and `_assert_wheel_bundles_core` exist so the entrypoint wheel physically carries `dbxcarta/core` under `--no-deps`. For the ingest path that is obsolete: the connector ships as ordinary modules inside the neocarta wheel. Remove or bypass that guard for ingest.
+- **Repoint the entrypoint.** Point the SparkPythonTask at the neocarta connector's ingest entry point, not the dbxcarta module.
+- **Possibly `databricks_job_runner` itself.** The build-from-source logic lives in that installed package, not the repo. If the repoint cannot be done entirely from the `dbxcarta-submit` caller, that package needs a change too.
+
+**Test (live pass; needs a live cluster):**
+- Stage the local neocarta wheel onto the UC Volume through the repointed dbxcarta path, then submit the ingest entrypoint on a classic cluster (Neo4j Spark Connector attached) against a test catalog and Neo4j.
+
+### Phase 8: Publish the versioned wheel to a package index
+
+**Decision: publish to a private index, not public PyPI.** A private index is the right release target because it is controllable and not public. A private index is not the easiest option for pure local testing, which is why Phases 6 and 7 use neocarta's local `dist/`; Phase 8 is where the real index enters.
+
+- Bump the version to `0.8.0` (Monday's release), update `CHANGELOG.md`, build, and publish the wheel plus sdist to the private index as the release artifact of record.
+- Flip the Phase 7 dbxcarta wheel source from the local path to "pull `neocarta[databricks-spark]==<version>` from the private index," and update operator config and docs to reference the connector wheel version rather than a local build (`cli.md` "In the external dbxcarta project").
+- Verify the full index path: dbxcarta pulls the published `0.8.0` wheel by version from the private index, stages it on the Volume, and the ingest job runs on a classic cluster.
+- **Shared contract (`cli.md`):** the wheel name `neocarta` plus the `databricks-spark` extra and the version scheme are the one handoff between the two projects. Record the chosen private index so both projects point at the same place.
 
 ---
 

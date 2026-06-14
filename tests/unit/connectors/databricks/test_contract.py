@@ -8,6 +8,8 @@ endpoint exclusion) without any Spark.
 from __future__ import annotations
 
 from neocarta.connectors.databricks.contract import (
+    DEFAULT_EMBEDDING_ENDPOINT,
+    EMBEDDING_TEXT_EXPR,
     MANAGED_NODE_LABELS,
     MANAGED_REL_TYPES,
     NODE_PROPERTIES,
@@ -57,3 +59,50 @@ def test_references_properties_exclude_join_endpoints():
     """Endpoint join keys are never stored as REFERENCES edge properties."""
     assert "source_column_id" not in REFERENCES_PROPERTIES
     assert "target_column_id" not in REFERENCES_PROPERTIES
+
+
+def test_embedding_is_a_declared_property_for_every_label():
+    """Every managed label carries an `embedding` graph property (added by
+    inline embedding or by enrichment), so the write boundary allows it."""
+    for label in MANAGED_NODE_LABELS:
+        assert "embedding" in NODE_PROPERTIES[label], f"{label} is missing `embedding`"
+
+
+def test_embedding_text_expr_covers_every_embeddable_label():
+    """The embedding-text map defines one expression per embeddable label.
+
+    Value is a managed label but is never embedded (no neocarta path embeds it;
+    it is reached by HAS_VALUE traversal, not vector search), so it carries no
+    embedding-text expression.
+    """
+    assert set(EMBEDDING_TEXT_EXPR) == set(MANAGED_NODE_LABELS) - {NodeLabel.VALUE}
+    assert all(expr for expr in EMBEDDING_TEXT_EXPR.values())
+
+
+def test_embedding_text_expr_is_never_a_graph_property():
+    """`embedding_text` is transient: it must not be a declared node property."""
+    for props in NODE_PROPERTIES.values():
+        assert "embedding_text" not in props
+
+
+def test_qualified_embedding_text_leads_with_catalog():
+    """Table/Column/Schema embedding text leads with the catalog so the same
+    name in two catalogs never embeds identically."""
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.TABLE].startswith(
+        "concat_ws(' | ', concat_ws('.', table_catalog"
+    )
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN].startswith(
+        "concat_ws(' | ', concat_ws('.', table_catalog"
+    )
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA].startswith(
+        "concat_ws(' | ', concat_ws('.', catalog_name"
+    )
+    # Database embeds a single scalar column. Value nodes are never embedded, so
+    # they have no embedding-text expression.
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.DATABASE] == "name"
+    assert NodeLabel.VALUE not in EMBEDDING_TEXT_EXPR
+
+
+def test_default_embedding_endpoint_is_the_gte_foundation_model():
+    """The inline default endpoint is the 1024-dim Databricks GTE model."""
+    assert DEFAULT_EMBEDDING_ENDPOINT == "databricks-gte-large-en"

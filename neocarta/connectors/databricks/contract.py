@@ -82,6 +82,12 @@ CONTRACT_VERSION = "1.7"
 # match the neocarta core convention (Database.service examples=["BIGQUERY"]).
 DATABASE_SERVICE = "DATABRICKS"
 
+# Default Databricks model-serving endpoint for inline embeddings. The
+# foundation-model GTE endpoint produces 1024-dim vectors (the inline default
+# dimension). Overridable via NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT, e.g. to
+# point at an External Models endpoint that proxies OpenAI text-embedding-3-small.
+DEFAULT_EMBEDDING_ENDPOINT = "databricks-gte-large-en"
+
 
 # The node labels and relationship types this connector produces and manages.
 # Iterate these (not the full neocarta enums) when creating constraints or
@@ -162,3 +168,30 @@ NODE_PROPERTIES: dict[NodeLabel, tuple[str, ...]] = {
 REFERENCES_PROPERTIES: tuple[str, ...] = _graph_properties(
     DatabricksReferences, exclude=_REFERENCES_ENDPOINTS
 )
+
+
+# Per-label embedding-text SQL expressions. Evaluated inside the node builder
+# (schema_graph.py) while the raw information_schema helper columns are still in
+# scope, producing one transient `embedding_text` column per node. The inline
+# embed stage hashes and embeds that column; the fail-closed write boundary
+# (run.py:_project) strips it, so it is never a graph property. Kept here so the
+# builders, the embed stage, and the tests share one definition. Value nodes are
+# never embedded (no neocarta path embeds them; they are reached by HAS_VALUE
+# traversal, not vector search), so they have no entry here. Catalog leads every
+# qualified name so `bronze.sales.orders` and `gold.sales.orders` never embed
+# identically in a multi-catalog graph; in a single-catalog graph it is a
+# constant prefix.
+EMBEDDING_TEXT_EXPR: dict[NodeLabel, str] = {
+    NodeLabel.TABLE: (
+        "concat_ws(' | ', concat_ws('.', table_catalog, table_schema, name),"
+        " nullif(trim(comment), ''))"
+    ),
+    NodeLabel.COLUMN: (
+        "concat_ws(' | ', concat_ws('.', table_catalog, table_schema, table_name, name),"
+        " data_type, nullif(trim(comment), ''))"
+    ),
+    NodeLabel.SCHEMA: (
+        "concat_ws(' | ', concat_ws('.', catalog_name, name), nullif(trim(comment), ''))"
+    ),
+    NodeLabel.DATABASE: "name",
+}

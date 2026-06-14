@@ -10,9 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from neocarta.connectors.databricks.contract import CONTRACT_VERSION, DATABASE_SERVICE
+from neocarta.connectors.databricks.contract import (
+    CONTRACT_VERSION,
+    DATABASE_SERVICE,
+    EMBEDDING_TEXT_EXPR,
+)
 from neocarta.connectors.databricks.ingest.contract_expr import id_expr
 from neocarta.connectors.utils.generate_id import compose_id
+from neocarta.enums import NodeLabel
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
@@ -29,7 +34,10 @@ def build_database_nodes(
     """Build one Database node per ingested catalog.
 
     A single-catalog run passes a one-element list, so the historical
-    one-Database-node behavior is preserved.
+    one-Database-node behavior is preserved. Carries the declared Database
+    properties plus a transient `embedding_text` (equal to `name`, the Database
+    embedding-text expression) so the inline embed stage is uniform across
+    labels; the write boundary strips `embedding_text`.
 
     `service` is the constant ``DATABASE_SERVICE`` ("DATABRICKS") — every
     catalog this connector ingests is a Unity Catalog catalog. `platform` is the
@@ -49,10 +57,11 @@ def build_database_nodes(
             StructField("service", StringType(), False),
             StructField("description", StringType(), True),
             StructField("contract_version", StringType(), False),
+            StructField("embedding_text", StringType(), False),
         ]
     )
     rows = [
-        (compose_id(c), c, platform, DATABASE_SERVICE, None, CONTRACT_VERSION) for c in catalogs
+        (compose_id(c), c, platform, DATABASE_SERVICE, None, CONTRACT_VERSION, c) for c in catalogs
     ]
     return spark.createDataFrame(rows, schema)
 
@@ -60,20 +69,24 @@ def build_database_nodes(
 def build_schema_nodes(schemata_df: DataFrame) -> DataFrame:
     """Build Schema nodes from information_schema.schemata rows.
 
-    Selects only the declared Schema properties; transform inputs
-    (`catalog_name`) do not leave the builder.
+    Computes `embedding_text` inline (while `catalog_name` is still in scope),
+    then selects only the declared Schema properties plus that one transient
+    `embedding_text` column. No helper column leaves the builder; the fail-closed
+    write boundary strips `embedding_text`.
     """
-    from pyspark.sql.functions import col, lit
+    from pyspark.sql.functions import col, expr, lit
 
     return (
         schemata_df.withColumn("id", id_expr("catalog_name", "schema_name"))
         .withColumn("name", col("schema_name"))
         .withColumn("contract_version", lit(CONTRACT_VERSION))
+        .withColumn("embedding_text", expr(EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA]))
         .select(
             "id",
             "name",
             col("comment").alias("description"),
             "contract_version",
+            "embedding_text",
         )
     )
 
@@ -84,14 +97,16 @@ def build_table_nodes(
 ) -> DataFrame:
     """Build Table nodes from information_schema.tables rows.
 
-    Selects only the declared Table properties; transform inputs
-    (`table_catalog` / `table_schema`) do not leave the builder. The `layer`
-    property is derived from `table_catalog` through the configured
-    catalog->layer map; catalogs absent from the map (or an empty map) yield a
-    null `layer` (contract v1.1, additive). `layer` is a real, declared
-    property.
+    Computes `embedding_text` inline (while `table_catalog` / `table_schema` are
+    still in scope), then selects only the declared Table properties plus that
+    one transient `embedding_text` column. `table_catalog` and `table_schema`
+    are transform inputs and do not leave the builder; the fail-closed write
+    boundary strips `embedding_text`. The `layer` property is derived from
+    `table_catalog` through the configured catalog->layer map; catalogs absent
+    from the map (or an empty map) yield a null `layer` (contract v1.1,
+    additive). `layer` is a real, declared property.
     """
-    from pyspark.sql.functions import col, lit, when
+    from pyspark.sql.functions import col, expr, lit, when
     from pyspark.sql.types import StringType
 
     layer_expr = lit(None).cast(StringType())
@@ -105,6 +120,7 @@ def build_table_nodes(
         .withColumn("schema", col("table_schema"))
         .withColumn("layer", layer_expr)
         .withColumn("contract_version", lit(CONTRACT_VERSION))
+        .withColumn("embedding_text", expr(EMBEDDING_TEXT_EXPR[NodeLabel.TABLE]))
         .select(
             "id",
             "name",
@@ -116,6 +132,7 @@ def build_table_nodes(
             "created",
             "last_altered",
             "contract_version",
+            "embedding_text",
         )
     )
 
@@ -128,9 +145,11 @@ def build_column_nodes(
 
     Converts Databricks YES/NO nullability strings into booleans while
     preserving ordinal position, data type, and comments for retrieval
-    context. Selects only the declared Column properties; the qualifying
-    columns (`table_catalog` / `table_schema` / `table_name`) are transform
-    inputs and do not leave the builder.
+    context. Computes `embedding_text` inline (while
+    `table_catalog` / `table_schema` / `table_name` are still in scope), then
+    selects only the declared Column properties plus that one transient
+    `embedding_text` column. The qualifying columns are transform inputs and do
+    not leave the builder; the fail-closed write boundary strips `embedding_text`.
 
     `is_primary_key` / `is_foreign_key` come from `constraints_df` (one
     boolean row per column, from the catalog's DECLARED PRIMARY KEY / FOREIGN
@@ -140,7 +159,7 @@ def build_column_nodes(
     neocarta core declared-only semantics. Inferred FK edges are a separate
     enrichment and never set these flags.
     """
-    from pyspark.sql.functions import coalesce, col, lit, when
+    from pyspark.sql.functions import coalesce, col, expr, lit, when
 
     keys = ["table_catalog", "table_schema", "table_name", "column_name"]
     if constraints_df is None:
@@ -165,6 +184,7 @@ def build_column_nodes(
             when(col("is_nullable") == "YES", True).when(col("is_nullable") == "NO", False),
         )
         .withColumn("contract_version", lit(CONTRACT_VERSION))
+        .withColumn("embedding_text", expr(EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN]))
         .select(
             "id",
             "name",
@@ -178,6 +198,7 @@ def build_column_nodes(
             "ordinal_position",
             col("comment").alias("description"),
             "contract_version",
+            "embedding_text",
         )
     )
 

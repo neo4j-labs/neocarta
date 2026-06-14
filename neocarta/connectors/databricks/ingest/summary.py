@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from neocarta.connectors.databricks.contract import NodeLabel
     from neocarta.connectors.databricks.ingest.fk.declared import DeclaredCounters
     from neocarta.connectors.databricks.ingest.transform.sample_values import SampleStats
 
@@ -130,6 +131,49 @@ class SampleValueCounts:
 
 
 @dataclass
+class EmbeddingCounts:
+    """Per-label inline-embedding bookkeeping.
+
+    Keyed by `NodeLabel` in memory; the `as_*_map` helpers flatten to
+    `dict[str, ...]` keyed by `label.value` for the serializable summary. Empty
+    by default, so external-mode runs carry an inert, all-null embedding view.
+    """
+
+    model: str | None = None
+    # The per-batch failure-*count* gate (`NEOCARTA_DATABRICKS_EMBEDDING_FAILURE_MAX`):
+    # the run aborts before writing a batch that produces more than this many
+    # failed-embedding rows. A raw count, not a rate — the measured rates live in
+    # `failure_rate_per_label`/`aggregate_failure_rate`. 0 means the gate is off.
+    failure_max: int | None = None
+    flags: dict[NodeLabel, bool] = field(default_factory=dict)
+    attempts: dict[NodeLabel, int] = field(default_factory=dict)
+    successes: dict[NodeLabel, int] = field(default_factory=dict)
+    failure_rate_per_label: dict[NodeLabel, float] = field(default_factory=dict)
+    ledger_hits: dict[NodeLabel, int] = field(default_factory=dict)
+    aggregate_failure_rate: float | None = None
+
+    def as_flags_map(self) -> dict[str, bool]:
+        """Return embedding enablement keyed by public node-label strings."""
+        return {k.value: v for k, v in self.flags.items()}
+
+    def as_attempts_map(self) -> dict[str, int]:
+        """Return embedding attempt counts keyed by public node-label strings."""
+        return {k.value: v for k, v in self.attempts.items()}
+
+    def as_successes_map(self) -> dict[str, int]:
+        """Return embedding success counts keyed by public node-label strings."""
+        return {k.value: v for k, v in self.successes.items()}
+
+    def as_failure_rate_map(self) -> dict[str, float]:
+        """Return per-label embedding failure rates keyed by public labels."""
+        return {k.value: v for k, v in self.failure_rate_per_label.items()}
+
+    def as_ledger_hits_map(self) -> dict[str, int]:
+        """Return per-label ledger hit counts keyed by public labels."""
+        return {k.value: v for k, v in self.ledger_hits.items()}
+
+
+@dataclass
 class RunSummary:
     """Run-level aggregate, returned to the caller of the ingest."""
 
@@ -145,6 +189,7 @@ class RunSummary:
     extract: ExtractCounts = field(default_factory=ExtractCounts)
     fk_declared: DeclaredCounters | None = None
     sample_values: SampleValueCounts | None = None
+    embeddings: EmbeddingCounts = field(default_factory=EmbeddingCounts)
     neo4j_counts: dict[str, int] = field(default_factory=dict)
     fk_skip: FKSkipCounts | None = None
     # Set to a loud message when the value path ran and found candidate columns
@@ -186,4 +231,12 @@ class RunSummary:
             "neo4j_counts": dict(self.neo4j_counts),
             "error": self.error,
             "value_sampling_warning": self.value_sampling_warning,
+            "embedding_model": self.embeddings.model,
+            "embedding_flags": self.embeddings.as_flags_map(),
+            "embedding_attempts": self.embeddings.as_attempts_map(),
+            "embedding_successes": self.embeddings.as_successes_map(),
+            "embedding_failure_rate_per_label": self.embeddings.as_failure_rate_map(),
+            "embedding_failure_rate": self.embeddings.aggregate_failure_rate,
+            "embedding_failure_max": self.embeddings.failure_max,
+            "embedding_ledger_hits": self.embeddings.as_ledger_hits_map(),
         }
