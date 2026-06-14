@@ -81,6 +81,40 @@ Mosaic AI External Models endpoint that proxies OpenAI `text-embedding-3-small`
 (1536 dimensions) and point `NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT` at it. Set
 `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION` to match the chosen endpoint.
 
+### Registering the OpenAI endpoint (manual step)
+
+Registering the External Models endpoint is a one-time manual step done outside
+the connector run. The repo ships a helper, `scripts/setup_openai_endpoint.py`,
+that automates it.
+
+1. Store the OpenAI key in a Databricks secret scope. The connector references
+   the secret, so the key value never leaves Databricks:
+
+   ```bash
+   databricks secrets create-scope neocarta-openai
+   databricks secrets put-secret neocarta-openai OPENAI_API_KEY
+   ```
+
+2. Create and verify the endpoint. The script creates the External Models
+   endpoint that proxies OpenAI `text-embedding-3-small` (1536-dim), then probes
+   it through the same `ai_query` path the connector uses to assert the returned
+   vector dimension:
+
+   ```bash
+   uv run scripts/setup_openai_endpoint.py --profile <profile>
+   ```
+
+   Pass `--skip-verify` to create the endpoint without the dimension probe, or
+   `--endpoint-name` / `--secret-scope` / `--secret-key` to override the
+   defaults. Run with `--help` for the full flag list.
+
+3. Point the connector at the endpoint:
+
+   ```bash
+   export NEOCARTA_DATABRICKS_EMBEDDING_ENDPOINT=openai-text-embedding-3-small
+   export NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION=1536
+   ```
+
 ## Two-step external flow
 
 External mode is two steps: run the Spark ingest job, then run the CLI embedding

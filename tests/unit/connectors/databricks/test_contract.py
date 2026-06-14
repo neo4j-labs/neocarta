@@ -61,11 +61,13 @@ def test_references_properties_exclude_join_endpoints():
     assert "target_column_id" not in REFERENCES_PROPERTIES
 
 
-def test_embedding_is_a_declared_property_for_every_label():
-    """Every managed label carries an `embedding` graph property (added by
-    inline embedding or by enrichment), so the write boundary allows it."""
-    for label in MANAGED_NODE_LABELS:
+def test_embedding_is_a_declared_property_for_every_embeddable_label():
+    """Every embeddable label carries an `embedding` graph property (added by
+    inline embedding or by enrichment), so the write boundary allows it. Value
+    is never embedded, so it has no `embedding` property."""
+    for label in set(MANAGED_NODE_LABELS) - {NodeLabel.VALUE}:
         assert "embedding" in NODE_PROPERTIES[label], f"{label} is missing `embedding`"
+    assert "embedding" not in NODE_PROPERTIES[NodeLabel.VALUE]
 
 
 def test_embedding_text_expr_covers_every_embeddable_label():

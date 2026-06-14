@@ -30,7 +30,7 @@ def _summary() -> RunSummary:
     return RunSummary(
         run_id="r1",
         job_name="databricks",
-        contract_version="1.1",
+        contract_version="1.0",
         catalog="c",
         schemas=["s"],
     )

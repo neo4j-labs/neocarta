@@ -229,6 +229,13 @@ ignore = [
     "N812",    # `functions as F` is the canonical PySpark import alias
     "PLC0415", # Lazy imports are intentional for optional Spark deps
 ]
+# Operational setup scripts (run via `uv run scripts/...`), not importable
+# modules: they predate neocarta's docstring gate the same way the connector
+# source does, so the missing-docstring presence rules (D1xx) are ignored here.
+"scripts/*.py" = [
+    "D100",    # Missing docstring in public module
+    "D103",    # Missing docstring in public function
+]
 "neocarta/enrichment/foreign_keys/**/*.py" = [
     "D100",
     "D101",

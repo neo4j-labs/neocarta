@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -67,6 +68,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _inject_cli_params() -> None:
+    """Fold ``KEY=VALUE`` argv tokens into ``os.environ`` for the wheel-job path.
+
+    Wheel-job launchers (e.g. a Databricks ``SparkPythonTask``) deliver
+    configuration as positional ``KEY=VALUE`` command-line arguments rather than
+    environment variables, while ``SparkIngestSettings`` reads only the
+    environment. This copies each such token into ``os.environ`` so the
+    env-driven settings see it. ``setdefault`` keeps any real environment
+    variable ahead of the command line (12-factor precedence); a token that is
+    not ``KEY=VALUE``, or that looks like a flag, is left untouched. Off-cluster
+    library and notebook runs carry no such tokens, so this is a no-op there.
+    """
+    for arg in sys.argv[1:]:
+        if arg.startswith("-"):
+            continue
+        key, sep, value = arg.partition("=")
+        if sep:
+            os.environ.setdefault(key, value)
+
+
 def run_ingest(
     *,
     settings: SparkIngestSettings | None = None,
@@ -80,8 +101,16 @@ def run_ingest(
     lazily, and Neo4j credentials come from the Databricks secret scope. Library
     consumers can pass an explicit ``SparkIngestSettings`` and/or a
     ``Neo4jConfig`` (e.g. running against a local or Spark Connect session).
+
+    On the no-argument wheel-job path, ``KEY=VALUE`` command-line tokens are
+    folded into ``os.environ`` before settings load, so launchers that deliver
+    config as positional args (rather than env vars) are read transparently.
     """
-    resolved_settings = settings if settings is not None else SparkIngestSettings()
+    if settings is not None:
+        resolved_settings = settings
+    else:
+        _inject_cli_params()
+        resolved_settings = SparkIngestSettings()
 
     if spark is None:
         from pyspark.sql import SparkSession

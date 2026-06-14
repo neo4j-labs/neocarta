@@ -28,54 +28,31 @@ from neocarta.enums import RelationshipType as RelType
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-# 1.1 adds the additive Table node `layer` property (bronze/silver/gold),
-# derived at ingest from a configurable catalog->layer map. Readers treat a
-# missing `layer` as null.
-# 1.2 makes structural identity first-class: Table nodes gain `catalog`,
-# `schema`; Column nodes gain `catalog`, `schema`, `table`. Previously the
-# only structural signal was the HAS_* edges plus an opaque hashed `id`, so
-# every consumer needing "which catalog/schema/table does this node belong
-# to" (batch-by-table-range, FK locality) had to re-join the cached
-# information_schema frames. Additive and readers treat the new properties
-# as authoritative scalar identity.
-# 1.3 stamps every Value node with `last_run` (the run-start timestamp),
-# `catalog`, and `schema`. This replaces the driver-collected stale-Value
-# purge (which paged catalog-scale column ids back to the driver) with a
-# single scoped server-side Cypher delete keyed on `last_run` < run-start
-# within the run's catalogs/schemas. Additive; readers treat the new
-# properties as authoritative.
-# 1.4 made Column key-likeness a first-class boolean `is_key_like` property
-# with a per-run `:KeyColumn` label projection. Both existed only to serve
-# the semantic-FK same-schema pre-filter and were removed in 1.5.
-# 1.5 removes semantic-similarity FK inference and everything that existed
-# only to support it: the `EdgeSource.SEMANTIC` provenance value, the
-# Column `is_key_like` property, the `:KeyColumn` label, and the
-# `keycolumn_embedding` vector index. Declared and metadata FK inference are
-# unchanged. Column embeddings and the per-label vector indexes used by
-# graph-RAG retrieval are unaffected. Readers of an older graph treat a
-# lingering `is_key_like`/`:KeyColumn`/`semantic` edge as inert.
-# 1.6 renames node properties to match the neocarta core RDBMS model
-# (neocarta/data_model/rdbms/core.py): the human-readable text on Schema,
-# Table, and Column nodes is `description` (was `comment`); the Column data
-# type is `type` (was `data_type`) and the Column nullability boolean is
-# `nullable` (was `is_nullable`). The rename happens only at the node-builder
-# `.select()` boundary; the Unity Catalog `information_schema` column names
-# (`comment`/`data_type`/`is_nullable`) are unchanged in the extract and FK
-# internals. This is a breaking rename; there is no legacy graph to migrate
-# (every run is a clean rebuild).
-# 1.7 aligns the Database and Column nodes with neocarta core. Database gains
-# three additive properties: `service` (always the constant "DATABRICKS" for
-# this connector), `platform` (the cloud tag — AWS/AZURE/GCP — sourced from
-# the optional NEOCARTA_DATABRICKS_PLATFORM config, null when unset), and `description`
-# (null; UC exposes no catalog comment in the extract today); both `platform`
-# and `service` are stored upper-cased to match the core convention. Column
-# gains two additive booleans, `is_primary_key` and `is_foreign_key`, derived
-# at extract time from the catalog's DECLARED constraints
-# (information_schema.table_constraints + key_column_usage), matching core's
-# declared-only semantics. Inferred REFERENCES edges never set these flags: an
-# inferred edge is a relationship, not a declared constraint. Readers of an
-# older graph treat the missing properties as null/false.
-CONTRACT_VERSION = "1.7"
+# Graph contract emitted by this connector. Every run is a clean rebuild, so
+# the version is a marker stamped on each node, not a migration target. The
+# shape extends the neocarta core RDBMS model (neocarta/data_model/rdbms) with
+# a few additive properties; the Pydantic subclasses in expanded.py are the
+# source of truth and NODE_PROPERTIES is derived from them.
+#
+# Node properties beyond core:
+#   Database: contract_version. service is the constant "DATABRICKS"; platform
+#     is the cloud tag (AWS/AZURE/GCP) from NEOCARTA_DATABRICKS_PLATFORM, null
+#     when unset. Both are stored upper-cased to match the core convention.
+#   Schema: contract_version.
+#   Table: catalog, schema, layer (bronze/silver/gold, from a configurable
+#     catalog->layer map, null when unmapped), table_type, created,
+#     last_altered, contract_version.
+#   Column: catalog, schema, table, ordinal_position, contract_version.
+#     is_primary_key / is_foreign_key come from the catalog's DECLARED
+#     constraints, matching core's declared-only semantics.
+#   Value: count, catalog, schema, last_run (run-start stamp; a scoped
+#     server-side delete purges Values older than the run start),
+#     contract_version. Values are never embedded.
+#
+# REFERENCES edges carry confidence, source, and criteria. source is an
+# EdgeSource value (declared or inferred from metadata); inferred edges never
+# set the Column key flags.
+CONTRACT_VERSION = "1.0"
 
 # The Database node `service` value. Constant for this connector: every
 # catalog this connector ingests lives in Databricks Unity Catalog. Upper-cased to

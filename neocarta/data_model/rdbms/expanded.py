@@ -484,9 +484,6 @@ class DatabricksValue(Value):
         default=None, description="Run-start stamp for scoped cleanup"
     )
     contract_version: str = Field(..., description="Graph contract version marker")
-    embedding: list[float] | None = Field(
-        default=None, description="Value embedding (added by enrichment)"
-    )
 
 
 class DatabricksReferences(References):

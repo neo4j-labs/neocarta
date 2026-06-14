@@ -103,8 +103,8 @@ def build_table_nodes(
     are transform inputs and do not leave the builder; the fail-closed write
     boundary strips `embedding_text`. The `layer` property is derived from
     `table_catalog` through the configured catalog->layer map; catalogs absent
-    from the map (or an empty map) yield a null `layer` (contract v1.1,
-    additive). `layer` is a real, declared property.
+    from the map (or an empty map) yield a null `layer`. `layer` is a real,
+    declared property.
     """
     from pyspark.sql.functions import col, expr, lit, when
     from pyspark.sql.types import StringType
