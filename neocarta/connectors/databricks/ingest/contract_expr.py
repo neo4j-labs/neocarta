@@ -21,7 +21,7 @@ _TRANSLATE_TO = "__"
 
 
 def id_expr_from_columns(*parts: Column) -> Column:
-    """Return a PySpark Column expression equivalent to generate_id().
+    """Return a PySpark Column expression equivalent to compose_id().
 
     Accepts arbitrary Column expressions, including literals. Use this when an
     identifier combines Python-known values with Spark row values.
@@ -32,7 +32,7 @@ def id_expr_from_columns(*parts: Column) -> Column:
 
 
 def id_expr(*column_names: str) -> Column:
-    """Return a PySpark Column expression equivalent to generate_id()."""
+    """Return a PySpark Column expression equivalent to compose_id()."""
     from pyspark.sql import functions as F
 
     return id_expr_from_columns(*(F.col(c) for c in column_names))

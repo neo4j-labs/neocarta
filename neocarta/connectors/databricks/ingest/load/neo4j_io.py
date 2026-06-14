@@ -107,9 +107,8 @@ def create_vector_indexes(driver: Driver, settings: SparkIngestSettings) -> None
     Called only when inline embeddings are enabled. One cosine vector index per
     label whose embedding flag is on, at `embedding_dimension`, reusing
     neocarta's shared :func:`neocarta.ingest.indexes.create_vector_index` so the
-    index name matches what the MCP server queries by. Value is never indexed
-    (see ``_VECTOR_INDEX_LABELS``); its flag embeds Value nodes but creates no
-    index.
+    index name matches what the MCP server queries by. Value is never embedded
+    or indexed (see ``_VECTOR_INDEX_LABELS``).
 
     Each mode owns its index config: inline creates these at its configured
     dimension; external mode leaves vector indexes to the enrichment layer.

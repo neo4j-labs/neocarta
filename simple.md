@@ -211,15 +211,21 @@ The point of it is cost and speed. Embedding calls cost money and time, and most
 
 **Decision: keep this as its own Phase 4**, after inline embeddings are working, rather than bundling it into the first inline release.
 
-### Phase 5: Cleanup and documentation
-- **Docs-review stage:** sweep every docstring and README in the connector and confirm none still describe removed behavior (the embed-and-chunk-loop, removed validators, the unmigrated verify subsystem).
-- Document both modes as equals in the connector README, including a "which mode to pick" section and the two-step external flow (Spark ingest job, then the CLI embedding command).
-- Update `CHANGELOG.md`.
-- Run `make fmt`, `make lint`, and the full test suite.
-- **Post-Phase-4 quality-review changes that still need documenting (done in code/tests, not yet in README/CHANGELOG):**
+### Phase 5: Cleanup and documentation — ✅ COMPLETE
+- [x] **Docs-review stage:** swept every docstring/comment in the connector for descriptions of removed behavior. Five files carried stale text and were fixed (no code logic changed):
+  - `ingest/transform/value_stage.py` — module + `ValueResult` + `transform_sample_values` docstrings still said the Value embed+write was "folded into the table-range chunk loop." Value is never embedded; rewritten to point at `run.py:_write_value_nodes`. Also dropped the stale reference to the removed value-embedding cross-field validator.
+  - `ingest/contract_expr.py` — module docstring + a comment claimed the Python id builders live in `neocarta.connectors.databricks.contract.generate_id`/`generate_value_id` (no such functions). Re-pointed to `neocarta.connectors.utils.generate_id` (`compose_id`/`generate_value_id`). (This was the Phase 1 deferred docstring.)
+  - `ingest/extract.py` — module docstring ("embedding enrichment happens later, before the Neo4j load") and `ExtractResult` ("fields mutable because enrichment replaces the node DataFrames in place after staging") described a mechanism that no longer exists; inline mode filters and embeds the frames per batch without reassigning them. Also fixed `unpersist_cached`'s reference to the dropped "verification steps."
+  - `ingest/load/neo4j_io.py` — `create_vector_indexes` docstring said Value's "flag embeds Value nodes"; the value-embedding flag was removed. Now reads "Value is never embedded or indexed."
+- [x] Document both modes as equals in the connector README, including a "which mode to pick" section and the two-step external flow (Spark ingest job, then the CLI embedding command). Created `neocarta/connectors/databricks/README.md` (execution model, external/inline modes, which-mode-to-pick, model/dimension consistency, the two-step external flow with `neocarta databricks embed`, the run-report capture via `SUMMARY_VOLUME`, the ledger cache, and a full `NEOCARTA_DATABRICKS_*` settings reference).
+- [x] Update `CHANGELOG.md`. Added four `Added` entries under `Upcoming`: inline embeddings + settings, the cross-run ledger, `SUMMARY_VOLUME` (with the `embedding_failure_max` output-key note), and the `neocarta databricks embed` CLI verb.
+- [x] Run `make fmt`, `make lint`, and the test suites.
+- **Post-Phase-4 quality-review changes that still need documenting (done in code/tests, not yet in README/CHANGELOG):** — ✅ now documented in the README and CHANGELOG entries above.
   - **`NEOCARTA_DATABRICKS_SUMMARY_VOLUME` (new optional setting).** When set to a `/Volumes/<cat>/<schema>/<vol>/<subdir>` subpath, each run writes `summary_<run_id>.json` (the flattened `RunSummary`) there; blank (default) disables it and the summary is only returned in memory + Neo4j counts logged. Mode-independent (both external and inline), durable (never deleted), best-effort (a write failure is logged, never raised, so it cannot mask the run outcome). Closes the "detached cluster job leaves no durable artifact" gap. Persistence lives inside `run_ingest`, so any caller — including the Phase 7 cluster entrypoint — gets it for free by setting the env var. Document it in the README's two-step external flow as the way to capture the run report.
   - **Run-summary key rename `embedding_failure_threshold` → `embedding_failure_max`.** This is a change to the connector's **public output shape** (the `RunSummary.to_dict()` JSON), so it needs a CHANGELOG note. The field held a per-batch failure *count* gate but was named/typed like a rate threshold; it is now `failure_max: int | None` emitted as `embedding_failure_max`, consistent with the `NEOCARTA_DATABRICKS_EMBEDDING_FAILURE_MAX` setting. No in-repo consumer read the old key, but an external operator script that calls `to_dict()` would see the new key.
   - **Minor cleanups (no doc impact, listed for completeness):** removed a dead `label` parameter from `add_embedding_column`; refreshed the `ledger.py` module docstring (dropped the stale "ported inert / tests land later" wording and the obsolete value-embedding mention); collapsed a redundant dual `except` in `staging.delete_transient`.
+
+**Phase 5 validation:** `make fmt` → 233 files unchanged; `make lint` → all checks passed. Default unit suite → 513 passed, 1 skipped. `--group databricks` (`tests/unit/connectors/databricks` + `tests/unit/enrichment/foreign_keys`) → 84 passed, 1 skipped. `make test-smoke` → 11 passed. Docstring-only/doc edits, so no test counts moved vs Phase 4's post-doc baseline. Live (cluster + Neo4j) verification remains the single post-3.5 pass.
 
 ### Phase 6: Build and version the connector wheel (neocarta side)
 

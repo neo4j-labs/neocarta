@@ -3,7 +3,8 @@
 This module does *only* UC extraction and DataFrame assembly for schemas,
 tables, and columns. FK discovery (declared, metadata) lives in
 `neocarta.connectors.databricks.ingest.fk.discovery` and runs against the extracted material.
-Embedding enrichment happens later in the ingestion pipeline, before the Neo4j load.
+In inline mode the node-write path embeds these frames per batch (see `run.py`);
+in external mode they reach Neo4j un-embedded and enrichment adds vectors later.
 """
 
 from __future__ import annotations
@@ -27,10 +28,10 @@ logger = logging.getLogger(__name__)
 class ExtractResult:
     """Raw UC extraction + node/rel DataFrames. No FK edges, no counters.
 
-    Fields are mutable only because embedding enrichment replaces the node
-    DataFrames in place after staging. The cached information_schema
-    DataFrames stay attached so later FK discovery and sample-value transforms
-    can reuse the same catalog snapshot.
+    A plain (mutable) dataclass: the node DataFrames are read, not reassigned —
+    inline mode filters and embeds them per batch without replacing them here.
+    The cached information_schema DataFrames stay attached so later FK discovery
+    and sample-value transforms can reuse the same catalog snapshot.
     """
 
     database_df: DataFrame
@@ -49,7 +50,7 @@ class ExtractResult:
 
         Extraction caches the three source DataFrames because several
         downstream steps read them. The pipeline calls this once the graph load
-        and verification steps no longer need the snapshot.
+        and the downstream transforms no longer need the snapshot.
         """
         self.schemata_df.unpersist()
         self.tables_df.unpersist()
