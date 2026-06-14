@@ -11,6 +11,40 @@ the Databricks Spark ingest is an optional extra on top of it. There are two
 ways to get it, depending on whether you are running off-cluster or on a
 Databricks cluster.
 
+### Build a wheel from source (deploy to a cluster)
+
+The schema ingest runs as a Spark wheel job on a Databricks cluster, so the
+connector is delivered as a wheel staged on a UC Volume. Build it from the repo
+root with `make`:
+
+```bash
+# In the neocarta repo root
+make build
+# produces dist/neocarta-<version>-py3-none-any.whl (and the sdist)
+```
+
+Optionally verify the built wheel before shipping it. `make databricks-wheel-test`
+clean-room installs `neocarta[databricks-spark]` into a fresh venv and runs the
+smoke suite against the wheel, catching modules or dependencies missing from the
+package that the editable source tree hides:
+
+```bash
+make databricks-wheel-test
+```
+
+Copy the `.whl` from `dist/` to a UC Volume (workspace uploader,
+`databricks fs cp`, or the Volumes UI) and point the notebook's `%pip install` at
+it, then add the `[databricks-spark]` extra on the cluster:
+
+```python
+%pip install "/Volumes/<catalog>/<schema>/<volume>/neocarta-<version>-py3-none-any.whl[databricks-spark]"
+```
+
+The Neo4j Spark Connector JAR is a separate, JVM-level cluster library; attach
+it once at the cluster level, not via pip. See
+[`examples/databricks/inline_embed_ingest.py`](../../../examples/databricks/inline_embed_ingest.py)
+for an end-to-end notebook.
+
 ### Install from PyPI (off-cluster / local development)
 
 ```bash
@@ -23,31 +57,6 @@ pip install "neocarta[databricks-spark]"
 
 `databricks-sdk` ships in the base install, so the only thing the extra adds is
 the heavy Spark dependency needed to actually run the ingest job.
-
-### Build a wheel from source (deploy to a cluster)
-
-The schema ingest runs as a Spark wheel job on a Databricks cluster, so the
-connector is delivered as a wheel staged on a UC Volume. Build it from the repo
-with `uv`:
-
-```bash
-# In the neocarta repo root
-uv build
-# produces dist/neocarta-<version>-py3-none-any.whl
-```
-
-Copy that single `.whl` to a UC Volume (workspace uploader, `databricks fs cp`,
-or the Volumes UI) and point the notebook's `%pip install` at it, then add the
-`[databricks-spark]` extra on the cluster:
-
-```python
-%pip install "/Volumes/<catalog>/<schema>/<volume>/neocarta-<version>-py3-none-any.whl[databricks-spark]"
-```
-
-The Neo4j Spark Connector JAR is a separate, JVM-level cluster library; attach
-it once at the cluster level, not via pip. See
-[`examples/databricks/inline_embed_ingest.py`](../../../examples/databricks/inline_embed_ingest.py)
-for an end-to-end notebook.
 
 ## Execution model
 
@@ -66,6 +75,30 @@ pip install neocarta[databricks-spark]
 Configuration is read from `NEOCARTA_DATABRICKS_*` environment variables.
 Databricks auth and connection (host, token, profile, cluster id) use the
 Databricks SDK's own `DATABRICKS_*` variables and are not redefined here.
+
+## Node identity
+
+Every node carries two identity fields with two distinct jobs:
+
+- `id` — the Neo4j MERGE key. It is an md5 hash of the node's lowercased dotted
+  path (`md5("catalog.schema.table.column")`), so it is a stable, opaque,
+  collision-free key. It is never parsed apart; the structural parts are stored
+  as their own properties (`catalog` / `schema` / `table`).
+- `qualified_name` — the human-readable form of that path
+  (`catalog.schema.table.column`), lowercased but otherwise verbatim. Kept for
+  debugging and hand-written Cypher.
+
+The id is hashed rather than stored as the dotted string to guarantee
+collision-safety. Unity Catalog allows hyphens in names (e.g.
+`graph-enriched-schema`), so a normalization that folded hyphens to underscores
+would let two distinct schemas collapse to one id and silently corrupt the graph
+on MERGE. Hashing the lossless lowercased path avoids this: because Unity Catalog
+forbids `.` (and spaces and control characters) inside object names, the dotted
+path is an unambiguous encoding of the identifier tuple, and its md5 is a
+collision-free key. This differs from the in-process connectors (BigQuery, CSV,
+Dataplex), which use the shared dotted-id scheme in
+`neocarta.connectors.utils.generate_id`. See
+`neocarta/connectors/databricks/ingest/contract_expr.py` for the full rationale.
 
 ## Embedding modes
 

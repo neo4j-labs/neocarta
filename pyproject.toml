@@ -31,9 +31,9 @@ dependencies = [
     "google-cloud-bigquery[pandas]>=3.40.0",
     "litellm>=1.55.0",
     "openai>=2.15.0",
-    "pydantic>=2.12.5",
+    "pydantic>=2.12.5,<2.13",
     "python-dotenv>=1.2.1",
-    "neo4j>=6.2.0",
+    "neo4j>=6.2.0,<6.3",
     "pandas>=2.0.0,<3",
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
@@ -42,7 +42,7 @@ dependencies = [
     # helpers (workspace/secret access, identifier parsing). Pure-Python and
     # small, so it lives in the base install; the heavy Spark dependency is
     # behind the `databricks-spark` extra.
-    "databricks-sdk>=0.40",
+    "databricks-sdk>=0.114.0,<0.115",
 ]
 
 [project.optional-dependencies]
@@ -67,8 +67,8 @@ cli = [
 # cluster). `databricks-sdk` is already a base dependency. pydantic-settings
 # backs the connector's env-driven SparkIngestSettings.
 databricks-spark = [
-    "pyspark>=4.1.2",
-    "pydantic-settings>=2.12.0",
+    "pyspark>=4.1.2,<4.2",
+    "pydantic-settings>=2.12.0,<2.13",
 ]
 
 [project.scripts]

@@ -12,6 +12,7 @@ import pytest
 
 pytest.importorskip("pyspark")
 
+from neocarta.connectors.databricks.ingest.contract_expr import node_id, qualified_name
 from neocarta.connectors.databricks.ingest.schema_graph import (
     build_column_nodes,
     build_database_nodes,
@@ -102,6 +103,21 @@ def test_column_nodes_embedding_text_includes_type_and_comment(local_spark):
     df = build_column_nodes(columns)
     assert "embedding_text" in df.columns
     assert _one(df, "embedding_text") == "sales.public.orders.total | DECIMAL | line total"
+
+
+def test_schema_node_id_and_qualified_name_agree_with_python(local_spark):
+    """The Spark builder's id/qualified_name match the Python builders byte-for-
+    byte, so driver-built edge endpoints (FK, candidates) connect to their nodes.
+    Hyphens are preserved in qualified_name and the id is the md5 of it."""
+    schemata = local_spark.createDataFrame(
+        [("sales", "graph-enriched-schema", "curated")],
+        ["catalog_name", "schema_name", "comment"],
+    )
+    df = build_schema_nodes(schemata)
+    assert _one(df, "id") == node_id("sales", "graph-enriched-schema")
+    assert _one(df, "qualified_name") == qualified_name("sales", "graph-enriched-schema")
+    assert _one(df, "qualified_name") == "sales.graph-enriched-schema"
+    assert len(_one(df, "id")) == 32  # md5 hex, not the readable path
 
 
 def test_builders_do_not_leak_information_schema_helpers(local_spark):

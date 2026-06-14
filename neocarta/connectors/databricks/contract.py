@@ -3,10 +3,14 @@
 Node labels and relationship types are the canonical neocarta enums
 (`neocarta.enums.NodeLabel` / `RelationshipType`); this connector manages only
 the subset listed in `MANAGED_NODE_LABELS` / `MANAGED_REL_TYPES`. Identifier
-production lives in `neocarta.connectors.utils.generate_id` (`compose_id` for
-the Python side; `ingest.contract_expr` for the byte-identical Spark side) — no
-id is built here. `EdgeSource` is connector-specific provenance with no
-neocarta-wide equivalent.
+production lives in `ingest.contract_expr`, which holds the byte-identical Python
+(`node_id` / `qualified_name`) and Spark (`node_id_expr` / `qualified_name_expr`)
+builders — no id is built here. The connector deliberately does NOT use the
+shared `neocarta.connectors.utils.generate_id` helpers: their normalization is
+lossy (it folds hyphens and spaces to underscores) and so is not collision-safe
+as a Unity Catalog identity key; see `ingest.contract_expr` for the full
+rationale. `EdgeSource` is connector-specific provenance with no neocarta-wide
+equivalent.
 """
 
 from __future__ import annotations
@@ -34,17 +38,23 @@ if TYPE_CHECKING:
 # a few additive properties; the Pydantic subclasses in expanded.py are the
 # source of truth and NODE_PROPERTIES is derived from them.
 #
+# Every node's `id` (the Neo4j MERGE key) is an md5 hash of its lowercased
+# dotted path, and `qualified_name` carries that readable path as a property.
+# The hash is the collision-safe identity key; the readable path is for humans.
+# See ingest.contract_expr for why the id is hashed rather than the dotted string.
+#
 # Node properties beyond core:
-#   Database: contract_version. service is the constant "DATABRICKS"; platform
-#     is the cloud tag (AWS/AZURE/GCP) from NEOCARTA_DATABRICKS_PLATFORM, null
-#     when unset. Both are stored upper-cased to match the core convention.
-#   Schema: contract_version.
-#   Table: catalog, schema, layer (bronze/silver/gold, from a configurable
-#     catalog->layer map, null when unmapped), table_type, created,
+#   Database: qualified_name, contract_version. service is the constant
+#     "DATABRICKS"; platform is the cloud tag (AWS/AZURE/GCP) from
+#     NEOCARTA_DATABRICKS_PLATFORM, null when unset. Both are stored upper-cased
+#     to match the core convention.
+#   Schema: qualified_name, contract_version.
+#   Table: qualified_name, catalog, schema, layer (bronze/silver/gold, from a
+#     configurable catalog->layer map, null when unmapped), table_type, created,
 #     last_altered, contract_version.
-#   Column: catalog, schema, table, ordinal_position, contract_version.
-#     is_primary_key / is_foreign_key come from the catalog's DECLARED
-#     constraints, matching core's declared-only semantics.
+#   Column: qualified_name, catalog, schema, table, ordinal_position,
+#     contract_version. is_primary_key / is_foreign_key come from the catalog's
+#     DECLARED constraints, matching core's declared-only semantics.
 #   Value: count, catalog, schema, last_run (run-start stamp; a scoped
 #     server-side delete purges Values older than the run start),
 #     contract_version. Values are never embedded.

@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from neocarta.connectors.databricks.contract import EdgeSource
+from neocarta.connectors.databricks.ingest.contract_expr import node_id
 from neocarta.connectors.databricks.ingest.fk.common import FKEdge
-from neocarta.connectors.utils.generate_id import compose_id
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
@@ -122,13 +122,13 @@ def discover_declared(
 
     edges: list[FKEdge] = []
     for r in fk_pairs_df.collect():
-        source_column_id = compose_id(
+        source_column_id = node_id(
             r["src_catalog"],
             r["src_schema"],
             r["src_table"],
             r["src_column"],
         )
-        target_column_id = compose_id(
+        target_column_id = node_id(
             r["tgt_catalog"],
             r["tgt_schema"],
             r["tgt_table"],

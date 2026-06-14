@@ -433,12 +433,18 @@ class HasTargetTable(BaseModel):
 class DatabricksDatabase(Database):
     """Database node emitted by the Databricks connector."""
 
+    qualified_name: str = Field(
+        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+    )
     contract_version: str = Field(..., description="Graph contract version marker")
 
 
 class DatabricksSchema(Schema):
     """Schema node emitted by the Databricks connector."""
 
+    qualified_name: str = Field(
+        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+    )
     contract_version: str = Field(..., description="Graph contract version marker")
 
 
@@ -447,6 +453,9 @@ class DatabricksTable(Table):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    qualified_name: str = Field(
+        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+    )
     catalog: str = Field(..., description="Unity Catalog catalog containing the table")
     schema_: str = Field(..., alias="schema", description="Schema containing the table")
     layer: str | None = Field(default=None, description="Medallion layer (bronze/silver/gold)")
@@ -463,6 +472,9 @@ class DatabricksColumn(Column):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    qualified_name: str = Field(
+        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+    )
     catalog: str = Field(..., description="Unity Catalog catalog containing the column")
     schema_: str = Field(..., alias="schema", description="Schema containing the column")
     table: str = Field(..., description="Table containing the column")

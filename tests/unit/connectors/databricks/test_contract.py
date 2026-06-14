@@ -48,6 +48,14 @@ def test_node_properties_declared_for_every_managed_label():
         assert NODE_PROPERTIES[label], f"{label} has no graph properties"
 
 
+def test_qualified_name_is_a_declared_property_for_node_labels():
+    """Database/Schema/Table/Column carry the readable `qualified_name` path
+    alongside their hashed `id`. Value nodes do not (no qualified path)."""
+    for label in (NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN):
+        assert "qualified_name" in NODE_PROPERTIES[label], f"{label} missing qualified_name"
+    assert "qualified_name" not in NODE_PROPERTIES[NodeLabel.VALUE]
+
+
 def test_schema_property_alias_surfaces_unprefixed():
     """The ``schema_`` field alias surfaces as the graph property ``schema``."""
     # Table and Column carry structural identity including the `schema` property.

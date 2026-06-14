@@ -15,8 +15,12 @@ from neocarta.connectors.databricks.contract import (
     DATABASE_SERVICE,
     EMBEDDING_TEXT_EXPR,
 )
-from neocarta.connectors.databricks.ingest.contract_expr import id_expr
-from neocarta.connectors.utils.generate_id import compose_id
+from neocarta.connectors.databricks.ingest.contract_expr import (
+    node_id,
+    node_id_expr,
+    qualified_name,
+    qualified_name_expr,
+)
 from neocarta.enums import NodeLabel
 
 if TYPE_CHECKING:
@@ -53,6 +57,7 @@ def build_database_nodes(
         [
             StructField("id", StringType(), False),
             StructField("name", StringType(), False),
+            StructField("qualified_name", StringType(), False),
             StructField("platform", StringType(), True),
             StructField("service", StringType(), False),
             StructField("description", StringType(), True),
@@ -61,7 +66,8 @@ def build_database_nodes(
         ]
     )
     rows = [
-        (compose_id(c), c, platform, DATABASE_SERVICE, None, CONTRACT_VERSION, c) for c in catalogs
+        (node_id(c), c, qualified_name(c), platform, DATABASE_SERVICE, None, CONTRACT_VERSION, c)
+        for c in catalogs
     ]
     return spark.createDataFrame(rows, schema)
 
@@ -77,13 +83,15 @@ def build_schema_nodes(schemata_df: DataFrame) -> DataFrame:
     from pyspark.sql.functions import col, expr, lit
 
     return (
-        schemata_df.withColumn("id", id_expr("catalog_name", "schema_name"))
+        schemata_df.withColumn("id", node_id_expr("catalog_name", "schema_name"))
         .withColumn("name", col("schema_name"))
+        .withColumn("qualified_name", qualified_name_expr("catalog_name", "schema_name"))
         .withColumn("contract_version", lit(CONTRACT_VERSION))
         .withColumn("embedding_text", expr(EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA]))
         .select(
             "id",
             "name",
+            "qualified_name",
             col("comment").alias("description"),
             "contract_version",
             "embedding_text",
@@ -114,8 +122,12 @@ def build_table_nodes(
         layer_expr = when(col("table_catalog") == catalog, lit(layer)).otherwise(layer_expr)
 
     return (
-        tables_df.withColumn("id", id_expr("table_catalog", "table_schema", "table_name"))
+        tables_df.withColumn("id", node_id_expr("table_catalog", "table_schema", "table_name"))
         .withColumn("name", col("table_name"))
+        .withColumn(
+            "qualified_name",
+            qualified_name_expr("table_catalog", "table_schema", "table_name"),
+        )
         .withColumn("catalog", col("table_catalog"))
         .withColumn("schema", col("table_schema"))
         .withColumn("layer", layer_expr)
@@ -124,6 +136,7 @@ def build_table_nodes(
         .select(
             "id",
             "name",
+            "qualified_name",
             "catalog",
             "schema",
             "layer",
@@ -174,8 +187,9 @@ def build_column_nodes(
         )
 
     return (
-        joined.withColumn("id", id_expr(*keys))
+        joined.withColumn("id", node_id_expr(*keys))
         .withColumn("name", col("column_name"))
+        .withColumn("qualified_name", qualified_name_expr(*keys))
         .withColumn("catalog", col("table_catalog"))
         .withColumn("schema", col("table_schema"))
         .withColumn("table", col("table_name"))
@@ -188,6 +202,7 @@ def build_column_nodes(
         .select(
             "id",
             "name",
+            "qualified_name",
             "catalog",
             "schema",
             "table",
@@ -208,12 +223,12 @@ def build_has_schema_rel(schemata_df: DataFrame) -> DataFrame:
 
     The Database source id is derived from each row's `catalog_name`, so a
     multi-catalog snapshot links every schema to its own Database node. This
-    matches `build_database_nodes`, whose id is `compose_id(catalog)` and
-    `id_expr("catalog_name")` applies the same normalization.
+    matches `build_database_nodes`, whose id is `node_id(catalog)` and
+    `node_id_expr("catalog_name")` produces the byte-identical hash.
     """
     return (
-        schemata_df.withColumn("source_id", id_expr("catalog_name"))
-        .withColumn("target_id", id_expr("catalog_name", "schema_name"))
+        schemata_df.withColumn("source_id", node_id_expr("catalog_name"))
+        .withColumn("target_id", node_id_expr("catalog_name", "schema_name"))
         .select("source_id", "target_id")
     )
 
@@ -221,8 +236,8 @@ def build_has_schema_rel(schemata_df: DataFrame) -> DataFrame:
 def build_has_table_rel(tables_df: DataFrame) -> DataFrame:
     """Build Schema -> Table edges for every table in scope."""
     return (
-        tables_df.withColumn("source_id", id_expr("table_catalog", "table_schema"))
-        .withColumn("target_id", id_expr("table_catalog", "table_schema", "table_name"))
+        tables_df.withColumn("source_id", node_id_expr("table_catalog", "table_schema"))
+        .withColumn("target_id", node_id_expr("table_catalog", "table_schema", "table_name"))
         .select("source_id", "target_id")
     )
 
@@ -230,9 +245,11 @@ def build_has_table_rel(tables_df: DataFrame) -> DataFrame:
 def build_has_column_rel(columns_df: DataFrame) -> DataFrame:
     """Build Table -> Column edges for every column in scope."""
     return (
-        columns_df.withColumn("source_id", id_expr("table_catalog", "table_schema", "table_name"))
+        columns_df.withColumn(
+            "source_id", node_id_expr("table_catalog", "table_schema", "table_name")
+        )
         .withColumn(
-            "target_id", id_expr("table_catalog", "table_schema", "table_name", "column_name")
+            "target_id", node_id_expr("table_catalog", "table_schema", "table_name", "column_name")
         )
         .select("source_id", "target_id")
     )

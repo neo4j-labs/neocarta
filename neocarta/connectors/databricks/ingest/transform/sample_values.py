@@ -13,8 +13,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar
 
 from neocarta.connectors.databricks.contract import CONTRACT_VERSION
-from neocarta.connectors.databricks.ingest.contract_expr import id_expr_from_columns, value_id_expr
-from neocarta.connectors.utils.generate_id import compose_id
+from neocarta.connectors.databricks.ingest.contract_expr import (
+    node_id,
+    node_id_expr_from_columns,
+    value_id_expr,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -208,8 +211,8 @@ def _candidates_from_columns_df(
         sch = row["table_schema"]
         tbl = row["table_name"]
         names: list[str] = list(row["column_names"])
-        # IDs are computed from compose_id(), byte-identical to id_expr() in Spark.
-        ids = [compose_id(cat, sch, tbl, name) for name in names]
+        # IDs are computed from node_id(), byte-identical to node_id_expr() in Spark.
+        ids = [node_id(cat, sch, tbl, name) for name in names]
         out.append(
             TableCandidate(
                 catalog=cat,
@@ -328,7 +331,7 @@ def _sample_values(
                     spark.sql(query)
                     .withColumn(
                         "col_id",
-                        id_expr_from_columns(
+                        node_id_expr_from_columns(
                             lit(cand.catalog),
                             lit(cand.schema_name),
                             lit(cand.table_name),
