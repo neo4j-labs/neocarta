@@ -34,7 +34,7 @@ The good news: the inline embedding code already exists, is tested, and uses no 
 - During the node-write loop, each batch runs `ai_query('<endpoint>', embedding_text, failOnError => false)` natively in Spark. No Python UDFs, no driver-side collection of table data.
 - The embedding text per node type comes from a single `EMBEDDING_TEXT_EXPR` map (for example a Column embeds its fully qualified name plus data type plus comment).
 - Each node type can be turned on independently (tables, columns, values, schemas, databases). All default to off.
-- A per-label cosine vector index named `{Label}_vector_index` is created when that label's flag is on. Value is written but not indexed, matching the original design.
+- A per-label cosine vector index named `{label}_vector_index` is created when that label's flag is on. Value is written but not indexed, matching the original design.
 - A failure gate can abort a batch before it is written to Neo4j if too many rows fail to embed.
 - An optional cross-run "ledger" cache can skip `ai_query` for unchanged nodes.
 
@@ -66,7 +66,7 @@ To make inline match an OpenAI-based neocarta graph, the branch already includes
 - Port `ledger.py` plus its settings if we want the cross-run cache. The module is ported **inert** in Phase 3 (so `embed_stage.py` imports cleanly) but its flag stays off and its settings wiring + tests land in Phase 4. See the Phase 3 / Phase 4 notes.
 - Add `EMBEDDING_TEXT_EXPR`, the `embedding` property, and the default endpoint constant to the connector's `contract.py`, and make the node builders in `schema_graph.py` and `sample_values.py` attach the `embedding_text` column.
 - Add the embedding preflight check (ping the endpoint, confirm the returned vector length matches the configured dimension) to `ingest/preflight.py`.
-- Create the per-label `{Label}_vector_index` cosine indexes in `ingest/load/neo4j_io.py` when inline mode is on.
+- Create the per-label `{label}_vector_index` cosine indexes in `ingest/load/neo4j_io.py` when inline mode is on.
 - Change the node-write path in `run.py` so that, when embeddings are enabled, writes go through the batched embed-and-write loop; when disabled, the current direct write is used unchanged.
 - Port the embedding and ledger tests from `dbxcarta/tests/spark/embeddings/` and `dbxcarta/tests/spark/ledger/` into the connector's test tree.
 
@@ -299,4 +299,4 @@ Step 3 downloads pyspark (large), so the first install takes a few minutes.
 - The default endpoint is `databricks-gte-large-en` at dimension 1024. The dimension is configurable and is checked against the endpoint at preflight.
 - The result is frozen to a transient Delta path and read back so `ai_query` runs exactly once per item, and the same frozen result feeds both the failure gate and the Neo4j write.
 - Only the `embedding` vector reaches the graph. All bookkeeping columns (text hash, model, timestamp, error) are stripped by the fail-closed projection before the write.
-- Vector indexes use cosine similarity and follow the `{Label}_vector_index` naming the MCP layer already expects.
+- Vector indexes use cosine similarity and follow the `{label}_vector_index` naming the MCP layer already expects.

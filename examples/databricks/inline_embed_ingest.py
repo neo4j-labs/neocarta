@@ -39,7 +39,10 @@
 # MAGIC   dimensions) and set `EMBEDDING_DIMENSION` to match.
 # MAGIC - The neocarta **connector wheel staged on a UC Volume** (see below).
 # MAGIC - A writable **UC Volume** path for the transient per-batch embedding
-# MAGIC   staging (`EMBEDDING_STAGING_VOLUME`).
+# MAGIC   staging (`EMBEDDING_STAGING_VOLUME`). This must be a *subpath* of an
+# MAGIC   existing volume — `/Volumes/<catalog>/<schema>/<volume>/<subdir>` (five
+# MAGIC   segments). The connector writes under `<subdir>`, never at the volume
+# MAGIC   root, so the `<volume>` segment cannot be omitted.
 # MAGIC
 # MAGIC ### Staging the wheel for local testing
 # MAGIC
@@ -97,6 +100,12 @@ NEO4J_PASSWORD = "<password>"
 EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
 EMBEDDING_DIMENSION = 1536
 # Writable UC Volume subpath for the transient per-batch ai_query materialization.
+# This MUST be /Volumes/<catalog>/<schema>/<volume>/<subdir> — five path
+# segments. <volume> is an existing UC Volume; <subdir> is a directory the
+# connector creates and writes under it (it never writes at the volume root).
+# A common mistake is dropping the <volume> segment, e.g.
+#   /Volumes/my_catalog/my_schema/embed_staging        # WRONG (only the volume, no subdir)
+#   /Volumes/my_catalog/my_schema/staging/embed_staging # RIGHT (volume=staging, subdir=embed_staging)
 EMBEDDING_STAGING_VOLUME = "/Volumes/<catalog>/<schema>/<volume>/embed_staging"
 
 # COMMAND ----------
@@ -168,8 +177,8 @@ print(json.dumps(summary.to_dict(), indent=2))
 # MAGIC ## What next
 # MAGIC
 # MAGIC - In Neo4j, the inline run created per-label cosine vector indexes named
-# MAGIC   `{Label}_vector_index` (for example `Table_vector_index`,
-# MAGIC   `Column_vector_index`) at the configured dimension. These are the indexes
+# MAGIC   `{label}_vector_index` (for example `table_vector_index`,
+# MAGIC   `column_vector_index`) at the configured dimension. These are the indexes
 # MAGIC   the MCP server queries.
 # MAGIC - **Model/dimension consistency:** this notebook embeds with the
 # MAGIC   1536-dimension OpenAI `openai-text-embedding-3-small` endpoint, which

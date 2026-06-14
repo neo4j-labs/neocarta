@@ -42,7 +42,7 @@ During the node-write loop, each batch runs
 `ai_query('<endpoint>', embedding_text, failOnError => false)` natively in
 Spark against a Databricks model-serving endpoint. There are no Python UDFs and
 no driver-side collection of table data. Each label can be enabled
-independently, and a per-label `{Label}_vector_index` cosine index is created
+independently, and a per-label `{label}_vector_index` cosine index is created
 for each enabled label at the configured dimension. Turn inline on by setting
 one or more of the `include_embeddings_*` flags and an
 `NEOCARTA_DATABRICKS_EMBEDDING_STAGING_VOLUME`.
