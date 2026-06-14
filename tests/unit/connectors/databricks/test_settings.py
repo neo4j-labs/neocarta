@@ -166,3 +166,21 @@ def test_ledger_path_rejects_path_traversal_segments():
     """A `..` segment in the ledger path is rejected as an invalid segment."""
     with pytest.raises(ValueError, match="invalid path segment"):
         SparkIngestSettings(catalog="c", ledger_path="/Volumes/cat/schema/vol/../ledger")
+
+
+def test_summary_volume_is_blank_by_default():
+    """Summary persistence is off by default (blank path)."""
+    settings = SparkIngestSettings(catalog="c")
+    assert settings.summary_volume == ""
+
+
+def test_explicit_summary_volume_is_accepted_and_trailing_slash_trimmed():
+    """An explicit /Volumes summary path is accepted with its trailing slash trimmed."""
+    settings = SparkIngestSettings(catalog="c", summary_volume="/Volumes/cat/schema/vol/runs/")
+    assert settings.summary_volume == "/Volumes/cat/schema/vol/runs"
+
+
+def test_summary_volume_rejects_a_non_volumes_subpath():
+    """A summary path that is not a /Volumes subpath fails at config load."""
+    with pytest.raises(ValueError, match="NEOCARTA_DATABRICKS_SUMMARY_VOLUME"):
+        SparkIngestSettings(catalog="c", summary_volume="/tmp/runs")

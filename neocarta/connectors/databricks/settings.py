@@ -68,6 +68,13 @@ class SparkIngestSettings(BaseSettings):
     # column count exceeds it, declared-FK discovery is skipped (extract and load
     # still run) and the skip is recorded in the run summary.
     fk_max_columns: int = 0
+    # Optional durable UC Volume subpath (/Volumes/<cat>/<schema>/<vol>/<subdir>)
+    # where each run writes summary_<run_id>.json (the flattened RunSummary).
+    # Mode-independent: written in both external and inline mode. Blank (default)
+    # disables persistence — the summary is still returned in memory and the
+    # Neo4j counts are still logged. Unlike `embedding_staging_volume` this path
+    # is durable (never deleted) and is never required.
+    summary_volume: str = ""
     # Inline embedding feature flags — all off by default; turn on one label at a
     # time. When all are off the connector runs in external mode (no vectors;
     # `neocarta.enrichment` adds them later). When any is on, the node-write loop
@@ -217,6 +224,20 @@ class SparkIngestSettings(BaseSettings):
     def _validate_embedding_endpoint(cls, v: str) -> str:
         """Reject endpoint names that cannot be safely interpolated into SQL."""
         return validate_serving_endpoint_name(v)
+
+    @field_validator("summary_volume")
+    @classmethod
+    def _validate_summary_volume(cls, v: str) -> str:
+        """Normalize the optional run-summary Volume path; blank stays blank.
+
+        Blank (the default) disables summary persistence. When set it must be a
+        /Volumes/<catalog>/<schema>/<volume>/<subdir> subpath, validated like the
+        staging volume, with the trailing slash trimmed; each run writes
+        summary_<run_id>.json beneath it.
+        """
+        if not v.strip():
+            return ""
+        return validate_uc_volume_subpath(v.strip(), label="NEOCARTA_DATABRICKS_SUMMARY_VOLUME")
 
     @field_validator("ledger_path")
     @classmethod

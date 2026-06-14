@@ -1,13 +1,17 @@
-"""Pure-Python tests for inline-embedding reporting and path resolution.
+"""Pure-Python tests for run-summary reporting, persistence, and path resolution.
 
 These cover the embedding bookkeeping that is plain arithmetic and dict
 flattening (`finalize_embedding_summary`, `EmbeddingCounts`, `RunSummary`
-embedding keys) plus the staging/ledger path helpers, none of which touch Spark
-or Neo4j. They run in the default ``test-unit`` group exactly like the settings
-tests; the Spark-logic embedding tests live in ``test_embeddings.py``.
+embedding keys), the `_persist_summary` UC Volume write, and the staging/ledger
+path helpers, none of which touch Spark or Neo4j. They run in the default
+``test-unit`` group exactly like the settings tests; the Spark-logic embedding
+tests live in ``test_embeddings.py``.
 """
 
 from __future__ import annotations
+
+import json
+from types import SimpleNamespace
 
 from neocarta.connectors.databricks.contract import NodeLabel
 from neocarta.connectors.databricks.ingest.summary import EmbeddingCounts, RunSummary
@@ -143,3 +147,43 @@ def test_resolve_ledger_path_uses_explicit_ledger_path_when_set():
     """An explicit ledger_path wins over the sibling default, slash trimmed."""
     settings = _inline_settings(ledger_path="/Volumes/c/s/v/my_ledger/")
     assert resolve_ledger_path(settings) == "/Volumes/c/s/v/my_ledger"
+
+
+def test_persist_summary_writes_json_named_by_run_id_when_volume_set(tmp_path):
+    """A set summary_volume gets summary_<run_id>.json with the flattened summary.
+
+    A SimpleNamespace stub stands in for settings so the test can target a real
+    temp dir (the /Volumes validator would reject one on the real settings).
+    """
+    from neocarta.connectors.databricks.run import _persist_summary
+
+    summary = _summary()
+    summary.finish(status="success")
+
+    _persist_summary(SimpleNamespace(summary_volume=f"{tmp_path}/"), summary)
+
+    out = tmp_path / "summary_r1.json"
+    assert out.exists()
+    payload = json.loads(out.read_text())
+    assert payload["run_id"] == "r1"
+    assert payload["status"] == "success"
+
+
+def test_persist_summary_is_noop_when_volume_blank(tmp_path):
+    """A blank summary_volume writes nothing (persistence disabled by default)."""
+    from neocarta.connectors.databricks.run import _persist_summary
+
+    _persist_summary(SimpleNamespace(summary_volume=""), _summary())
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_persist_summary_swallows_write_error(tmp_path):
+    """A write failure is logged, never raised, so it cannot mask the run outcome."""
+    from neocarta.connectors.databricks.run import _persist_summary
+
+    # Parent directory is absent, so the write raises OSError internally.
+    missing = tmp_path / "absent_dir"
+    _persist_summary(SimpleNamespace(summary_volume=str(missing)), _summary())
+
+    assert not missing.exists()

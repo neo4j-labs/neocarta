@@ -17,8 +17,10 @@ ingests catalog facts only.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from neocarta.connectors.databricks.contract import (
@@ -97,7 +99,32 @@ def run_ingest(
         # RunSummary.error before re-raising so a Databricks job still fails.
         summary.finish(status="failure", error=str(exc))
         raise
+    finally:
+        # Persist the finished summary (success or failure) so a failed run still
+        # leaves an artifact. Best-effort: a write failure is logged, never
+        # raised, so it cannot flip a green run red or mask the original error.
+        _persist_summary(resolved_settings, summary)
     return summary
+
+
+def _persist_summary(settings: SparkIngestSettings, summary: RunSummary) -> None:
+    """Write the flattened summary to the configured UC Volume, if any.
+
+    No-op when ``summary_volume`` is blank (the default): the summary is still
+    returned in memory and the Neo4j counts are still logged. When set, writes
+    ``summary_<run_id>.json`` beneath the (durable, never-deleted) Volume path.
+    On a Databricks cluster ``/Volumes/...`` is a FUSE-mounted local path, so a
+    plain file write reaches the Volume. A write failure is logged, not raised.
+    """
+    root = settings.summary_volume.strip()
+    if not root:
+        return
+    path = f"{root.rstrip('/')}/summary_{summary.run_id}.json"
+    try:
+        Path(path).write_text(json.dumps(summary.to_dict(), indent=2), encoding="utf-8")
+        logger.info("[neocarta] wrote run summary to %s", path)
+    except OSError as exc:
+        logger.warning("[neocarta] failed to write run summary to %s: %s", path, exc)
 
 
 def _build_summary(
