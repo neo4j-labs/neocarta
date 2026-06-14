@@ -199,12 +199,14 @@ def format_schema_context(retrieved_tables: list[dict]) -> str:
     """Render retrieved tables as a compact schema description for the prompt."""
     blocks = []
     for table in retrieved_tables:
-        fqn = f"{table['catalog']}.{table['schema_name']}.{table['table_name']}"
+        # Backtick each identifier part so names with hyphens or other
+        # special characters are valid unquoted-identifier-free Spark SQL.
+        fqn = f"`{table['catalog']}`.`{table['schema_name']}`.`{table['table_name']}`"
         lines = [f"Table: {fqn}"]
         if table.get("description"):
             lines.append(f"  -- {table['description']}")
         for col in table["columns"]:
-            line = f"  {col['name']} {col['type'] or ''}".rstrip()
+            line = f"  `{col['name']}` {col['type'] or ''}".rstrip()
             notes = []
             if col.get("description"):
                 notes.append(col["description"])
@@ -227,8 +229,9 @@ print(schema_context)
 # MAGIC
 # MAGIC Sends the question and the retrieved schema to the foundation-model
 # MAGIC endpoint and asks for a single Spark SQL statement that uses only those
-# MAGIC tables, with fully-qualified `catalog.schema.table` names. Any Markdown code
-# MAGIC fence the model adds is stripped off.
+# MAGIC tables, with fully-qualified, backtick-quoted `` `catalog`.`schema`.`table` ``
+# MAGIC names so identifiers with hyphens or other special characters parse
+# MAGIC correctly. Any Markdown code fence the model adds is stripped off.
 
 # COMMAND ----------
 
@@ -239,6 +242,7 @@ PROMPT_TEMPLATE = """You are a Spark SQL expert. Write a single Spark SQL query 
 Rules:
 - Use ONLY the tables and columns listed below.
 - Always use fully-qualified names: catalog.schema.table.
+- Backtick-quote every identifier part, e.g. `catalog`.`schema`.`table` and `column`, so names with hyphens, spaces, or other special characters parse correctly.
 - Return only the SQL, with no explanation and no markdown fences.
 
 Schema:
@@ -271,10 +275,21 @@ print(generated_sql)
 # MAGIC above before running this cell.** The retrieval and prompt steer toward
 # MAGIC read-only `SELECT`s, but nothing here enforces that, so inspect the
 # MAGIC statement first.
+# MAGIC
+# MAGIC Capture the result in a DataFrame so it can be reused for further analysis.
 
 # COMMAND ----------
 
-display(spark.sql(generated_sql))  # noqa: F821 — spark/display provided by the runtime
+result_df = spark.sql(generated_sql)  # noqa: F821 — spark provided by the runtime
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Show the result
+
+# COMMAND ----------
+
+display(result_df)  # noqa: F821 — display provided by the runtime
 
 # COMMAND ----------
 
