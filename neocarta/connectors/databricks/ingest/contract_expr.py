@@ -1,9 +1,10 @@
 """PySpark Column expressions for graph contract identifiers.
 
-Spark-side counterparts of `neocarta.connectors.databricks.contract.generate_id` and
-`generate_value_id`. The Python and SQL implementations must agree
-byte-for-byte; this agreement is maintained by keeping the two normalizations in
-lockstep (there is no separate runtime check enforcing it).
+Spark-side counterparts of the Python id builders in
+`neocarta.connectors.utils.generate_id` (`compose_id` and `generate_value_id`).
+The Python and SQL implementations must agree byte-for-byte; this agreement is
+maintained by keeping the two normalizations in lockstep (there is no separate
+runtime check enforcing it).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from pyspark.sql import Column
 
 # Characters translated in normalization: space→_, hyphen→_.
-# Mirrors the substitutions in neocarta.connectors.databricks.contract.generate_id.
+# Mirrors the substitutions in neocarta.connectors.utils.generate_id.compose_id.
 _TRANSLATE_FROM = " -"
 _TRANSLATE_TO = "__"
 

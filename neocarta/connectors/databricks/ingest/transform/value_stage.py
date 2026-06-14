@@ -1,12 +1,11 @@
 """Sample-values transform stage.
 
 Samples distinct column values and returns the sampled-value frames. This
-stage no longer writes Value nodes or purges stale ones: the Value embed +
-Neo4j write is folded into the table-range chunk loop (so a Value slice
-embeds and writes alongside its Column slice), and stale-Value cleanup is a
-single scoped server-side Cypher delete keyed on the run-start stamp. The
-un-embedded sampled frame is returned whole for that per-chunk write, for
-FK discovery, and for the HAS_VALUE relationship write in `_load`, so value
+stage no longer writes Value nodes or purges stale ones: Value nodes are
+written (never embedded) by `run.py:_write_value_nodes`, and stale-Value
+cleanup is a single scoped server-side Cypher delete keyed on the run-start
+stamp. The sampled frame is returned whole for that Value write, for FK
+discovery, and for the HAS_VALUE relationship write in `_load`, so value
 sampling stays a single bounded pass.
 """
 
@@ -30,15 +29,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ValueResult:
-    """Sample-values output passed from transform into the chunk loop, FK
+    """Sample-values output passed from transform into the Value write, FK
     discovery, and load.
 
     The pipeline uses `None` instead of an empty ValueResult when sampling is
     disabled, so downstream branches can cleanly skip Value nodes and HAS_VALUE
     relationships without inspecting Spark DataFrames. `value_node_df` is the
-    un-embedded sampled frame: the chunk loop slices it per table range to
-    embed+write the Value nodes, FK discovery joins on sampled values (never
-    the embedding vector), and `_load` writes HAS_VALUE from it.
+    sampled frame: `run.py:_write_value_nodes` writes the Value nodes from it
+    (un-embedded), FK discovery joins on sampled values, and `_load` writes
+    HAS_VALUE from it.
     """
 
     value_node_df: DataFrame
@@ -46,17 +45,16 @@ class ValueResult:
     sample_stats: sv.SampleStats
     # Cached sampled-value DataFrame backing value_node_df and has_value_df.
     # None when nothing was cached. The pipeline releases this only after the
-    # chunk-loop Value writes, FK discovery, and the Neo4j load have finished,
+    # Value writes, FK discovery, and the Neo4j load have finished,
     # mirroring ExtractResult.unpersist_cached().
     cache_handle: DataFrame | None = None
 
     def unpersist_cached(self) -> None:
         """Release the cached sampled-value DataFrame after the ingest run.
 
-        Sampling caches raw_df because the per-chunk Value writes, FK
-        discovery, and the HAS_VALUE write all read it. The pipeline calls
-        this once those steps no longer need the cache. Idempotent and a
-        no-op when nothing cached.
+        Sampling caches raw_df because the Value writes, FK discovery, and the
+        HAS_VALUE write all read it. The pipeline calls this once those steps no
+        longer need the cache. Idempotent and a no-op when nothing cached.
         """
         if self.cache_handle is not None:
             self.cache_handle.unpersist()
@@ -71,16 +69,14 @@ def transform_sample_values(
 ) -> ValueResult | None:
     """Sample distinct values and return the sampled-value frames.
 
-    Sampling-only: the Value embed + Neo4j write now happens in the
-    table-range chunk loop, and stale-Value cleanup is a single scoped
-    server-side delete after the loop. Returns None when
-    NEOCARTA_DATABRICKS_INCLUDE_VALUES is off; the Settings cross-field validator
-    already rejects the embedding-values-without-include-values incoherence,
-    so no warning branch is needed here.
+    Sampling-only: Value nodes are written (never embedded) by
+    `run.py:_write_value_nodes`, and stale-Value cleanup is a single scoped
+    server-side delete after the writes. Returns None when
+    NEOCARTA_DATABRICKS_INCLUDE_VALUES is off.
 
     Value sampling is a single bounded pass (sample_limit + the cardinality
-    threshold, not the n² FK blowup); the whole un-embedded frame is returned
-    so the chunk loop can slice it by table range.
+    threshold, not the n² FK blowup); the whole sampled frame is returned so
+    `_write_value_nodes` can write it.
     """
     if not settings.include_values:
         return None

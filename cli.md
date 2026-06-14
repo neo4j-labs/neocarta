@@ -54,3 +54,10 @@ A notebook can download the libraries and run the pipeline. A cell can install t
 
 * Agree on the connector wheel name and version scheme, since it is the one contract between the two projects.
 * Decide which package index is used for publishing and pulling.
+
+
+### Notes 
+
+The CLI needs the cli extra to actually run. The command depends on click / rich / pydantic-settings, which live in neocarta[cli], not the base install. So the realistic operator setup is neocarta[cli] (to get the neocarta databricks embed console command) — neocarta[databricks-spark] is for the cluster wheel that runs the ingest, a separate concern.
+
+So the two-step external flow is: run the Spark ingest job (cluster, neocarta[databricks-spark]), then run neocarta databricks embed (operator machine, neocarta[cli]).
