@@ -31,18 +31,13 @@ dependencies = [
     "google-cloud-bigquery[pandas]>=3.40.0",
     "litellm>=1.55.0",
     "openai>=2.15.0",
-    "pydantic>=2.12.5,<2.13",
+    "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
-    "neo4j>=6.2.0,<6.3",
+    "neo4j>=6.1.0",
     "pandas>=2.0.0,<3",
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
     "google-cloud-bigquery-storage>=2.36.2",
-    # Lightweight Databricks SDK — used by the Databricks connector's platform
-    # helpers (workspace/secret access, identifier parsing). Pure-Python and
-    # small, so it lives in the base install; the heavy Spark dependency is
-    # behind the `databricks-spark` extra.
-    "databricks-sdk>=0.114.0,<0.115",
 ]
 
 [project.optional-dependencies]
@@ -61,14 +56,17 @@ cli = [
     "rich>=13.0.0",
     "pydantic-settings>=2.12.0",
 ]
-# Spark dependencies for the Databricks connector. The connector ingests Unity
+# Dependencies for the Databricks connector. The connector ingests Unity
 # Catalog schema via a Spark job; pyspark is the heavy dependency, so it is
 # optional and only needed to actually run the connector (locally / on a
-# cluster). `databricks-sdk` is already a base dependency. pydantic-settings
-# backs the connector's env-driven SparkIngestSettings.
+# cluster). databricks-sdk is only imported lazily (databricks.sdk.runtime,
+# available on a cluster) for secret-scope and dbutils access, so it lives here
+# rather than in the base install. pydantic-settings backs the connector's
+# env-driven SparkIngestSettings.
 databricks-spark = [
     "pyspark>=4.1.2,<4.2",
     "pydantic-settings>=2.12.0,<2.13",
+    "databricks-sdk>=0.114.0,<0.115",
 ]
 
 [project.scripts]
@@ -145,7 +143,6 @@ ignore = [
     "CPY",     # No copyright
     "D205",    # Blank line after summary — multiline summaries add clarity
     "D212",    # Conflicts with Google convention (D213)
-    "D213",    # Multi-line summary on second line — dbxcarta uses first-line summaries
     "FIX002",  # Line contains TODO
     "PERF203", # Rarely useful
     "PLR09",   # Too many something (args, statements, etc.)
@@ -225,6 +222,7 @@ ignore = [
     "D103",    # Missing docstring in public function
     "D105",    # Missing docstring in magic method
     "D107",    # Missing docstring in __init__
+    "D213",    # Multi-line summary on second line — dbxcarta uses first-line summaries
     "N804",    # after-mode model_validator takes self, not cls (see note above)
     "N812",    # `functions as F` is the canonical PySpark import alias
     "PLC0415", # Lazy imports are intentional for optional Spark deps
