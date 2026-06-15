@@ -1,7 +1,8 @@
-"""The core components of the RDBMS metadata graph data model."""
+"""The structural components of the RDBMS metadata graph data model."""
 
-from pandas import isna
 from pydantic import BaseModel, Field, field_validator
+
+from ..._validators import coerce_str_or_none, coerce_upper
 
 
 class Database(BaseModel):
@@ -20,23 +21,10 @@ class Database(BaseModel):
         default=None, description="The embedding of the database description"
     )
 
-    @field_validator("platform", "service", mode="after")
-    def validate_string_uppercase(cls, v: str | None) -> str | None:
-        """Validate that the string is in uppercase."""
-        return v.upper() if v is not None else None
-
-    @field_validator("description", "platform", "service", mode="before")
-    def validate_string_or_none(cls, v: str | None) -> str | None:
-        """
-        Validate that the string is string type or None.
-        This will cast NaN values to None.
-        """
-        if isinstance(v, str):
-            return v
-        if v is None or isna(v):
-            return None
-
-        return v
+    _uppercase = field_validator("platform", "service", mode="after")(coerce_upper)
+    _normalize = field_validator("description", "platform", "service", mode="before")(
+        coerce_str_or_none
+    )
 
 
 class Schema(BaseModel):
@@ -49,18 +37,7 @@ class Schema(BaseModel):
         default=None, description="The embedding of the schema description"
     )
 
-    @field_validator("description", mode="before")
-    def validate_string_or_none(cls, v: str | None) -> str | None:
-        """
-        Validate that the string is string type or None.
-        This will cast NaN values to None.
-        """
-        if isinstance(v, str):
-            return v
-        if v is None or isna(v):
-            return None
-
-        return v
+    _normalize = field_validator("description", mode="before")(coerce_str_or_none)
 
 
 class Table(BaseModel):
@@ -73,18 +50,7 @@ class Table(BaseModel):
         default=None, description="The embedding of the table description"
     )
 
-    @field_validator("description", mode="before")
-    def validate_string_or_none(cls, v: str | None) -> str | None:
-        """
-        Validate that the string is string type or None.
-        This will cast NaN values to None.
-        """
-        if isinstance(v, str):
-            return v
-        if v is None or isna(v):
-            return None
-
-        return v
+    _normalize = field_validator("description", mode="before")(coerce_str_or_none)
 
 
 class Column(BaseModel):
@@ -104,18 +70,7 @@ class Column(BaseModel):
     is_primary_key: bool = Field(default=False, description="Whether the column is a primary key")
     is_foreign_key: bool = Field(default=False, description="Whether the column is a foreign key")
 
-    @field_validator("description", "type", mode="before")
-    def validate_string_or_none(cls, v: str | None) -> str | None:
-        """
-        Validate that the string is string type or None.
-        This will cast NaN values to None.
-        """
-        if isinstance(v, str):
-            return v
-        if v is None or isna(v):
-            return None
-
-        return v
+    _normalize = field_validator("description", "type", mode="before")(coerce_str_or_none)
 
 
 class HasSchema(BaseModel):
@@ -161,15 +116,4 @@ class References(BaseModel):
         description="The criteria for the references relationship. This is the join condition for the two columns.",
     )
 
-    @field_validator("criteria", mode="before")
-    def validate_string_or_none(cls, v: str | None) -> str | None:
-        """
-        Validate that the string is string type or None.
-        This will cast NaN values to None.
-        """
-        if isinstance(v, str):
-            return v
-        if v is None or isna(v):
-            return None
-
-        return v
+    _normalize = field_validator("criteria", mode="before")(coerce_str_or_none)

@@ -2,25 +2,24 @@
 
 from typing import TypedDict
 
-from ..data_model.rdbms import (
+from ..data_model.glossary import (
     BusinessTerm,
     Category,
-    Column,
-    Database,
     Glossary,
     HasBusinessTerm,
     HasCategory,
+)
+from ..data_model.instance import HasValue, Value
+from ..data_model.query import Query, UsesColumn, UsesTable
+from ..data_model.schema.rdbms import (
+    Column,
+    Database,
     HasColumn,
     HasSchema,
     HasTable,
-    HasValue,
-    Query,
     References,
     Schema,
     Table,
-    UsesColumn,
-    UsesTable,
-    Value,
 )
 
 

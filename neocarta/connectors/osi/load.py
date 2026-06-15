@@ -10,8 +10,8 @@ Adds load methods for OSI node and relationship types on top of the base
 
 import json
 
-from ...data_model.rdbms import (
-    BusinessTerm,
+from ...data_model.glossary import BusinessTerm, TaggedWith
+from ...data_model.osi import (
     DomainHasTable,
     Expression,
     HasAspect,
@@ -27,7 +27,6 @@ from ...data_model.rdbms import (
     OsiCustomExtensions,
     OsiSemanticModel,
     OsiTable,
-    TaggedWith,
     UsedInJoin,
 )
 from ...enums import NodeLabel, RelationshipType

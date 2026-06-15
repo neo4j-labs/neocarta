@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from ....data_model.rdbms import (
+from ....data_model.glossary import (
     BusinessTerm,
     Category,
     Glossary,

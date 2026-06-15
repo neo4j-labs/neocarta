@@ -2,17 +2,16 @@
 
 import pandas as pd
 
-from ....data_model.rdbms import (
+from ....data_model.instance import HasValue, Value
+from ....data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,
     HasSchema,
     HasTable,
-    HasValue,
     References,
     Schema,
     Table,
-    Value,
 )
 from ...models import NodesCache, RelationshipsCache
 from ...utils.generate_id import (

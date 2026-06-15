@@ -6,28 +6,25 @@ from functools import partial
 from neo4j import Driver, RoutingControl
 
 from ...data_model.metadata import NeocartaGraph
-from ...data_model.rdbms import (
-    CTE,
+from ...data_model.glossary import (
     BusinessTerm,
     Category,
-    Column,
-    Database,
-    Defines,
     Glossary,
     HasBusinessTerm,
     HasCategory,
+    TaggedWith,
+)
+from ...data_model.instance import HasValue, Value
+from ...data_model.query import CTE, Defines, Query, UsesColumn, UsesTable
+from ...data_model.schema.rdbms import (
+    Column,
+    Database,
     HasColumn,
     HasSchema,
     HasTable,
-    HasValue,
-    Query,
     References,
     Schema,
     Table,
-    TaggedWith,
-    UsesColumn,
-    UsesTable,
-    Value,
 )
 from ...enums import NodeLabel, RelationshipType
 from ..indexes import create_full_text_index, create_name_range_index

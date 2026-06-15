@@ -2,7 +2,17 @@
 
 import pandas as pd
 
-from ...data_model.rdbms.core import (
+from ...data_model.glossary import (
+    BusinessTerm,
+    Category,
+    Glossary,
+    HasBusinessTerm,
+    HasCategory,
+    TaggedWith,
+)
+from ...data_model.instance import HasValue, Value
+from ...data_model.query import Query, UsesColumn, UsesTable
+from ...data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,
@@ -11,19 +21,6 @@ from ...data_model.rdbms.core import (
     References,
     Schema,
     Table,
-)
-from ...data_model.rdbms.expanded import (
-    BusinessTerm,
-    Category,
-    Glossary,
-    HasBusinessTerm,
-    HasCategory,
-    HasValue,
-    Query,
-    TaggedWith,
-    UsesColumn,
-    UsesTable,
-    Value,
 )
 from ..models import NodesCache, RelationshipsCache
 
