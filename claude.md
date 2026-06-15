@@ -32,6 +32,10 @@ Use the following Make commands for Ruff formatting and linting:
 * Formatting -> `make fmt`
 * Linting -> `make lint`
 
+## Databricks work (dbxcarta subtree)
+
+The `dbxcarta/` subtree hosts the Databricks semantic-layer capability: the `dbxcarta-core` and `dbxcarta-spark` packages (published as the `neocarta[dbxcarta-core]` and `neocarta[dbxcarta-spark]` extras), plus the `dbxcarta-client`, `dbxcarta-submit`, and `dbxcarta-materialize` workspace packages. Before writing or changing anything under `dbxcarta/`, read `dbxcarta/CLAUDE.md` — it carries the pipeline design rules (no Python UDFs for rule logic, no catalog-scale collect to the driver) and the layered env/secret configuration. Those rules are scoped to `dbxcarta/`.
+
 ## Project Architecture Overview
 
 Neocarta builds a semantic layer in Neo4j by integrating database metadata with business logic. It extracts schema and structural information from data sources, transforms it into a unified graph data model, and links it to business terminology — giving AI agents and users systemic familiarity with how data is organized and what it means. An optional MCP server exposes the graph to AI agents via tools.

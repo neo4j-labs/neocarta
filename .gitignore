@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -136,6 +139,8 @@ celerybeat.pid
 
 # Environments
 .env
+# Filled-in config for the Databricks submit example (the .sample is committed).
+examples/databricks/submit_finance_genie.env
 .envrc
 .venv
 env/
@@ -216,3 +221,6 @@ eval/datasets/schemas/
 datasets/dataplex/lookup_entry_links.py
 claude_config.json
 .local/
+
+
+.idea/

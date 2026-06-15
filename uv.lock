@@ -546,6 +546,20 @@ wheels = [
 ]
 
 [[package]]
+name = "databricks-sdk"
+version = "0.114.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-auth" },
+    { name = "protobuf" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9f/1f/b11394c4439f4e1c14af91d133126396bbe3e70e9204784f58be064b749c/databricks_sdk-0.114.0.tar.gz", hash = "sha256:d62e6fcb1dc98b0b390d369261d1d68a6cf9f91139c34cf659865faf50b1d044", size = 961592, upload-time = "2026-06-02T09:33:31.302Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/f5/54a7fa8f9bb292fe1c4095731bb2cf9bbc38ebfe25abbc88657dea34d4ce/databricks_sdk-0.114.0-py3-none-any.whl", hash = "sha256:25a40b83d76fa6c8a621f884da41e45e3ae5267218dafa71db9b363dd9238f57", size = 907537, upload-time = "2026-06-02T09:33:29.541Z" },
+]
+
+[[package]]
 name = "db-dtypes"
 version = "1.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2361,6 +2375,11 @@ cli = [
     { name = "pydantic-settings" },
     { name = "rich" },
 ]
+databricks-spark = [
+    { name = "databricks-sdk" },
+    { name = "pydantic-settings" },
+    { name = "pyspark" },
+]
 mcp = [
     { name = "fastmcp" },
     { name = "mcp" },
@@ -2379,6 +2398,10 @@ agent = [
     { name = "langchain-openai" },
     { name = "langgraph" },
 ]
+databricks = [
+    { name = "neocarta", extra = ["databricks-spark"] },
+    { name = "pytest" },
+]
 dev = [
     { name = "ipykernel" },
     { name = "pytest" },
@@ -2394,6 +2417,7 @@ eval = [
 [package.metadata]
 requires-dist = [
     { name = "click", marker = "extra == 'cli'", specifier = ">=8.1.0" },
+    { name = "databricks-sdk", marker = "extra == 'databricks-spark'", specifier = ">=0.114.0,<0.115" },
     { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=2.14.4,<3" },
     { name = "google-cloud-bigquery", extras = ["pandas"], specifier = ">=3.40.0" },
     { name = "google-cloud-bigquery-storage", specifier = ">=2.36.2" },
@@ -2406,12 +2430,14 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.0,<3" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", marker = "extra == 'cli'", specifier = ">=2.12.0" },
+    { name = "pydantic-settings", marker = "extra == 'databricks-spark'", specifier = ">=2.12.0,<2.13" },
     { name = "pydantic-settings", marker = "extra == 'mcp'", specifier = ">=2.12.0" },
+    { name = "pyspark", marker = "extra == 'databricks-spark'", specifier = ">=4.1.2,<4.2" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
     { name = "sqlglot", specifier = ">=28.10.1" },
 ]
-provides-extras = ["performance", "mcp", "cli"]
+provides-extras = ["performance", "mcp", "cli", "databricks-spark"]
 
 [package.metadata.requires-dev]
 agent = [
@@ -2421,6 +2447,10 @@ agent = [
     { name = "langchain-mcp-adapters", specifier = ">=0.2.1" },
     { name = "langchain-openai", specifier = ">=1.1.7" },
     { name = "langgraph", specifier = ">=1.0.7" },
+]
+databricks = [
+    { name = "neocarta", extras = ["databricks-spark"] },
+    { name = "pytest" },
 ]
 dev = [
     { name = "ipykernel", specifier = ">=7.1.0" },
@@ -3255,6 +3285,15 @@ wheels = [
 ]
 
 [[package]]
+name = "py4j"
+version = "0.10.9.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/31/0b210511177070c8d5d3059556194352e5753602fa64b85b7ab81ec1a009/py4j-0.10.9.9.tar.gz", hash = "sha256:f694cad19efa5bd1dee4f3e5270eb406613c974394035e5bfc4ec1aba870b879", size = 761089, upload-time = "2025-01-15T03:53:18.624Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/db/ea0203e495be491c85af87b66e37acfd3bf756fd985f87e46fc5e3bf022c/py4j-0.10.9.9-py2.py3-none-any.whl", hash = "sha256:c7c26e4158defb37b0bb124933163641a2ff6e3a3913f7811b0ddbe07ed61533", size = 203008, upload-time = "2025-01-15T03:53:15.648Z" },
+]
+
+[[package]]
 name = "pyarrow"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3562,6 +3601,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/e8/52/d87eba7cb129b8156
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/80/fc9d01d5ed37ba4c42ca2b55b4339ae6e200b456be3a1aaddf4a9fa99b8c/pyperclip-1.11.0-py3-none-any.whl", hash = "sha256:299403e9ff44581cb9ba2ffeed69c7aa96a008622ad0c46cb575ca75b5b84273", size = 11063, upload-time = "2025-09-26T14:40:36.069Z" },
 ]
+
+[[package]]
+name = "pyspark"
+version = "4.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "py4j" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/71/4dd20c69332a2a4bf7ece8a655c9da98e4bd9b6bcea235349c1a00399d57/pyspark-4.1.2.tar.gz", hash = "sha256:fa5d6159f700d0990a07f4f62df1b7449401dccee9cd7d5d6df8957530841602", size = 455428043, upload-time = "2026-05-21T14:49:21.785Z" }
 
 [[package]]
 name = "pytest"

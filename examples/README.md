@@ -33,6 +33,19 @@ python bigquery.py --skip-embeddings
 #### `dataplex.py` - Google Dataplex Connector
 Extract metadata from Google Cloud Dataplex catalog.
 
+#### `databricks/inline_embed_ingest.py` - Databricks Connector (Notebook)
+Databricks notebook that ingests Unity Catalog schema into Neo4j and generates
+vector embeddings inline (in the same Spark job) via `ai_query`.
+
+Unlike the other examples, this is a Databricks source notebook that runs **on a
+classic Databricks cluster**, not locally: the schema ingest is a Spark job that
+writes through the Neo4j Spark Connector (a JVM library, unsupported on
+serverless). Import it into a Databricks workspace, fill in the values at the
+top, and run it top to bottom.
+
+See [neocarta/connectors/databricks/README.md](../neocarta/connectors/databricks/README.md)
+for the embedding modes and the full `NEOCARTA_DATABRICKS_*` settings reference.
+
 #### `bigquery_query_log_db.py` - Query Log from BigQuery
 Extract query lineage from BigQuery INFORMATION_SCHEMA.
 

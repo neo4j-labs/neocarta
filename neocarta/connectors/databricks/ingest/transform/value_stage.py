@@ -1,0 +1,106 @@
+"""Sample-values transform stage.
+
+Samples distinct column values and returns the sampled-value frames. This
+stage no longer writes Value nodes or purges stale ones: Value nodes are
+written (never embedded) by `run.py:_write_value_nodes`, and stale-Value
+cleanup is a single scoped server-side Cypher delete keyed on the run-start
+stamp. The sampled frame is returned whole for that Value write, for FK
+discovery, and for the HAS_VALUE relationship write in `_load`, so value
+sampling stays a single bounded pass.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+import neocarta.connectors.databricks.ingest.transform.sample_values as sv
+from neocarta.connectors.databricks.ingest.summary import RunSummary, SampleValueCounts
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame, SparkSession
+
+    from neocarta.connectors.databricks.ingest.extract import ExtractResult
+    from neocarta.connectors.databricks.settings import SparkIngestSettings
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ValueResult:
+    """Sample-values output passed from transform into the Value write, FK
+    discovery, and load.
+
+    The pipeline uses `None` instead of an empty ValueResult when sampling is
+    disabled, so downstream branches can cleanly skip Value nodes and HAS_VALUE
+    relationships without inspecting Spark DataFrames. `value_node_df` is the
+    sampled frame: `run.py:_write_value_nodes` writes the Value nodes from it
+    (un-embedded), FK discovery joins on sampled values, and `_load` writes
+    HAS_VALUE from it.
+    """
+
+    value_node_df: DataFrame
+    has_value_df: DataFrame
+    sample_stats: sv.SampleStats
+    # Cached sampled-value DataFrame backing value_node_df and has_value_df.
+    # None when nothing was cached. The pipeline releases this only after the
+    # Value writes, FK discovery, and the Neo4j load have finished,
+    # mirroring ExtractResult.unpersist_cached().
+    cache_handle: DataFrame | None = None
+
+    def unpersist_cached(self) -> None:
+        """Release the cached sampled-value DataFrame after the ingest run.
+
+        Sampling caches raw_df because the Value writes, FK discovery, and the
+        HAS_VALUE write all read it. The pipeline calls this once those steps no
+        longer need the cache. Idempotent and a no-op when nothing cached.
+        """
+        if self.cache_handle is not None:
+            self.cache_handle.unpersist()
+
+
+def transform_sample_values(
+    spark: SparkSession,
+    settings: SparkIngestSettings,
+    schema_list: list[str],
+    extract_result: ExtractResult,
+    summary: RunSummary,
+) -> ValueResult | None:
+    """Sample distinct values and return the sampled-value frames.
+
+    Sampling-only: Value nodes are written (never embedded) by
+    `run.py:_write_value_nodes`, and stale-Value cleanup is a single scoped
+    server-side delete after the writes. Returns None when
+    NEOCARTA_DATABRICKS_INCLUDE_VALUES is off.
+
+    Value sampling is a single bounded pass (sample_limit + the cardinality
+    threshold, not the n² FK blowup); the whole sampled frame is returned so
+    `_write_value_nodes` can write it.
+    """
+    if not settings.include_values:
+        return None
+
+    value_node_df, has_value_df, sample_stats, cache_handle = sv.sample(
+        spark,
+        extract_result.columns_df,
+        settings.catalog,
+        schema_list,
+        settings.sample_limit,
+        settings.sample_cardinality_threshold,
+        settings.stack_chunk_size,
+    )
+    summary.sample_values = SampleValueCounts.from_sample_stats(sample_stats)
+    logger.info(
+        "[databricks] sample values: candidates=%d sampled=%d value_nodes=%d",
+        sample_stats.candidate_columns,
+        sample_stats.sampled_columns,
+        sample_stats.value_nodes,
+    )
+
+    return ValueResult(
+        value_node_df=value_node_df,
+        has_value_df=has_value_df,
+        sample_stats=sample_stats,
+        cache_handle=cache_handle,
+    )

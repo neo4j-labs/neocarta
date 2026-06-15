@@ -13,6 +13,7 @@ from .._logging import configure_logging
 from .agent_context import agent_context
 from .commands.bigquery import bigquery
 from .commands.csv import csv
+from .commands.databricks import databricks
 from .commands.dataplex import dataplex
 from .commands.osi import osi
 from .commands.query_log import query_log
@@ -86,6 +87,7 @@ def cli(
 
 cli.add_command(bigquery)
 cli.add_command(csv)
+cli.add_command(databricks)
 cli.add_command(dataplex)
 cli.add_command(osi)
 cli.add_command(query_log)

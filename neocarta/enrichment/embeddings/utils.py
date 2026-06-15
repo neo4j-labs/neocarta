@@ -9,7 +9,6 @@ import pandas as pd
 from neo4j import Driver, RoutingControl
 
 from ...enums import NodeLabel
-from ...errors import ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,6 @@ logger = logging.getLogger(__name__)
 def get_nodes_to_embed(
     neo4j_driver: Driver,
     node_label: NodeLabel,
-    min_length: int = 20,
     database_name: str = "neo4j",
 ) -> pd.DataFrame:
     """
@@ -29,8 +27,6 @@ def get_nodes_to_embed(
         The Neo4j driver to use.
     node_label: str
         The label of the node to embed. Must be one of: Database, Table, Column.
-    min_length: int
-        The minimum length of the description to embed. Must be greater than 0.
     database_name: str
         The name of the database to get nodes from.
 
@@ -40,23 +36,28 @@ def get_nodes_to_embed(
         The nodes to embed.
         - id: The id of the node.
         - node_label: The label of the node.
-        - description: The description of the node.
+        - description: The text to embed, composed as ``name | type |
+          description`` with the parts joined by `` | ``. Null or blank parts
+          are dropped, so a node always embeds on at least its name and never
+          requires a description to be present.
     """
-    if min_length <= 0:
-        raise ConfigError("Minimum length must be greater than 0")
-
+    # Embed a composed `name | type | description` string rather than the bare
+    # description, so every node embeds (name is always present) and every
+    # connector and embedding mode embeds the identical text. `type` exists only
+    # on Column nodes; on other labels the property access yields null and is
+    # dropped. Parts are trimmed and blank parts removed before joining.
     query = f"""
 MATCH (n:{node_label})
-WHERE n.description IS NOT NULL
-    AND n.embedding IS NULL
-    AND size(n.description) > 0
-RETURN n.id as id,
-    labels(n)[0] as node_label,
-    n.description as description
+WHERE n.embedding IS NULL
+WITH n, [part IN [n.name, n.type, n.description]
+         WHERE part IS NOT NULL AND trim(part) <> '' | trim(part)] AS parts
+WHERE size(parts) > 0
+RETURN n.id AS id,
+    labels(n)[0] AS node_label,
+    reduce(text = head(parts), p IN tail(parts) | text + ' | ' + p) AS description
 """
     results = neo4j_driver.execute_query(
         query_=query,
-        parameters_={"min_length": min_length},
         database_=database_name,
         routing_=RoutingControl.READ,
         result_transformer_=lambda x: x.data(),

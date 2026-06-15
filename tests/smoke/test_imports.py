@@ -21,6 +21,12 @@ def test_csv_connector_imports():
     assert CSVConnector
 
 
+def test_databricks_connector_imports():
+    from neocarta.connectors.databricks import DatabricksSparkSchemaConnector
+
+    assert DatabricksSparkSchemaConnector
+
+
 def test_query_log_connector_imports():
     from neocarta.connectors.query_log import QueryLogConnector
 

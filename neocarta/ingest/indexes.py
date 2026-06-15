@@ -87,6 +87,47 @@ CREATE FULLTEXT INDEX {"_".join(labels_lower_sorted) + "_full_text_index"} IF NO
     return summary.counters.__dict__
 
 
+def create_range_index(
+    neo4j_driver: Driver,
+    node_label: str,
+    property_name: str,
+    database_name: str = "neo4j",
+) -> dict:
+    """
+    Create a range index on an arbitrary node property.
+
+    A range index backs exact-equality and range ``MATCH``/``WHERE`` predicates so they seek
+    rather than scan (vector and full-text indexes do not back equality matches).
+
+    Parameters
+    ----------
+    neo4j_driver: Driver
+        The Neo4j driver to use.
+    node_label: str
+        The label of the node to index. Its nodes must carry ``property_name``.
+    property_name: str
+        The property to index.
+    database_name: str
+        The name of the database to create the index in.
+
+    Returns:
+    -------
+    dict
+        The summary of the index created.
+    """
+    index_query = f"""
+CREATE INDEX {node_label.lower()}_{property_name.lower()}_index IF NOT EXISTS
+    FOR (n:{node_label})
+    ON (n.{property_name})
+"""
+    _, summary, _ = neo4j_driver.execute_query(
+        query_=index_query,
+        routing_=RoutingControl.WRITE,
+        database_=database_name,
+    )
+    return summary.counters.__dict__
+
+
 def create_name_range_index(
     neo4j_driver: Driver,
     node_label: str,
@@ -95,9 +136,8 @@ def create_name_range_index(
     """
     Create a range index on a node's ``name`` property.
 
-    A range index backs exact-equality ``MATCH (n:Label {name: $value})`` lookups, such as the
-    ones the MCP catalog queries issue. Vector and full-text indexes do not back equality
-    matches, so a dedicated range index is required for these lookups to seek rather than scan.
+    Thin wrapper over :func:`create_range_index` for the common ``name`` case, which backs the
+    exact-equality ``MATCH (n:Label {name: $value})`` lookups the MCP catalog queries issue.
 
     Parameters
     ----------
@@ -114,14 +154,4 @@ def create_name_range_index(
     dict
         The summary of the index created.
     """
-    name_index_query = f"""
-CREATE INDEX {node_label.lower() + "_name_index"} IF NOT EXISTS
-    FOR (n:{node_label})
-    ON (n.name)
-"""
-    _, summary, _ = neo4j_driver.execute_query(
-        query_=name_index_query,
-        routing_=RoutingControl.WRITE,
-        database_=database_name,
-    )
-    return summary.counters.__dict__
+    return create_range_index(neo4j_driver, node_label, "name", database_name)
