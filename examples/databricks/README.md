@@ -41,9 +41,32 @@ for details.
   credentials from it; they are never in this repo.
 - **Databricks auth** for the profile named in the config (a
   `~/.databrickscfg` profile, or the SDK auth chain).
-- A built neocarta wheel. Build it first following
-  [`neocarta/connectors/databricks/README.md`](../../neocarta/connectors/databricks/README.md)
-  ("Build a wheel from source"); it produces `dist/neocarta-<version>-py3-none-any.whl`.
+- A built neocarta wheel. Build it with `make build`; it produces
+  `dist/neocarta-<version>-py3-none-any.whl`.
+
+### Set the secrets
+
+The job runs on the cluster and reads the Neo4j credentials at runtime from the
+Databricks secret scope named in `NEOCARTA_DATABRICKS_SECRET_SCOPE`
+(`dbxcarta-neo4j-finance-genie` in the sample config). They never live in this
+repo or in `submit_finance_genie.env`. Create the scope and put the three keys
+the cluster reads, `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`:
+
+```bash
+databricks secrets create-scope dbxcarta-neo4j-finance-genie
+databricks secrets put-secret dbxcarta-neo4j-finance-genie NEO4J_URI
+databricks secrets put-secret dbxcarta-neo4j-finance-genie NEO4J_USERNAME
+databricks secrets put-secret dbxcarta-neo4j-finance-genie NEO4J_PASSWORD
+```
+
+Each `put-secret` opens an editor for the value, so the credential is never on
+the command line. Use the same scope name you set for
+`NEOCARTA_DATABRICKS_SECRET_SCOPE`.
+
+If you run inline embeddings, the OpenAI External Model endpoint reads the OpenAI
+key from its own secret scope. That secret is set when you register the endpoint;
+see the connector README
+([Registering the OpenAI endpoint](../../neocarta/connectors/databricks/README.md)).
 
 ### Run it
 
@@ -71,6 +94,17 @@ for details.
    stages the prebuilt connector wheel and submits the ingest job. By default it
    uses the newest `dist/neocarta-*.whl`; pass a wheel path as the first argument
    to override.
+
+4. (Optional) If inline embeddings were not enabled on the ingest job, generate
+   them afterward with neocarta:
+
+   ```bash
+   uv run neocarta databricks embed
+   ```
+
+   See the connector README
+   ([`neocarta/connectors/databricks/README.md`](../../neocarta/connectors/databricks/README.md))
+   for details.
 
 ## Notebooks
 

@@ -107,9 +107,9 @@ After the Spark ingest job builds the graph, embed the node descriptions with
 OpenAI and write the vectors back using the neocarta CLI:
 
 ```bash
-neocarta databricks embed
+uv run neocarta databricks embed
 # or override the model and dimensions:
-neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 1536
+uv run neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 1536
 ```
 
 The CLI loads a `.env` from the **current working directory** (not the Spark
@@ -242,20 +242,19 @@ a two-step flow, and neocarta ships a CLI verb for the second step. See
 
 ### Inline mode
 
-During the node-write loop, each batch runs
-`ai_query('<endpoint>', embedding_text, failOnError => false)` natively in
-Spark against a Databricks model-serving endpoint, where `embedding_text` is the
-composed `name | type | comment` string (null/blank parts dropped) — the same
-text the external/shared embed path composes, so inline and external embed
-identically. There are no Python UDFs and
-no driver-side collection of table data. Each label can be enabled
-independently, and a per-label `{label}_vector_index` cosine index is created
-for each enabled label at the configured dimension. Turn inline on by setting
-one or more of the `include_embeddings_*` flags and an
-`NEOCARTA_DATABRICKS_EMBEDDING_STAGING_VOLUME`.
-
-Value nodes are never embedded in either mode. No neocarta retrieval path embeds
-Value nodes; they are reached by `HAS_VALUE` traversal, not vector search.
+* **How it runs**: during the node-write loop, each batch runs
+  `ai_query('<endpoint>', embedding_text, failOnError => false)` natively in Spark
+  against a Databricks model-serving endpoint.
+* **Embedding text**: `embedding_text` is the composed `name | type | comment`
+  string (null/blank parts dropped), the same text the external/shared embed path
+  composes, so inline and external embed identically.
+* **Per-label control**: each label can be enabled independently, and a per-label
+  `{label}_vector_index` cosine index is created for each enabled label at the
+  configured dimension.
+* **Turning it on**: set one or more of the `include_embeddings_*` flags and an
+  `NEOCARTA_DATABRICKS_EMBEDDING_STAGING_VOLUME`.
+* **Value nodes**: never embedded in either mode. No neocarta retrieval path
+  embeds Value nodes; they are reached by `HAS_VALUE` traversal, not vector search.
 
 ### Which mode to pick
 
