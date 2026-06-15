@@ -5,7 +5,6 @@ from functools import partial
 
 from neo4j import Driver, RoutingControl
 
-from ...data_model.metadata import NeocartaGraph
 from ...data_model.glossary import (
     BusinessTerm,
     Category,
@@ -15,6 +14,7 @@ from ...data_model.glossary import (
     TaggedWith,
 )
 from ...data_model.instance import HasValue, Value
+from ...data_model.metadata import NeocartaGraph
 from ...data_model.query import CTE, Defines, Query, UsesColumn, UsesTable
 from ...data_model.schema.rdbms import (
     Column,

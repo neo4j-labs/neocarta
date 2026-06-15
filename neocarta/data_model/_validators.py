@@ -19,7 +19,7 @@ def coerce_str_or_none(value: Any) -> Any:
     value : Any
         The raw field value.
 
-    Returns
+    Returns:
     -------
     Any
         ``None`` if ``value`` is ``None`` or NaN, otherwise the value unchanged.
@@ -40,7 +40,7 @@ def coerce_upper(value: str | None) -> str | None:
     value : str | None
         The string to uppercase.
 
-    Returns
+    Returns:
     -------
     str | None
         The uppercased string, or ``None`` if ``value`` is ``None``.
@@ -56,7 +56,7 @@ def coerce_str(value: Any) -> str:
     value : Any
         The raw field value.
 
-    Returns
+    Returns:
     -------
     str
         ``""`` if ``value`` is ``None`` or NaN, otherwise ``str(value)``.

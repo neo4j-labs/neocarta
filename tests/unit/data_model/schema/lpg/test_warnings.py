@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-import neocarta.data_model.lpg as lpg_module
+import neocarta.data_model.schema.lpg as lpg_module
 
 
 def test_lpg_import_triggers_warning():

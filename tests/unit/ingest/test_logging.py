@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from neocarta.data_model.rdbms import Table
+from neocarta.data_model.schema.rdbms import Table
 from neocarta.ingest.rdbms import Neo4jRDBMSLoader
 
 _LOADER_LOGGER = "neocarta.ingest.rdbms.load"
