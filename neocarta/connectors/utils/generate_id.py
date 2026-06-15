@@ -15,8 +15,11 @@ def compose_id(*parts: str) -> str:
 
     Each segment is normalized (lowercase; spaces and hyphens → underscores)
     and the segments are joined with dots — the canonical recipe shared by every
-    hierarchical id helper here. Use this when the segment arity is dynamic (e.g.
-    the Databricks Spark connector builds ids from a variable number of parts).
+    hierarchical id helper here. Use this when the segment arity is dynamic.
+
+    Note this normalization is lossy (hyphens collapse to underscores), so it is
+    not suitable where the original identifier must round-trip; the Databricks
+    connector deliberately uses its own lossless id scheme instead.
 
     Examples:
     --------

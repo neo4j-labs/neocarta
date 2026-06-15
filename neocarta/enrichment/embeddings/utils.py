@@ -9,7 +9,6 @@ import pandas as pd
 from neo4j import Driver, RoutingControl
 
 from ...enums import NodeLabel
-from ...errors import ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,6 @@ logger = logging.getLogger(__name__)
 def get_nodes_to_embed(
     neo4j_driver: Driver,
     node_label: NodeLabel,
-    min_length: int = 20,
     database_name: str = "neo4j",
 ) -> pd.DataFrame:
     """
@@ -29,8 +27,6 @@ def get_nodes_to_embed(
         The Neo4j driver to use.
     node_label: str
         The label of the node to embed. Must be one of: Database, Table, Column.
-    min_length: int
-        The minimum length of the description to embed. Must be greater than 0.
     database_name: str
         The name of the database to get nodes from.
 
@@ -45,9 +41,6 @@ def get_nodes_to_embed(
           are dropped, so a node always embeds on at least its name and never
           requires a description to be present.
     """
-    if min_length <= 0:
-        raise ConfigError("Minimum length must be greater than 0")
-
     # Embed a composed `name | type | description` string rather than the bare
     # description, so every node embeds (name is always present) and every
     # connector and embedding mode embeds the identical text. `type` exists only

@@ -79,7 +79,7 @@ def infer_foreign_keys(
         Columns scanned, candidate pairs considered, and edges written.
     """
     columns = _read_columns(neo4j_driver, database_name, catalogs, schemas)
-    declared = _read_existing_reference_pairs(neo4j_driver, database_name)
+    declared = _read_existing_reference_pairs(neo4j_driver, database_name, catalogs, schemas)
     logger.info("[neocarta] FK inference: scanning %d columns", len(columns))
 
     edges = _infer_edges(columns, declared, threshold)
@@ -226,10 +226,24 @@ def _read_columns(
     ]
 
 
-def _read_existing_reference_pairs(driver: Driver, database_name: str) -> set[tuple[str, str]]:
-    query = "MATCH (a:Column)-[:REFERENCES]->(b:Column) RETURN a.id AS source_id, b.id AS target_id"
+def _read_existing_reference_pairs(
+    driver: Driver,
+    database_name: str,
+    catalogs: list[str] | None,
+    schemas: list[str] | None,
+) -> set[tuple[str, str]]:
+    # Scope to the source column so the read matches the inference scope: an
+    # inferred edge can only be suppressed by a declared pair whose source is an
+    # in-scope column, so a declared pair anchored outside the scope is never
+    # consulted and need not be materialized on the driver.
+    query = (
+        "MATCH (a:Column)-[:REFERENCES]->(b:Column) "
+        "WHERE ($catalogs IS NULL OR a.catalog IN $catalogs) "
+        "AND ($schemas IS NULL OR a.schema IN $schemas) "
+        "RETURN a.id AS source_id, b.id AS target_id"
+    )
     with driver.session(database=database_name) as session:
-        records = session.run(query).data()
+        records = session.run(query, catalogs=catalogs, schemas=schemas).data()
     return {(r["source_id"], r["target_id"]) for r in records}
 
 

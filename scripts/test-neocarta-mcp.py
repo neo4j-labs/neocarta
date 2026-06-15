@@ -157,16 +157,16 @@ def result_to_payload(result: Any) -> Any:
 
 async def call_tool(
     session: ClientSession, name: str, arguments: dict[str, Any]
-) -> tuple[bool, str]:
-    """Call one tool defensively, returning (ok, preview)."""
+) -> tuple[bool, str, Any]:
+    """Call one tool defensively, returning (ok, preview, payload)."""
     try:
         result = await session.call_tool(name, arguments)
     except Exception as exc:  # one bad tool must not abort the whole run.
-        return False, f"call raised {type(exc).__name__}: {exc}"
+        return False, f"call raised {type(exc).__name__}: {exc}", None
+    payload = result_to_payload(result)
     if getattr(result, "isError", False):
-        payload = result_to_payload(result)
-        return False, f"tool reported an error: {preview_result(payload)}"
-    return True, preview_result(result_to_payload(result))
+        return False, f"tool reported an error: {preview_result(payload)}", payload
+    return True, preview_result(payload), payload
 
 
 def first_schema_name(payload: Any) -> str | None:
@@ -216,10 +216,9 @@ async def run(args: argparse.Namespace) -> int:
         discovered_schema: str | None = None
         names = {tool.name for tool in tools}
         if "list_schemas" in names:
-            ok, _ = await call_tool(session, "list_schemas", {})
+            ok, _, payload = await call_tool(session, "list_schemas", {})
             if ok:
-                schemas_result = await session.call_tool("list_schemas", {})
-                discovered_schema = first_schema_name(result_to_payload(schemas_result))
+                discovered_schema = first_schema_name(payload)
 
         for tool in tools:
             arguments = build_probe_arguments(tool, args.query)
@@ -237,7 +236,7 @@ async def run(args: argparse.Namespace) -> int:
             else:
                 print(f"\n  > {tool.name} ({arguments or 'no args'})")
 
-            ok, preview = await call_tool(session, tool.name, arguments)
+            ok, preview, _ = await call_tool(session, tool.name, arguments)
             if ok:
                 called_ok += 1
                 print(f"      ok: {preview}")
