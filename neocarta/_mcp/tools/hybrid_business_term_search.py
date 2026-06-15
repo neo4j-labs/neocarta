@@ -3,12 +3,14 @@
 from fastmcp import FastMCP
 from neo4j import AsyncDriver, RoutingControl
 
+from ...connectors.utils.generate_id import generate_osi_semantic_model_id
 from ...enrichment.embeddings import LiteLLMEmbeddingsConnector
 from ..cypher import (
     get_context_by_column_business_term_hybrid_search_cypher,
+    get_context_by_metric_business_term_hybrid_search_cypher,
     get_context_by_table_business_term_hybrid_search_cypher,
 )
-from ..models import TableContext
+from ..models import MetricContext, TableContext
 from ..utils import remove_lucene_chars
 
 
@@ -135,3 +137,66 @@ def register_column_tool(
             result_transformer_=lambda x: x.data(),
         )
         return [TableContext.model_validate(r["result"]) for r in results]
+
+
+def register_metric_tool(
+    server: FastMCP,
+    neo4j_driver: AsyncDriver,
+    neo4j_database: str,
+    embedder: LiteLLMEmbeddingsConnector,
+) -> None:
+    """Register the metric-level BT-bridged hybrid search tool."""
+
+    @server.tool()
+    async def get_context_by_metric_business_term_hybrid_search(
+        text_content: str,
+        max_metrics: int = 10,
+        search_top_k: int = 10,
+        domain_name: str | None = None,
+    ) -> list[MetricContext]:
+        """
+        Find OSI metrics via vector + full-text search, with the full-text branch routed through business-glossary terms.
+
+        Anchors on metrics using two parallel signals:
+        (1) embedding similarity on metric descriptions, and
+        (2) full-text matches on business-glossary terms — surfacing only those metrics that
+        are tagged to a matching glossary term AND whose name or description also matches the
+        query.
+
+        The two signals are normalized and merged per metric by taking the stronger of the
+        two. Each surviving anchor is returned with its full context: owning domain, all
+        dialect-specific SQL expressions, business-term synonyms, and aspects.
+
+        Prefer this tool when the query uses business-glossary language (e.g. "annual
+        recurring revenue", "customer satisfaction") that maps onto a metric via its synonyms.
+
+        Parameters
+        ----------
+        text_content: str
+            Natural-language and/or business-term query. The same string is used for the
+            embedding lookup and both full-text branches.
+        max_metrics: int
+            Maximum number of metrics in the returned context.
+        search_top_k: int
+            Number of candidates each search call returns — applies to the metric vector
+            lookup, the metric full-text lookup, and the business-term full-text lookup.
+            Increase to widen recall; decrease to tighten precision.
+        domain_name: str | None
+            When set, restrict the search to metrics owned by that domain (semantic model).
+        """
+        embedding = await embedder._create_embedding_async(text_content)
+        cypher = get_context_by_metric_business_term_hybrid_search_cypher()
+        results = await neo4j_driver.execute_query(
+            query_=cypher,
+            parameters_={
+                "queryEmbedding": embedding,
+                "queryText": remove_lucene_chars(text_content),
+                "searchTopK": search_top_k,
+                "maxMetrics": max_metrics,
+                "domainId": generate_osi_semantic_model_id(domain_name) if domain_name else None,
+            },
+            database_=neo4j_database,
+            routing_=RoutingControl.READ,
+            result_transformer_=lambda x: x.data(),
+        )
+        return [MetricContext.model_validate(r["result"]) for r in results]

@@ -58,6 +58,32 @@ async def has_business_term_nodes(neo4j_driver: AsyncDriver, neo4j_database: str
     return bool(records and records[0].get("present"))
 
 
+async def has_osi_nodes(neo4j_driver: AsyncDriver, neo4j_database: str) -> bool:
+    """
+    Return ``True`` if the graph contains an OSI semantic model.
+
+    The presence of at least one ``:OsiSemanticModel`` node (the secondary label the OSI
+    connector writes onto ``:Domain``) is the marker that ``neocarta osi ingest`` loaded an
+    OSI layer into this graph. It gates registration of the OSI reference and
+    domain-context tools.
+
+    Parameters
+    ----------
+    neo4j_driver: AsyncDriver
+        The Neo4j async driver used to query the database.
+    neo4j_database: str
+        The target database name.
+    """
+    cypher = "MATCH (d:OsiSemanticModel) RETURN count(d) > 0 AS present"
+    records = await neo4j_driver.execute_query(
+        query_=cypher,
+        database_=neo4j_database,
+        routing_=RoutingControl.READ,
+        result_transformer_=lambda x: x.data(),
+    )
+    return bool(records and records[0].get("present"))
+
+
 async def fetch_neocarta_graph_metadata(
     neo4j_driver: AsyncDriver, neo4j_database: str
 ) -> NeocartaGraph | None:
