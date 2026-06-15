@@ -4,19 +4,15 @@ import json
 import re
 from typing import Any, TypedDict
 
-from ....data_model.rdbms import (
-    BusinessTerm,
-    Database,
+from ....data_model.glossary import BusinessTerm, TaggedWith
+from ....data_model.osi import (
     DomainHasTable,
     Expression,
     HasAspect,
-    HasColumn,
     HasExpression,
     HasMetric,
     HasQuery,
-    HasSchema,
     HasSourceTable,
-    HasTable,
     HasTargetTable,
     Join,
     Metric,
@@ -25,12 +21,16 @@ from ....data_model.rdbms import (
     OsiCustomExtensions,
     OsiSemanticModel,
     OsiTable,
-    Query,
+    UsedInJoin,
+)
+from ....data_model.query import Query, UsesColumn
+from ....data_model.schema.rdbms import (
+    Database,
+    HasColumn,
+    HasSchema,
+    HasTable,
     References,
     Schema,
-    TaggedWith,
-    UsedInJoin,
-    UsesColumn,
 )
 from ...utils.generate_id import (
     create_query_id,

@@ -182,7 +182,7 @@ def test_loader_writes_secondary_labels_and_dedupes_bts_by_name(
 
 def test_loader_bt_merge_on_name_keeps_existing_id(neo4j_driver):
     """A pre-existing BusinessTerm (by name) keeps its id when OSI synonyms collide."""
-    from neocarta.data_model.rdbms import BusinessTerm
+    from neocarta.data_model.glossary import BusinessTerm
 
     loader = OsiNeo4jLoader(neo4j_driver, database_name="neo4j")
 

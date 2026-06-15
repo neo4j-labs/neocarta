@@ -35,8 +35,11 @@ Unit tests use mocked clients and pre-populated caches — no external services 
 | `query_log` | Query log extract, transform, and SQL parsing utilities |
 | `connectors/utils` | Deterministic ID generation (`generate_id`) |
 | `connectors/test_loader.py` | Generic connector loader behaviour |
-| `data_model/rdbms` | Core node validation and expanded relationship models |
-| `data_model/lpg` | Core node validation and expanded relationship models |
+| `data_model/metadata` | `NeocartaGraph` metadata node validation |
+| `data_model/schema/rdbms` | Relational structural node validation |
+| `data_model/schema/lpg` | LPG structural node validation and import warning |
+| `data_model/glossary` | Glossary node and relationship models |
+| `data_model/instance` | `Value` node coercion and `HasValue` relationship |
 
 ## Integration tests
 

@@ -7,7 +7,7 @@ DataFrame caches and builds ``data_model`` objects, routing every id through
 
 import pandas as pd
 
-from ....data_model.rdbms import (
+from ....data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,

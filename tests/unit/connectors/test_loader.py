@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from neocarta import __version__
-from neocarta.data_model.rdbms import Database
+from neocarta.data_model.schema.rdbms import Database
 from neocarta.errors import ConfigError
 from neocarta.ingest.metadata import (
     FETCH_NEOCARTA_GRAPH_CYPHER,

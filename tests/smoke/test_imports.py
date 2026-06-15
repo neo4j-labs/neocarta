@@ -35,25 +35,24 @@ def test_dataplex_connector_imports():
 
 
 def test_rdbms_data_model_imports():
-    from neocarta.data_model.rdbms import (
+    from neocarta.data_model.glossary import (
         BusinessTerm,
         Category,
-        Column,
-        Database,
         Glossary,
         HasBusinessTerm,
         HasCategory,
+    )
+    from neocarta.data_model.instance import HasValue, Value
+    from neocarta.data_model.query import Query, UsesColumn, UsesTable
+    from neocarta.data_model.schema.rdbms import (
+        Column,
+        Database,
         HasColumn,
         HasSchema,
         HasTable,
-        HasValue,
-        Query,
         References,
         Schema,
         Table,
-        UsesColumn,
-        UsesTable,
-        Value,
     )
 
     assert all(
@@ -108,7 +107,7 @@ def test_warnings_module_imports():
 
 
 def test_osi_data_model_imports():
-    from neocarta.data_model.rdbms import (
+    from neocarta.data_model.osi import (
         Aspect,
         Domain,
         DomainHasTable,

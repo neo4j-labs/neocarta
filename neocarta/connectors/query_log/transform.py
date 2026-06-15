@@ -2,20 +2,16 @@
 
 import pandas as pd
 
-from ...data_model.rdbms import (
-    CTE,
+from ...data_model.query import CTE, Defines, Query, UsesColumn, UsesTable
+from ...data_model.schema.rdbms import (
     Column,
     Database,
-    Defines,
     HasColumn,
     HasSchema,
     HasTable,
-    Query,
     References,
     Schema,
     Table,
-    UsesColumn,
-    UsesTable,
 )
 from ..models import NodesCache, RelationshipsCache
 from ..utils.generate_id import generate_database_id

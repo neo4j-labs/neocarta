@@ -1,6 +1,6 @@
 import numpy as np
 
-from neocarta.data_model.rdbms.core import Column, References
+from neocarta.data_model.schema.rdbms import Column, References
 
 
 def test_column_valid():

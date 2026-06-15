@@ -3,18 +3,16 @@ import pytest
 
 from neocarta.connectors.query_log.extract import QueryLogExtractor
 from neocarta.connectors.query_log.transform import QueryLogTransformer
-from neocarta.data_model.rdbms import (
+from neocarta.data_model.query import Query, UsesColumn, UsesTable
+from neocarta.data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,
     HasSchema,
     HasTable,
-    Query,
     References,
     Schema,
     Table,
-    UsesColumn,
-    UsesTable,
 )
 
 
