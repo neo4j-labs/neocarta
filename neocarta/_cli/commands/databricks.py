@@ -45,8 +45,9 @@ def databricks() -> None:
 @click.option(
     "--embedding-dimensions",
     type=int,
-    default=None,
-    help="Embedding vector dimensions (default: 768).",
+    default=768,
+    show_default=True,
+    help="Embedding vector dimensions.",
 )
 @click.option(
     "--dry-run",
