@@ -10,9 +10,10 @@ Thin coordinator for the schema-ingest run. Its job is limited to:
 Embeddings have two modes. External (default): no vectors are produced here and
 neocarta's enrichment layer adds them afterward. Inline (when any
 `include_embeddings_*` flag is on): the node-write path embeds each batch
-in-cluster via ai_query. Both modes create the per-label vector indexes at the
-configured `embedding_dimension` (inline for the enabled labels, external for
-all four). Inferred (heuristic) foreign keys live in
+in-cluster via ai_query. Only inline creates the per-label vector indexes here
+(at the configured `embedding_dimension`, for the enabled labels); external mode
+defers index creation to the `neocarta databricks embed` CLI, which builds each
+index at the dimension it embeds. Inferred (heuristic) foreign keys live in
 `neocarta.enrichment.foreign_keys`. This module ingests catalog facts only.
 """
 
@@ -249,7 +250,15 @@ def _run(
             inline = settings.any_embeddings_enabled()
             if inline:
                 _log_embedding_consistency_warning(settings)
-            create_vector_indexes(driver, settings, inline=inline)
+                # Only inline mode writes embeddings during ingest, so only it
+                # creates the vector indexes here. External mode writes no
+                # embeddings in the job; the `neocarta databricks embed` CLI
+                # creates each vector index at the dimension it actually embeds
+                # (see enrichment.embeddings.base), so the index dimension always
+                # matches the stored vectors. Creating it here would lock the
+                # index to the job's configured dimension before any embedding
+                # exists, leaving 0 vector-search results on a dimension mismatch.
+                create_vector_indexes(driver, settings)
 
             extract_result = extract(spark, settings, schema_list, summary)
 

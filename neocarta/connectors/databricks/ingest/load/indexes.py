@@ -8,13 +8,12 @@ bootstrap is one cohesive unit.
 The actual Cypher reuses neocarta's shared :mod:`neocarta.ingest.indexes`
 helpers so index names match what the MCP server queries by.
 
-Both embedding modes create the same `{label}_vector_index` cosine indexes at
-``settings.embedding_dimension``. Inline creates an index only for labels whose
-embedding flag is on; external creates all four eligible labels, matching what
-the `neocarta databricks embed` CLI embeds. The dimension is therefore the
-single source of truth across modes: the operator must align
-``embedding_dimension`` with whatever the external enrichment model produces, or
-cross-mode vector search is inconsistent.
+Only inline mode creates `{label}_vector_index` cosine indexes here, at
+``settings.embedding_dimension`` and only for labels whose embedding flag is on,
+because only inline writes embeddings during the Spark job. External mode creates
+no vector indexes during ingest; the `neocarta databricks embed` CLI creates each
+index at the dimension it actually embeds, so the index dimension always matches
+the stored vectors.
 """
 
 from __future__ import annotations
@@ -125,15 +124,14 @@ def create_full_text_indexes(driver: Driver) -> None:
         )
 
 
-def _vector_index_labels(settings: SparkIngestSettings, *, inline: bool) -> tuple[NodeLabel, ...]:
-    """Labels to create a vector index for in the given mode.
+def _vector_index_labels(settings: SparkIngestSettings) -> tuple[NodeLabel, ...]:
+    """Labels to create a vector index for during the Spark job (inline mode).
 
-    Inline restricts to labels whose `include_embeddings_*` flag is on (only
-    those carry an `embedding` property after the run). External embeds all four
-    eligible labels via the enrichment CLI, so it indexes all of them.
+    Restricted to labels whose `include_embeddings_*` flag is on, since only
+    those carry an `embedding` property after an inline run. External mode
+    creates no vector indexes during ingest; the `neocarta databricks embed` CLI
+    creates each one at the dimension it embeds.
     """
-    if not inline:
-        return _VECTOR_INDEX_LABELS
     flags = {
         NodeLabel.DATABASE: settings.include_embeddings_databases,
         NodeLabel.SCHEMA: settings.include_embeddings_schemas,
@@ -143,23 +141,23 @@ def _vector_index_labels(settings: SparkIngestSettings, *, inline: bool) -> tupl
     return tuple(label for label in _VECTOR_INDEX_LABELS if flags[label])
 
 
-def create_vector_indexes(driver: Driver, settings: SparkIngestSettings, *, inline: bool) -> None:
-    """Create per-label `{label}_vector_index` cosine indexes.
+def create_vector_indexes(driver: Driver, settings: SparkIngestSettings) -> None:
+    """Create per-label `{label}_vector_index` cosine indexes for inline mode.
 
-    One cosine vector index per selected label, at ``embedding_dimension``,
+    One cosine vector index per inline-enabled label, at ``embedding_dimension``,
     reusing neocarta's shared :func:`neocarta.ingest.indexes.create_vector_index`
-    so the index name matches what the MCP server queries by. Inline creates
-    indexes only for labels whose embedding flag is on; external creates all
-    four eligible labels (Value is never embedded or indexed; see
-    ``_VECTOR_INDEX_LABELS``).
+    so the index name matches what the MCP server queries by. Only called in
+    inline mode (the only mode that writes embeddings during the job); external
+    mode creates no vector indexes here — the `neocarta databricks embed` CLI
+    creates each index at the dimension it actually embeds. Value is never
+    embedded or indexed (see ``_VECTOR_INDEX_LABELS``).
 
-    Both modes index at ``embedding_dimension``. The index is created with
-    `IF NOT EXISTS` and is fixed at one dimension, so the external enrichment
-    model must embed at this same dimension or vector search is inconsistent.
+    The index is created with `IF NOT EXISTS` and is fixed at one dimension, so
+    the inline endpoint must embed at ``embedding_dimension``.
     """
     from neocarta.ingest.indexes import create_vector_index
 
-    for label in _vector_index_labels(settings, inline=inline):
+    for label in _vector_index_labels(settings):
         create_vector_index(driver, label.value, settings.embedding_dimension)
         logger.info(
             "[databricks] created %s_vector_index (dim=%d, cosine)",

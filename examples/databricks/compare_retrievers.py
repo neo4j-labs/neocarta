@@ -42,9 +42,11 @@ Environment variables required
 
 import argparse
 import asyncio
+import logging
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase, RoutingControl
@@ -162,6 +164,55 @@ STRATEGIES: tuple[Strategy, ...] = (
 STRATEGIES_BY_CODE = {s.code: s for s in STRATEGIES}
 
 
+class _NotificationCounter(logging.Handler):
+    """Logging handler that tallies notification records for an end-of-run summary."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.count = 0
+
+    def emit(self, _record: logging.LogRecord) -> None:
+        self.count += 1
+
+
+def _configure_notification_logging() -> tuple[Path, _NotificationCounter]:
+    """Route the driver's notification warnings to a gitignored log file.
+
+    The neo4j driver logs every server notification through the
+    ``neo4j.notifications`` logger (``neo4j/_async/work/result.py``). One of
+    these is the harmless ``01N51`` warning emitted whenever an ``OPTIONAL
+    MATCH`` references a relationship type no node uses yet (e.g. ``REFERENCES``
+    before any foreign keys are loaded). Left unconfigured, Python's last-resort
+    handler prints these to stderr and clutter the comparison output.
+
+    Redirect that logger to ``logs/notifications.log`` and stop it propagating to
+    the root logger, so the console stays clean while the warnings remain
+    available for anyone who needs them. A counting handler is attached
+    alongside the file so the run can report whether any were emitted.
+
+    Returns:
+    -------
+    tuple[Path, _NotificationCounter]
+        The log file the notifications are written to, and the handler tracking
+        how many were emitted during the run.
+    """
+    log_dir = Path(__file__).parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / "notifications.log"
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    counter = _NotificationCounter()
+
+    logger = logging.getLogger("neo4j.notifications")
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    logger.addHandler(handler)
+    logger.addHandler(counter)
+    logger.propagate = False
+    return log_path, counter
+
+
 def _fqn(table: TableContext) -> str:
     """Fully-qualified ``database.schema.table`` name for a result."""
     return f"{table.database_name}.{table.schema_name}.{table.table_name}"
@@ -212,14 +263,17 @@ async def run_strategy(
 
 def print_strategy_results(strategy: Strategy, tables: list[TableContext], top: int) -> None:
     """Print the top ranked tables a strategy returned."""
-    print(f"\n[{strategy.code}] {strategy.description} — {len(tables)} result(s)")
+    header = f"[{strategy.code}] {strategy.description} — {len(tables)} result(s)"
+    print(f"\n{header}")
+    print("-" * len(header))
     if not tables:
         print("  (no matches)")
         return
+    print(f"  {'#':>2}  {'score':>6}  table")
     for rank, table in enumerate(tables[:top], start=1):
         score = table.table_score
-        score_text = f"{score:.3f}" if score is not None else "  -  "
-        print(f"  {rank:>2}. {score_text}  {_fqn(table)}  ({table.num_columns} cols)")
+        score_text = f"{score:.3f}" if score is not None else "   -  "
+        print(f"  {rank:>2}  {score_text:>6}  {_fqn(table)} ({table.num_columns} cols)")
 
 
 def print_comparison_matrix(results: dict[str, list[TableContext]], top: int) -> None:
@@ -240,7 +294,8 @@ def print_comparison_matrix(results: dict[str, list[TableContext]], top: int) ->
 
     fqn_width = max(len("table"), *(len(fqn) for fqn in ranks))
     header = "  ".join([f"{'table':<{fqn_width}}", *(f"{code:>11}" for code in codes)])
-    print(f"\nComparison matrix (rank within top {top}, '-' = absent)\n{header}")
+    title = f"Comparison matrix (rank within top {top}, '-' = absent)"
+    print(f"\n{'=' * 80}\n{title}\n{'=' * 80}\n{header}\n{'-' * len(header)}")
     # Stable order: tables that appear earliest/most often float up.
     ordered = sorted(ranks, key=lambda f: (min(ranks[f].values()), -len(ranks[f])))
     for fqn in ordered:
@@ -257,6 +312,7 @@ async def compare(
 ) -> None:
     """Embed the query once, then run it through each selected strategy."""
     load_dotenv()
+    notifications_log, notification_counter = _configure_notification_logging()
     uri = os.environ["NEO4J_URI"]
     username = os.environ["NEO4J_USERNAME"]
     password = os.environ["NEO4J_PASSWORD"]
@@ -266,9 +322,13 @@ async def compare(
     strategies = [STRATEGIES_BY_CODE[code] for code in strategy_codes]
     need_embedding = any(s.needs_embedding for s in strategies)
 
-    print(f"Query: {query!r}")
-    print(f"Neo4j: {uri} (database {database!r})")
-    print(f"Strategies: {', '.join(strategy_codes)}")
+    print("=" * 80)
+    print("neocarta retriever comparison")
+    print("=" * 80)
+    print(f"  Query        : {query!r}")
+    print(f"  Neo4j        : {uri} (database {database!r})")
+    print(f"  Strategies   : {', '.join(strategy_codes)}")
+    print(f"  Notifications: {notifications_log}")
 
     async with AsyncGraphDatabase.driver(uri, auth=(username, password)) as driver:
         embedding: list[float] | None = None
@@ -295,6 +355,15 @@ async def compare(
             print_strategy_results(strategy, tables, top)
 
     print_comparison_matrix(results, top)
+
+    warnings = notification_counter.count
+    if warnings:
+        print(
+            f"\n{warnings} driver notification(s) emitted during this run "
+            f"(logged to {notifications_log})."
+        )
+    else:
+        print("\nNo driver notifications during this run.")
 
 
 def main() -> None:

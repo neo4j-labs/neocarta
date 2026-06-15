@@ -2,8 +2,9 @@
 
 These exercise the pure label-selection logic and the `create_vector_indexes`
 fan-out without a live Neo4j: the shared `create_vector_index` helper is patched
-so the test asserts which labels are indexed, and at which dimension, in each
-mode.
+so the test asserts which labels are indexed, and at which dimension. Only inline
+mode creates vector indexes during the job; external mode defers to the
+`neocarta databricks embed` CLI, so there is no external fan-out to test here.
 """
 
 from __future__ import annotations
@@ -25,12 +26,6 @@ from neocarta.connectors.databricks.settings import SparkIngestSettings
 _STAGING = "/Volumes/cat/sch/vol/staging"
 
 
-def test_external_indexes_all_eligible_labels() -> None:
-    """External mode (no inline flags) indexes all four eligible labels."""
-    settings = SparkIngestSettings(catalog="c")
-    assert _vector_index_labels(settings, inline=False) == _VECTOR_INDEX_LABELS
-
-
 def test_inline_indexes_only_enabled_labels() -> None:
     """Inline mode indexes only labels whose embedding flag is on, in order."""
     settings = SparkIngestSettings(
@@ -39,26 +34,47 @@ def test_inline_indexes_only_enabled_labels() -> None:
         include_embeddings_databases=True,
         embedding_staging_volume=_STAGING,
     )
-    assert _vector_index_labels(settings, inline=True) == (
+    assert _vector_index_labels(settings) == (
         NodeLabel.DATABASE,
         NodeLabel.TABLE,
     )
 
 
-def test_value_label_never_indexed() -> None:
-    """Value is never in the eligible set in either mode."""
+def test_no_flags_indexes_nothing() -> None:
+    """With no inline flags on (the external default) no labels are indexed here."""
     settings = SparkIngestSettings(catalog="c")
+    assert _vector_index_labels(settings) == ()
+
+
+def test_value_label_never_indexed() -> None:
+    """Value is never in the eligible set."""
+    settings = SparkIngestSettings(
+        catalog="c",
+        include_embeddings_tables=True,
+        include_embeddings_columns=True,
+        include_embeddings_schemas=True,
+        include_embeddings_databases=True,
+        embedding_staging_volume=_STAGING,
+    )
     assert NodeLabel.VALUE not in _VECTOR_INDEX_LABELS
-    assert NodeLabel.VALUE not in _vector_index_labels(settings, inline=False)
+    assert NodeLabel.VALUE not in _vector_index_labels(settings)
 
 
 def test_create_vector_indexes_uses_embedding_dimension() -> None:
-    """Both modes create indexes at ``embedding_dimension``; external fans out to all four."""
-    settings = SparkIngestSettings(catalog="c", embedding_dimension=1536)
+    """All inline-enabled labels are indexed at ``embedding_dimension``."""
+    settings = SparkIngestSettings(
+        catalog="c",
+        include_embeddings_tables=True,
+        include_embeddings_columns=True,
+        include_embeddings_schemas=True,
+        include_embeddings_databases=True,
+        embedding_dimension=1536,
+        embedding_staging_volume=_STAGING,
+    )
     driver = object()
 
     with patch("neocarta.ingest.indexes.create_vector_index") as create_vector_index:
-        create_vector_indexes(driver, settings, inline=False)
+        create_vector_indexes(driver, settings)
 
     created = {call.args[1]: call.args[2] for call in create_vector_index.call_args_list}
     assert created == {
@@ -80,7 +96,7 @@ def test_create_vector_indexes_inline_skips_disabled_labels() -> None:
     driver = object()
 
     with patch("neocarta.ingest.indexes.create_vector_index") as create_vector_index:
-        create_vector_indexes(driver, settings, inline=True)
+        create_vector_indexes(driver, settings)
 
     create_vector_index.assert_called_once_with(driver, NodeLabel.COLUMN.value, 1024)
 

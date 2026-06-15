@@ -12,13 +12,10 @@ A running log of outstanding questions and decisions for Neocarta.
 
 **Open question:** Keep the composed `name | type | description`, or revert to just `description`?
 
-- Keep composed: every node embeds and vector search matches names/types, but this also changes the vectors for BigQuery, CSV, and Dataplex.
-- Just description: vectors reflect only human-authored text, but uncommented tables/columns and all Database nodes embed nothing and are invisible to vector search.
 
 ## Databricks full-text (keyword) search
 
-- Retrieval is hybrid, blending vector similarity with full-text keyword search, which needs Neo4j full-text indexes. The Databricks connector previously created none, so keyword search returned nothing on a Databricks graph.
-- The connector now creates `schema_full_text_index`, `table_full_text_index`, and `column_full_text_index` via the shared `neocarta.ingest.indexes.create_full_text_index` helper, matching the MCP server and the other connectors. Database is not indexed.
+- The Databricks connector creates `schema_full_text_index`, `table_full_text_index`, and `column_full_text_index` via the shared `neocarta.ingest.indexes.create_full_text_index` helper, matching the MCP server and the other connectors. Database is not indexed.
 - Each index covers `name | qualified_name | description`.
 - Including the dotted `qualified_name` lets Lucene tokenize the path so the bare name still matches while catalog/schema words become searchable.
 - This is lexical only: `qualified_name` is deliberately not in the embedded text, to keep embeddings identical across connectors.
