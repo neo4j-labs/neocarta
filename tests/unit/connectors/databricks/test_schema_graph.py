@@ -54,39 +54,39 @@ def test_database_nodes_embedding_text_equals_name(local_spark):
     assert _one(df, "embedding_text") == _one(df, "name")
 
 
-def test_schema_nodes_embedding_text_is_catalog_qualified(local_spark):
-    """Schema embedding text qualifies the name with its catalog plus comment."""
+def test_schema_nodes_embedding_text_is_name_and_comment(local_spark):
+    """Schema embedding text is `name | comment`, matching the shared embed path."""
     schemata = local_spark.createDataFrame(
         [("sales", "public", "customer facing")],
         ["catalog_name", "schema_name", "comment"],
     )
     df = build_schema_nodes(schemata)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "sales.public | customer facing"
+    assert _one(df, "embedding_text") == "public | customer facing"
 
 
 def test_schema_nodes_embedding_text_drops_blank_comment(local_spark):
-    """A blank/whitespace comment is dropped, leaving just the qualified name."""
+    """A blank/whitespace comment is dropped, leaving just the name."""
     schemata = local_spark.createDataFrame(
         [("sales", "public", "   ")],
         ["catalog_name", "schema_name", "comment"],
     )
-    assert _one(build_schema_nodes(schemata), "embedding_text") == "sales.public"
+    assert _one(build_schema_nodes(schemata), "embedding_text") == "public"
 
 
-def test_table_nodes_embedding_text_is_catalog_qualified(local_spark):
-    """Table embedding text leads with catalog.schema.table plus the comment."""
+def test_table_nodes_embedding_text_is_name_and_comment(local_spark):
+    """Table embedding text is `name | comment`."""
     tables = local_spark.createDataFrame(
         [("sales", "public", "orders", "order facts", "MANAGED", None, None)],
         _tables_schema(),
     )
     df = build_table_nodes(tables)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "sales.public.orders | order facts"
+    assert _one(df, "embedding_text") == "orders | order facts"
 
 
 def test_column_nodes_embedding_text_includes_type_and_comment(local_spark):
-    """Column embedding text is the 4-part name, then the data type, then comment."""
+    """Column embedding text is `name | type | comment`."""
     columns = local_spark.createDataFrame(
         [("sales", "public", "orders", "total", "DECIMAL", "YES", "line total", 3)],
         [
@@ -102,7 +102,7 @@ def test_column_nodes_embedding_text_includes_type_and_comment(local_spark):
     )
     df = build_column_nodes(columns)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "sales.public.orders.total | DECIMAL | line total"
+    assert _one(df, "embedding_text") == "total | DECIMAL | line total"
 
 
 def test_schema_node_id_and_qualified_name_agree_with_python(local_spark):

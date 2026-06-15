@@ -44,6 +44,28 @@ _VECTOR_INDEX_LABELS = (
     NodeLabel.COLUMN,
 )
 
+# Labels that get a `{label}_full_text_index`, matching the other connectors
+# (the shared RDBMS loader full-text-indexes Schema, Table, and Column). Database
+# is excluded — no connector full-text-indexes it, and the MCP server only
+# queries the table and column indexes. The shared helper names each single-label
+# index `{label}_full_text_index`, so these line up with what the MCP server's
+# full-text Cypher queries by.
+_FULL_TEXT_INDEX_LABELS = (
+    NodeLabel.SCHEMA,
+    NodeLabel.TABLE,
+    NodeLabel.COLUMN,
+)
+
+# Properties covered by each full-text index. `qualified_name` (the readable
+# `catalog.schema.table` path) is indexed alongside `name` and `description` so
+# keyword search can disambiguate by catalog/schema: Lucene tokenizes the dotted
+# path into separate words, so the bare name still matches exactly while the
+# catalog and schema words become searchable too. This is a lexical-only choice
+# — embeddings stay on the bare `name | type | comment` text (see
+# EMBEDDING_TEXT_EXPR) to keep every connector embedding identical text and avoid
+# diluting vectors with non-semantic catalog/schema words.
+_FULL_TEXT_PROPERTIES = ("name", "qualified_name", "description")
+
 
 def bootstrap_constraints(driver: Driver) -> None:
     """Create id constraints and the connector's lookup indexes.
@@ -52,8 +74,10 @@ def bootstrap_constraints(driver: Driver) -> None:
     :func:`neocarta.ingest.utils.write_neo4j_constraints`, which picks NODE KEY
     (enterprise) or UNIQUE (community) constraints per the server edition. Two
     connector-specific range indexes back hot lookups: Column ``type`` and the
-    Value ``last_run`` run-stamp (the scoped stale-Value delete keys on it).
-    Vector indexes are created separately by :func:`create_vector_indexes`.
+    Value ``last_run`` run-stamp (the scoped stale-Value delete keys on it). The
+    Schema/Table/Column full-text indexes that back keyword search are created by
+    :func:`create_full_text_indexes`. Vector indexes are created separately by
+    :func:`create_vector_indexes`.
     """
     from neocarta.ingest.indexes import create_range_index
     from neocarta.ingest.rdbms.constraints import (
@@ -70,7 +94,35 @@ def bootstrap_constraints(driver: Driver) -> None:
     )
     create_range_index(driver, NodeLabel.COLUMN.value, "type")
     create_range_index(driver, NodeLabel.VALUE.value, "last_run")
+    create_full_text_indexes(driver)
     logger.info("[databricks] neo4j constraints and indexes bootstrapped")
+
+
+def create_full_text_indexes(driver: Driver) -> None:
+    """Create the Schema/Table/Column `{label}_full_text_index` indexes.
+
+    One full-text index per label in :data:`_FULL_TEXT_INDEX_LABELS`, each over
+    :data:`_FULL_TEXT_PROPERTIES`, reusing neocarta's shared
+    :func:`neocarta.ingest.indexes.create_full_text_index` so the index names
+    match what the MCP server's full-text Cypher queries by. These back the
+    hybrid retrieval's keyword half; without them, name/description keyword
+    search returns nothing on a Databricks graph. The shared helper uses
+    ``IF NOT EXISTS``, so this is idempotent across reruns and independent of the
+    embedding mode (both inline and external benefit from keyword search).
+    """
+    from neocarta.ingest.indexes import create_full_text_index
+
+    for label in _FULL_TEXT_INDEX_LABELS:
+        create_full_text_index(
+            driver,
+            node_labels=[label.value],
+            property_names=list(_FULL_TEXT_PROPERTIES),
+        )
+        logger.info(
+            "[databricks] created %s_full_text_index (%s)",
+            label.value.lower(),
+            ", ".join(_FULL_TEXT_PROPERTIES),
+        )
 
 
 def _vector_index_labels(settings: SparkIngestSettings, *, inline: bool) -> tuple[NodeLabel, ...]:
@@ -118,5 +170,6 @@ def create_vector_indexes(driver: Driver, settings: SparkIngestSettings, *, inli
 
 __all__ = [
     "bootstrap_constraints",
+    "create_full_text_indexes",
     "create_vector_indexes",
 ]

@@ -95,17 +95,19 @@ def test_embedding_text_expr_is_never_a_graph_property():
         assert "embedding_text" not in props
 
 
-def test_qualified_embedding_text_leads_with_catalog():
-    """Table/Column/Schema embedding text leads with the catalog so the same
-    name in two catalogs never embeds identically."""
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.TABLE].startswith(
-        "concat_ws(' | ', concat_ws('.', table_catalog"
+def test_embedding_text_is_name_type_comment():
+    """Embedding text is composed as `name | type | comment`, matching the
+    shared enrichment embed path so inline and external embed the identical
+    text. Only Column carries a type (`data_type`); the others are
+    `name | comment`."""
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.TABLE] == (
+        "concat_ws(' | ', name, nullif(trim(comment), ''))"
     )
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN].startswith(
-        "concat_ws(' | ', concat_ws('.', table_catalog"
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN] == (
+        "concat_ws(' | ', name, data_type, nullif(trim(comment), ''))"
     )
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA].startswith(
-        "concat_ws(' | ', concat_ws('.', catalog_name"
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA] == (
+        "concat_ws(' | ', name, nullif(trim(comment), ''))"
     )
     # Database embeds a single scalar column. Value nodes are never embedded, so
     # they have no embedding-text expression.

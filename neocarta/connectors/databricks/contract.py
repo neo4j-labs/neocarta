@@ -164,21 +164,17 @@ REFERENCES_PROPERTIES: tuple[str, ...] = _graph_properties(
 # (run.py:_project) strips it, so it is never a graph property. Kept here so the
 # builders, the embed stage, and the tests share one definition. Value nodes are
 # never embedded (no neocarta path embeds them; they are reached by HAS_VALUE
-# traversal, not vector search), so they have no entry here. Catalog leads every
-# qualified name so `bronze.sales.orders` and `gold.sales.orders` never embed
-# identically in a multi-catalog graph; in a single-catalog graph it is a
-# constant prefix.
+# traversal, not vector search), so they have no entry here.
+#
+# The text is composed as `name | type | comment`, matching the shared
+# enrichment embed path (enrichment.embeddings.utils.get_nodes_to_embed), so
+# inline and external embeddings and every other connector embed the identical
+# text. `concat_ws` drops null parts and `nullif(trim(comment), '')` drops blank
+# comments, so a node always embeds on at least its name. Only Column carries a
+# type (`data_type`); the other labels are `name | comment`.
 EMBEDDING_TEXT_EXPR: dict[NodeLabel, str] = {
-    NodeLabel.TABLE: (
-        "concat_ws(' | ', concat_ws('.', table_catalog, table_schema, name),"
-        " nullif(trim(comment), ''))"
-    ),
-    NodeLabel.COLUMN: (
-        "concat_ws(' | ', concat_ws('.', table_catalog, table_schema, table_name, name),"
-        " data_type, nullif(trim(comment), ''))"
-    ),
-    NodeLabel.SCHEMA: (
-        "concat_ws(' | ', concat_ws('.', catalog_name, name), nullif(trim(comment), ''))"
-    ),
+    NodeLabel.TABLE: "concat_ws(' | ', name, nullif(trim(comment), ''))",
+    NodeLabel.COLUMN: "concat_ws(' | ', name, data_type, nullif(trim(comment), ''))",
+    NodeLabel.SCHEMA: "concat_ws(' | ', name, nullif(trim(comment), ''))",
     NodeLabel.DATABASE: "name",
 }

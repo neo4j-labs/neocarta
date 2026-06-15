@@ -80,7 +80,19 @@ neocarta databricks embed
 neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 768
 ```
 
-- Embeds Database, Schema, Table, and Column descriptions.
+`neocarta` is the console script installed with the package, so a bare
+`neocarta …` invocation works once you have `pip install neocarta` into an
+active environment. Developing from this repo with `uv`, the binary is not on
+your `PATH`; prefix the command with `uv run` to run it inside the managed
+environment:
+
+```bash
+uv run neocarta databricks embed
+```
+
+- Embeds Database, Schema, Table, and Column nodes, using a composed
+  `name | type | description` text per node (null/blank parts dropped), so a
+  node embeds on at least its name even without a comment.
 - Requires `OPENAI_API_KEY`.
 - `--dry-run` prints the planned run without touching Neo4j.
 - `--json` produces machine-readable output.
@@ -157,6 +169,28 @@ Dataplex), which use the shared dotted-id scheme in
 `neocarta.connectors.utils.generate_id`. See
 `neocarta/connectors/databricks/ingest/contract_expr.py` for the full rationale.
 
+## Keyword search indexes
+
+neocarta retrieval is hybrid: it blends vector (embedding) similarity with
+full-text (keyword) search and ranks the two together. The keyword half needs
+Neo4j full-text indexes, and the index bootstrap creates them for every run,
+independent of the embedding mode: `schema_full_text_index`,
+`table_full_text_index`, and `column_full_text_index`, built via the shared
+`neocarta.ingest.indexes.create_full_text_index` helper so the names match what
+the MCP server's full-text Cypher queries by. This is the same set the other
+connectors (BigQuery, CSV, Dataplex) create through the RDBMS loader. Database is
+not full-text indexed, matching the other connectors.
+
+Each index covers `name`, `qualified_name`, and `description`. Including
+`qualified_name` (the dotted `catalog.schema.table` path) lets keyword search
+disambiguate by catalog or schema: Lucene tokenizes the dotted path into separate
+words, so the bare name still matches exactly while the catalog and schema words
+become searchable too. This is a lexical-only choice — embeddings stay on the
+bare `name | type | comment` text (see [Embedding modes](#embedding-modes)) to
+keep every connector embedding identical text and avoid diluting vectors with
+non-semantic catalog/schema words. The indexes are created with `IF NOT EXISTS`,
+so reruns are safe.
+
 ## Embedding modes
 
 Vectors can be produced in two ways. Both are fully supported, first-class
@@ -181,7 +215,10 @@ This is a two-step flow, and neocarta ships a CLI verb for the second step. See
 
 During the node-write loop, each batch runs
 `ai_query('<endpoint>', embedding_text, failOnError => false)` natively in
-Spark against a Databricks model-serving endpoint. There are no Python UDFs and
+Spark against a Databricks model-serving endpoint, where `embedding_text` is the
+composed `name | type | comment` string (null/blank parts dropped) — the same
+text the external/shared embed path composes, so inline and external embed
+identically. There are no Python UDFs and
 no driver-side collection of table data. Each label can be enabled
 independently, and a per-label `{label}_vector_index` cosine index is created
 for each enabled label at the configured dimension. Turn inline on by setting
@@ -287,7 +324,8 @@ summary = DatabricksSparkSchemaConnector().run()
 ```
 
 **Step 2: CLI embedding command.** After the graph exists, embed the
-descriptions with OpenAI and write the vectors back:
+descriptions with OpenAI and write the vectors back (prefix with `uv run` when
+working from this repo):
 
 ```bash
 neocarta databricks embed
@@ -295,7 +333,8 @@ neocarta databricks embed
 neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 768
 ```
 
-The command embeds Database, Schema, Table, and Column descriptions and requires
+The command embeds Database, Schema, Table, and Column nodes — each on a composed
+`name | type | description` text (null/blank parts dropped) — and requires
 `OPENAI_API_KEY`. Pass `--dry-run` to print the planned run without touching
 Neo4j, and `--json` for machine-readable output. The Spark ingest itself is not a
 CLI verb, and inline embeddings remain a setting on the Spark job rather than a

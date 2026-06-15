@@ -12,8 +12,12 @@ from unittest.mock import patch
 
 from neocarta.connectors.databricks.contract import NodeLabel
 from neocarta.connectors.databricks.ingest.load.indexes import (
+    _FULL_TEXT_INDEX_LABELS,
+    _FULL_TEXT_PROPERTIES,
     _VECTOR_INDEX_LABELS,
     _vector_index_labels,
+    bootstrap_constraints,
+    create_full_text_indexes,
     create_vector_indexes,
 )
 from neocarta.connectors.databricks.settings import SparkIngestSettings
@@ -79,3 +83,53 @@ def test_create_vector_indexes_inline_skips_disabled_labels() -> None:
         create_vector_indexes(driver, settings, inline=True)
 
     create_vector_index.assert_called_once_with(driver, NodeLabel.COLUMN.value, 1024)
+
+
+def test_full_text_indexes_cover_schema_table_column() -> None:
+    """One full-text index per label, over name/qualified_name/description.
+
+    The labels and property set match what the MCP server's full-text Cypher
+    queries by; Database is intentionally not full-text indexed.
+    """
+    assert _FULL_TEXT_INDEX_LABELS == (
+        NodeLabel.SCHEMA,
+        NodeLabel.TABLE,
+        NodeLabel.COLUMN,
+    )
+    assert _FULL_TEXT_PROPERTIES == ("name", "qualified_name", "description")
+    assert NodeLabel.DATABASE not in _FULL_TEXT_INDEX_LABELS
+
+    driver = object()
+
+    with patch("neocarta.ingest.indexes.create_full_text_index") as create_full_text_index:
+        create_full_text_indexes(driver)
+
+    created = {
+        tuple(call.kwargs["node_labels"]): tuple(call.kwargs["property_names"])
+        for call in create_full_text_index.call_args_list
+    }
+    assert created == {
+        (NodeLabel.SCHEMA.value,): ("name", "qualified_name", "description"),
+        (NodeLabel.TABLE.value,): ("name", "qualified_name", "description"),
+        (NodeLabel.COLUMN.value,): ("name", "qualified_name", "description"),
+    }
+
+
+def test_bootstrap_constraints_creates_full_text_indexes() -> None:
+    """The full-text indexes are wired into the connector's index bootstrap.
+
+    Guards against the bootstrap silently dropping the full-text step: keyword
+    search would break with no other test failing.
+    """
+    driver = object()
+
+    with (
+        patch("neocarta.ingest.utils.write_neo4j_constraints"),
+        patch("neocarta.ingest.indexes.create_range_index"),
+        patch(
+            "neocarta.connectors.databricks.ingest.load.indexes.create_full_text_indexes"
+        ) as create_full_text_indexes_mock,
+    ):
+        bootstrap_constraints(driver)
+
+    create_full_text_indexes_mock.assert_called_once_with(driver)
