@@ -40,6 +40,12 @@ class MockEmbeddingsConnector(LiteLLMEmbeddingsConnector):
     async def _create_embedding_async(self, description: str) -> list[float]:  # noqa: ARG002
         return list(_MOCK_EMBEDDING)
 
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float]]:
+        return [list(_MOCK_EMBEDDING) for _ in descriptions]
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float]]:
+        return [list(_MOCK_EMBEDDING) for _ in descriptions]
+
 
 @pytest.fixture(scope="module")
 def sample_csv_dir(setup):

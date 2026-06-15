@@ -1,7 +1,8 @@
 import pandas as pd
 import pytest
 
-from neocarta.connectors.query_log import QueryLogExtractor, QueryLogTransformer
+from neocarta.connectors.query_log.extract import QueryLogExtractor
+from neocarta.connectors.query_log.transform import QueryLogTransformer
 from neocarta.data_model.rdbms import (
     Column,
     Database,

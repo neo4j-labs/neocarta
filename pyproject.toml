@@ -1,6 +1,6 @@
 [project]
 name = "neocarta"
-version = "0.6.0"
+version = "0.7.0"
 description = "Library that facilitates the creation of semantic layer metadata graph in Neo4j."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -85,7 +85,7 @@ neocarta-databricks-ingest = "neocarta.connectors.databricks.run:run_ingest"
 dev = [
     "ipykernel>=7.1.0",
     "pytest>=9.0.2",
-    "testcontainers[neo4j]>=4.14.2",
+    "testcontainers[neo4j,postgres]>=4.14.2",
     "ruff>=0.15.10",
 ]
 

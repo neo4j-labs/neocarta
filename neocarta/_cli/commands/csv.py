@@ -13,12 +13,13 @@ import click
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
+    _run_embeddings,
 )
 
 
@@ -42,13 +43,13 @@ def csv() -> None:
 @click.option(
     "--embedding-model",
     default=None,
-    help="OpenAI embedding model name (default: text-embedding-3-small).",
+    help="Embedding model id in LiteLLM format (default: text-embedding-3-small).",
 )
 @click.option(
     "--embedding-dimensions",
     type=int,
     default=None,
-    help="Embedding vector dimensions (default: 768).",
+    help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
     "--dry-run",
@@ -79,10 +80,10 @@ def csv_ingest(
     Ingests every entity CSV found in the directory (Database, Schema, Table,
     Column, Value, Query, and glossary nodes) plus their relationships; files
     that are not present are skipped. When --embeddings is enabled, description
-    embeddings are generated and written back to the graph (requires
-    OPENAI_API_KEY); the default is disabled. Pass --dry-run to print the
-    planned ingestion without touching Neo4j. The directory can come from the
-    --csv-directory flag or the CSV_DIRECTORY env var.
+    embeddings are generated and written back to the graph (requires provider
+    credentials, e.g. OPENAI_API_KEY); the default is disabled. Pass --dry-run to
+    print the planned ingestion without touching Neo4j. The directory can come
+    from the --csv-directory flag or the CSV_DIRECTORY env var.
     """
     settings = load_settings()
     csv_directory = require(
@@ -122,8 +123,6 @@ def csv_ingest(
     # Lazy import: keep the connector dependency off the --help / --dry-run path.
     from ...connectors.csv import CSVConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting CSV connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = CSVConnector(
@@ -131,12 +130,13 @@ def csv_ingest(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run()
+            with cli_status(stderr, "Ingesting CSV metadata..."):
+                connector.ingest()
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=node_labels)
+                with cli_status(stderr, "Generating embeddings..."):
+                    _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 

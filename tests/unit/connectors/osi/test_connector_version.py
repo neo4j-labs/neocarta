@@ -25,18 +25,19 @@ def test_unsupported_version_warning_is_a_user_warning_subclass():
 
 def test_unsupported_version_arg_warns_at_ingest_time():
     """Calling ingest with a version outside SUPPORTED_VERSIONS warns."""
-    connector = _make_connector()
-    # Patch out the IO-heavy stages so we can isolate the version-warning behavior.
-    connector._load_ingest = MagicMock()  # type: ignore[method-assign]
-    connector.loader.upsert_neocarta_graph_node = MagicMock(  # type: ignore[method-assign]
-        return_value=MagicMock(model_dump=MagicMock(return_value={}))
-    )
+    spec = {"version": "9.9.9", "semantic_model": []}
 
-    with (
-        pytest.warns(UnsupportedOsiVersionWarning, match="outside the supported set"),
-        _patch_extractor({"version": "9.9.9", "semantic_model": []}),
-    ):
-        connector.ingest("dummy_path.yaml", version="9.9.9")
+    with _patch_extractor(spec):
+        # Construct INSIDE the patch so __init__ picks up the mocked OsiSpecExtractor.
+        connector = _make_connector()
+        # Patch out the IO-heavy stages so we can isolate the version-warning behavior.
+        connector._load_ingest = MagicMock()  # type: ignore[method-assign]
+        connector.loader.upsert_neocarta_graph_node = MagicMock(  # type: ignore[method-assign]
+            return_value=MagicMock(model_dump=MagicMock(return_value={}))
+        )
+
+        with pytest.warns(UnsupportedOsiVersionWarning, match="outside the supported set"):
+            connector.ingest("dummy_path.yaml", version="9.9.9")
 
 
 def test_ingest_warns_when_spec_version_mismatches_provided_version():
@@ -78,4 +79,5 @@ def _patch_extractor(spec: dict):
 
     extractor = MagicMock()
     extractor.extract.return_value = spec
+    extractor.spec = spec
     return patch("neocarta.connectors.osi.connector.OsiSpecExtractor", return_value=extractor)

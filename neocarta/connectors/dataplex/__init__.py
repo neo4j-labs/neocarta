@@ -1,7 +1,6 @@
-"""Dataplex connector."""
+"""Dataplex connectors: BigQuery catalog schema + business glossary."""
 
-from .connector import DataplexConnector
-from .extract import DataplexExtractor
-from .transform import DataplexTransformer
+from .glossary import DataplexGlossaryConnector
+from .schema import DataplexSchemaConnector
 
-__all__ = ["DataplexConnector", "DataplexExtractor", "DataplexTransformer"]
+__all__ = ["DataplexGlossaryConnector", "DataplexSchemaConnector"]

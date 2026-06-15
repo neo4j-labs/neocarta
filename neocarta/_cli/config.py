@@ -26,12 +26,21 @@ ENV_VARS: dict[str, str] = {
     "NEO4J_USERNAME": "Neo4j username.",
     "NEO4J_PASSWORD": "Neo4j password (secret).",
     "NEO4J_DATABASE": "Neo4j database name (default: neo4j).",
-    "OPENAI_API_KEY": "OpenAI API key for embeddings (secret).",
+    "OPENAI_API_KEY": (
+        "Embedding-provider API key, read by LiteLLM (secret). OpenAI uses "
+        "OPENAI_API_KEY; other providers use their own vars (GEMINI_API_KEY, "
+        "COHERE_API_KEY, AZURE_*, AWS_*, ...)."
+    ),
     "GCP_PROJECT_ID": "Google Cloud project ID.",
+    "GCP_PROJECT_NUMBER": "Google Cloud project number (for `dataplex *`).",
     "BIGQUERY_DATASET_ID": "Default BigQuery dataset ID.",
     "BIGQUERY_REGION": "BigQuery region for INFORMATION_SCHEMA queries.",
+    "DATAPLEX_LOCATION": "Dataplex location, e.g. `us` (for `dataplex *`).",
     "GOOGLE_APPLICATION_CREDENTIALS": "Path to a GCP service-account JSON (secret).",
     "CSV_DIRECTORY": "Directory containing CSV metadata files (for `csv ingest`).",
+    "OSI_SPEC_SOURCE": "Path or URL to an OSI YAML spec (for `osi ingest`).",
+    "OSI_SEMANTIC_MODEL_NAME": "Name of the OsiSemanticModel to export (for `osi export`).",
+    "QUERY_LOG_FILE": "Path to a query-log JSON file (for `query-log ingest`).",
 }
 
 
@@ -49,10 +58,13 @@ class CLISettings(BaseSettings):
     neo4j_password: SecretStr | None = Field(default=None, validation_alias="NEO4J_PASSWORD")
     neo4j_database: str = Field(default="neo4j", validation_alias="NEO4J_DATABASE")
 
-    # Embeddings / OpenAI
-    openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    # Embeddings (LiteLLM, multi-provider). Provider auth (OPENAI_API_KEY,
+    # GEMINI_API_KEY, AZURE_*, AWS_*, ...) is read directly from the environment
+    # by LiteLLM, so no API key is parsed onto this settings object.
     embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 768
+    # None => let LiteLLM use the model's native dimension. Set via
+    # --embedding-dimensions to request truncation on models that support it.
+    embedding_dimensions: int | None = None
     embedding_batch_size: int = 100
 
     # BigQuery
@@ -60,8 +72,20 @@ class CLISettings(BaseSettings):
     bigquery_dataset_id: str | None = Field(default=None, validation_alias="BIGQUERY_DATASET_ID")
     bigquery_region: str = Field(default="region-us", validation_alias="BIGQUERY_REGION")
 
+    # Dataplex
+    gcp_project_number: str | None = Field(default=None, validation_alias="GCP_PROJECT_NUMBER")
+    dataplex_location: str | None = Field(default=None, validation_alias="DATAPLEX_LOCATION")
+
     # CSV
     csv_directory: str | None = Field(default=None, validation_alias="CSV_DIRECTORY")
+
+    # OSI
+    osi_spec_source: str | None = Field(default=None, validation_alias="OSI_SPEC_SOURCE")
+    osi_semantic_model_name: str | None = Field(
+        default=None, validation_alias="OSI_SEMANTIC_MODEL_NAME"
+    )
+    # Query log
+    query_log_file: str | None = Field(default=None, validation_alias="QUERY_LOG_FILE")
 
 
 def load_settings() -> CLISettings:

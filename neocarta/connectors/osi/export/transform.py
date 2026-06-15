@@ -98,7 +98,7 @@ class OsiExportTransformer:
         self.spec = spec
         return spec
 
-    def to_yaml(self, output_path: str | Path) -> None:
+    def _to_yaml(self, output_path: str | Path) -> None:
         """
         Write the cached OSI spec dict to ``output_path`` as YAML.
 

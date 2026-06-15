@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from neo4j import Driver
 
-    from ...enrichment.embeddings import OpenAIEmbeddingsConnector
+    from ...enrichment.embeddings import BaseEmbeddingsConnector, LiteLLMEmbeddingsConnector
     from ..config import CLISettings
 
 
@@ -78,29 +78,61 @@ def _neo4j_driver(settings: CLISettings) -> Iterator[Driver]:
 def _build_embedder(
     settings: CLISettings,
     neo4j_driver: Driver,
-) -> OpenAIEmbeddingsConnector:
-    """Construct an OpenAIEmbeddingsConnector for post-load embedding runs.
+) -> LiteLLMEmbeddingsConnector:
+    """Construct a LiteLLMEmbeddingsConnector for post-load embedding runs.
 
-    The OpenAI API key is unwrapped from :class:`SecretStr` inline in the
-    ``OpenAI(...)`` constructor call, so the raw key is never assigned to a
-    named local variable.
+    LiteLLM routes to the provider implied by ``embedding_model`` and reads
+    provider auth (``OPENAI_API_KEY``, ``GEMINI_API_KEY``, ...) directly from
+    the environment, so no secret is unwrapped here. The vector dimension is
+    auto-detected from the model on first use; when ``embedding_dimensions`` is
+    set (via ``--embedding-dimensions``) it is forwarded to LiteLLM for models
+    that support dimension truncation.
     """
-    # Lazy import: heavy dependencies are only loaded when embeddings run.
-    from openai import OpenAI  # noqa: PLC0415
+    # Lazy import: the embedding stack is only loaded when embeddings run.
+    from ...enrichment.embeddings import LiteLLMEmbeddingsConnector  # noqa: PLC0415
 
-    from ...enrichment.embeddings import OpenAIEmbeddingsConnector  # noqa: PLC0415
-
-    require_secret(
-        "OPENAI_API_KEY",
-        settings.openai_api_key,
-        env_var="OPENAI_API_KEY",
+    litellm_kwargs = (
+        {"dimensions": settings.embedding_dimensions}
+        if settings.embedding_dimensions is not None
+        else None
     )
-    # require_secret raised on missing/empty; the assert narrows the type.
-    assert settings.openai_api_key is not None  # noqa: S101
-    return OpenAIEmbeddingsConnector(
+    return LiteLLMEmbeddingsConnector(
         neo4j_driver=neo4j_driver,
-        client=OpenAI(api_key=settings.openai_api_key.get_secret_value()),
         embedding_model=settings.embedding_model,
-        dimensions=settings.embedding_dimensions,
         database_name=settings.neo4j_database,
+        litellm_kwargs=litellm_kwargs,
     )
+
+
+def _run_embeddings(
+    embedder: BaseEmbeddingsConnector,
+    node_labels: list[NodeLabel],
+) -> None:
+    """Run an embedder and normalise failures into the CLI error contract.
+
+    Library-level :class:`NeocartaError` instances (e.g. a Neo4j
+    ``IndexCreationError``) are re-raised unchanged so the caller's
+    ``cli_error_from`` adapter maps them to their declared exit code. Any other
+    failure — LiteLLM surfaces missing/invalid credentials or an unknown model
+    as a plain ``RuntimeError`` from the dimension probe — is wrapped in a
+    structured :class:`CLIError` so agents get a clean envelope instead of a
+    raw traceback.
+    """
+    # Local imports keep the error deps off the --help / --dry-run path.
+    from ...errors import NeocartaError  # noqa: PLC0415
+    from ..errors import CLIError  # noqa: PLC0415
+
+    try:
+        embedder.run(node_labels=node_labels)
+    except NeocartaError:
+        raise
+    except Exception as exc:  # provider/probe failures aren't NeocartaError
+        raise CLIError(
+            "upstream_error",
+            "Embedding generation failed.",
+            suggestion=(
+                "Check the embedding provider credentials and that the model id "
+                "is valid for your provider (e.g. set OPENAI_API_KEY for OpenAI "
+                "models, GEMINI_API_KEY for Gemini)."
+            ),
+        ) from exc

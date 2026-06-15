@@ -1,11 +1,14 @@
 """Connector for creating embeddings via LiteLLM (multi-provider)."""
 
+import logging
 from typing import Any
 
 import litellm
 from neo4j import Driver
 
 from .base import BaseEmbeddingsConnector
+
+logger = logging.getLogger(__name__)
 
 
 class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
@@ -85,7 +88,7 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0]["embedding"]
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
 
     async def _create_embedding_async(self, description: str) -> list[float] | None:
@@ -110,5 +113,61 @@ class LiteLLMEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0]["embedding"]
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
+
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (sync).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
+        """
+        try:
+            response = litellm.embedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
+            raise
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (async).
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding vector per description, in input order. Raises if the
+            batch request fails, rather than silently falling back to slow
+            per-item calls.
+        """
+        try:
+            response = await litellm.aembedding(
+                model=self.embedding_model,
+                input=descriptions,
+                **self._call_kwargs,
+            )
+            ordered = sorted(response.data, key=lambda item: item["index"])
+            return [item["embedding"] for item in ordered]
+        except Exception as e:
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
+            raise

@@ -1,5 +1,7 @@
 """Base class for embedding connectors."""
 
+import logging
+
 import pandas as pd
 from neo4j import Driver
 
@@ -11,6 +13,8 @@ from .utils import (
     get_nodes_to_embed,
     write_embeddings_to_graph,
 )
+
+logger = logging.getLogger(__name__)
 
 _DIMENSION_PROBE_INPUT = "dimension probe"
 
@@ -78,6 +82,22 @@ class BaseEmbeddingsConnector:
         """
         raise NotImplementedError
 
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (sync).
+
+        Subclasses must override this.
+        """
+        raise NotImplementedError
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of descriptions in a single request (async).
+
+        Subclasses must override this.
+        """
+        raise NotImplementedError
+
     def _probe_dimensions_sync(self) -> int:
         """Discover the model's embedding dimension via one probe call."""
         if self._dimensions is not None:
@@ -89,6 +109,11 @@ class BaseEmbeddingsConnector:
                 "Check provider credentials and model id."
             )
         self._dimensions = len(vector)
+        logger.info(
+            "Detected embedding dimension %d for model %s",
+            self._dimensions,
+            self.embedding_model,
+        )
         return self._dimensions
 
     async def _probe_dimensions_async(self) -> int:
@@ -102,6 +127,11 @@ class BaseEmbeddingsConnector:
                 "Check provider credentials and model id."
             )
         self._dimensions = len(vector)
+        logger.info(
+            "Detected embedding dimension %d for model %s",
+            self._dimensions,
+            self.embedding_model,
+        )
         return self._dimensions
 
     def create_embeddings_sync(
@@ -127,9 +157,9 @@ class BaseEmbeddingsConnector:
             Has columns ``id`` and ``embedding``.
         """
         results = create_embeddings_in_batches_sync(
-            self._create_embedding_sync, nodes_to_embed_dataframe, batch_size
+            self._create_embeddings_sync, nodes_to_embed_dataframe, batch_size
         )
-        print(f"Successful Embeddings : {len(results)}")
+        logger.info("Embedded %d descriptions", len(results))
         return pd.DataFrame(results, columns=["id", "embedding"])
 
     async def create_embeddings_async(
@@ -155,9 +185,9 @@ class BaseEmbeddingsConnector:
             Has columns ``id`` and ``embedding``.
         """
         results = await create_embeddings_in_batches_async(
-            self._create_embedding_async, nodes_to_embed_dataframe, batch_size
+            self._create_embeddings_async, nodes_to_embed_dataframe, batch_size
         )
-        print(f"Successful Embeddings : {len(results)}")
+        logger.info("Embedded %d descriptions", len(results))
         return pd.DataFrame(results, columns=["id", "embedding"])
 
     def run(
@@ -178,8 +208,7 @@ class BaseEmbeddingsConnector:
         dimensions = self._probe_dimensions_sync()
 
         for label in node_labels:
-            print(f"Processing {label} nodes...")
-            print("--------------------------------")
+            logger.info("Embedding %s nodes...", label)
             create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
             nodes_to_embed_dataframe = get_nodes_to_embed(
                 self.neo4j_driver, label, 20, self.database_name
@@ -189,13 +218,9 @@ class BaseEmbeddingsConnector:
                 batch_size=batch_size,
             )
             if len(embeddings) > 0:
-                print(
-                    write_embeddings_to_graph(
-                        embeddings, label, self.neo4j_driver, self.database_name
-                    )
-                )
+                write_embeddings_to_graph(embeddings, label, self.neo4j_driver, self.database_name)
             else:
-                print(f"No embeddings found for {label} nodes")
+                logger.info("No %s nodes needed embedding", label)
 
     async def arun(
         self,
@@ -215,8 +240,7 @@ class BaseEmbeddingsConnector:
         dimensions = await self._probe_dimensions_async()
 
         for label in node_labels:
-            print(f"Processing {label} nodes...")
-            print("--------------------------------")
+            logger.info("Embedding %s nodes...", label)
             create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
             nodes_to_embed_dataframe = get_nodes_to_embed(
                 self.neo4j_driver, label, 20, self.database_name
@@ -226,10 +250,6 @@ class BaseEmbeddingsConnector:
                 batch_size=batch_size,
             )
             if len(embeddings) > 0:
-                print(
-                    write_embeddings_to_graph(
-                        embeddings, label, self.neo4j_driver, self.database_name
-                    )
-                )
+                write_embeddings_to_graph(embeddings, label, self.neo4j_driver, self.database_name)
             else:
-                print(f"No embeddings found for {label} nodes")
+                logger.info("No %s nodes needed embedding", label)

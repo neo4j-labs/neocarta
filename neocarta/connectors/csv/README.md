@@ -390,19 +390,19 @@ from neocarta import NodeLabel as nl, RelationshipType as rt
 # Enum members are recommended, but exact string values (e.g. "Database", "HAS_SCHEMA") also work.
 
 # Load only core schema entities
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN]
 )
 
 # Load schema + column values
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
 
 # Load everything including queries and glossary
-connector.run()  # No filters = load all available CSV files
+connector.ingest()  # No filters = load all available CSV files
 ```
 
 ## Usage Examples
@@ -429,7 +429,7 @@ connector = CSVConnector(
 )
 
 # Run the complete connector (loads all available CSV files)
-connector.run()
+connector.ingest()
 
 # Cleanup
 neo4j_driver.close()
@@ -455,7 +455,7 @@ connector = CSVConnector(
 )
 
 # Load only specific entities
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
@@ -473,7 +473,7 @@ connector = CSVConnector(
     database_name="neo4j",
     csv_file_map={NodeLabel.TABLE: "alternative_tables.csv"},
 )
-connector.run(
+connector.ingest(
     include_nodes=[nl.TABLE],
     include_relationships=[rt.HAS_TABLE]
 )

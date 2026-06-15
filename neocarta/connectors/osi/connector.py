@@ -1,16 +1,39 @@
 """OSI (Open Semantic Interchange) connector — bidirectional Neo4j integration."""
 
+import logging
 import warnings
 from pathlib import Path
 
 from neo4j import Driver
 
+from ..._logging import log_transform_counts
+from ...errors import StateError
 from ...warnings import UnsupportedOsiVersionWarning
 from .export.extract import OsiGraphExtractor
 from .export.transform import OsiExportTransformer
 from .ingest.extract import OsiSpecExtractor
 from .ingest.transform import OsiIngestTransformer
 from .load import OsiNeo4jLoader
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs counted at the end of transform().
+# OsiIngestTransformer exposes node lists as direct instance attributes rather
+# than via transform_to_* methods, so counts are read off these after transform.
+_OSI_COUNT_FIELDS = (
+    ("semantic models", "osi_semantic_model_nodes"),
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("queries", "query_nodes"),
+    ("metrics", "metric_nodes"),
+    ("joins", "join_nodes"),
+    ("expressions", "expression_nodes"),
+    ("AI contexts", "ai_context_nodes"),
+    ("custom extensions", "custom_extension_nodes"),
+    ("business terms", "business_term_nodes"),
+)
 
 
 class OsiConnector:
@@ -23,12 +46,17 @@ class OsiConnector:
     - :meth:`export` reads an OSI semantic model from Neo4j (filtered by name) and emits
       an OSI YAML spec.
 
+    Ingest is decomposed into three public stages — :meth:`extract`, :meth:`transform`,
+    :meth:`load` — that :meth:`ingest` runs in order. Export is exposed as a single
+    public :meth:`export` orchestrator; its internal stages are not part of the
+    public surface.
+
     Version handling
     ----------------
     The connector targets a known set of OSI spec versions (see
-    :attr:`SUPPORTED_VERSIONS`). The ``version`` argument on :meth:`ingest`
-    declares which version the caller expects for that particular file; the
-    connector emits a ``UserWarning`` if:
+    :attr:`SUPPORTED_VERSIONS`). The ``version`` argument on :meth:`ingest` /
+    :meth:`extract` declares which version the caller expects for that particular
+    file; the connector emits a ``UserWarning`` if:
 
     - ``version`` is not in :attr:`SUPPORTED_VERSIONS` (the connector may miss
       features or behave unexpectedly), or
@@ -63,9 +91,21 @@ class OsiConnector:
         self.http_timeout = http_timeout
         self.loader = OsiNeo4jLoader(neo4j_driver, database_name)
 
-    def ingest(self, spec_source: str | Path, version: str = "0.1.1") -> None:
+        # Ingest-direction stages. Their caches are reset on each .extract() /
+        # .transform() call so repeat ingests against the same instance behave
+        # like independent runs.
+        self.extractor = OsiSpecExtractor(http_timeout=http_timeout)
+        self.transformer = OsiIngestTransformer()
+        self._extracted = False
+        self._transformed = False
+
+    # ------------------------------------------------------------------ #
+    # Ingest direction
+    # ------------------------------------------------------------------ #
+
+    def extract(self, spec_source: str | Path, *, version: str = "0.1.1") -> None:
         """
-        Read an OSI YAML spec and load it into Neo4j.
+        Read an OSI YAML spec into the connector's extract cache.
 
         Parameters
         ----------
@@ -85,22 +125,76 @@ class OsiConnector:
                 stacklevel=2,
             )
 
-        print(f"Extracting OSI spec from {spec_source}...")
-        extractor = OsiSpecExtractor(spec_source, http_timeout=self.http_timeout)
-        spec = extractor.extract()
+        logger.info("Extracting OSI spec from %s", spec_source)
+        # Reset downstream lifecycle: any prior transform/load no longer
+        # corresponds to the new source.
+        self._extracted = False
+        self._transformed = False
+        self.extractor.extract(spec_source)
+        self._check_spec_version(self.extractor.spec, version)
+        self._extracted = True
 
-        self._check_spec_version(spec, version)
+    def transform(self) -> None:
+        """
+        Transform the cached OSI spec into graph data model objects.
 
-        print("Transforming OSI spec...")
-        transformer = OsiIngestTransformer()
-        transformer.transform(spec)
+        Raises:
+        ------
+        StateError
+            If called before a successful :meth:`extract`.
+        """
+        if not self._extracted:
+            raise StateError(
+                "OsiConnector.transform() called before extract(); "
+                "call .extract(spec_source) first.",
+                suggestion="Call connector.extract(spec_source) before connector.transform().",
+            )
+        logger.info("Transforming OSI spec...")
+        # OsiIngestTransformer accumulates state across .transform() calls; replace
+        # the instance so repeat transforms behave like independent runs.
+        self.transformer = OsiIngestTransformer()
+        self.transformer.transform(self.extractor.spec)
+        log_transform_counts(logger, self.transformer, _OSI_COUNT_FIELDS)
+        self._transformed = True
 
-        print("Loading OSI semantic model into Neo4j...")
-        self._load_ingest(transformer)
+    def load(self) -> None:
+        """
+        Load the most recent transform into Neo4j.
 
-        print("Recording neocarta graph metadata...")
-        print(self.loader.upsert_neocarta_graph_node().model_dump())
-        print("OSI ingest completed successfully!")
+        Raises:
+        ------
+        StateError
+            If called before a successful :meth:`transform`.
+        """
+        if not self._transformed:
+            raise StateError(
+                "OsiConnector.load() called before transform(); call .transform() first.",
+                suggestion="Call connector.transform() before connector.load().",
+            )
+        logger.info("Loading OSI semantic model into Neo4j...")
+        self._load_ingest(self.transformer)
+
+    def ingest(self, spec_source: str | Path, *, version: str = "0.1.1") -> None:
+        """
+        Read an OSI YAML spec and load it into Neo4j (extract → transform → load).
+
+        Parameters
+        ----------
+        spec_source : str | Path
+            A local filesystem path or an ``http(s)://`` URL pointing to the OSI YAML.
+        version : str, default ``"0.1.1"``
+            Declared OSI spec version. See :meth:`extract` for warning behavior.
+        """
+        self.extract(spec_source, version=version)
+        self.transform()
+        self.load()
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("OSI ingest completed successfully")
+
+    # ------------------------------------------------------------------ #
+    # Export direction
+    # ------------------------------------------------------------------ #
 
     def export(self, semantic_model_name: str, output_path: str | Path) -> None:
         """
@@ -113,39 +207,48 @@ class OsiConnector:
         output_path : str | Path
             Destination path for the OSI YAML output.
         """
-        print(f"Extracting OSI semantic model '{semantic_model_name}' from Neo4j...")
-        extractor = OsiGraphExtractor(self.neo4j_driver, self.database_name)
-        snapshot = extractor.extract(semantic_model_name)
+        logger.info("Extracting OSI semantic model '%s' from Neo4j...", semantic_model_name)
+        graph_extractor = OsiGraphExtractor(self.neo4j_driver, self.database_name)
+        snapshot = graph_extractor.extract(semantic_model_name)
 
-        print("Transforming graph snapshot to OSI spec...")
-        transformer = OsiExportTransformer()
-        transformer.transform(snapshot)
+        logger.info("Transforming graph snapshot to OSI spec...")
+        graph_transformer = OsiExportTransformer()
+        graph_transformer.transform(snapshot)
 
-        print(f"Writing OSI YAML to {output_path}...")
-        transformer.to_yaml(output_path)
-        print("OSI export completed successfully!")
+        logger.info("Writing OSI YAML to %s", output_path)
+        graph_transformer._to_yaml(output_path)
+        logger.info("OSI export completed successfully")
+
+    # ------------------------------------------------------------------ #
+    # Deprecated entrypoint
+    # ------------------------------------------------------------------ #
 
     def run(self, spec_source: str | Path) -> None:
         """
         Run the OSI connector in ingest mode.
 
-        .. note::
-           This entrypoint is retained for compatibility with other connectors;
-           prefer calling :meth:`ingest` directly. A deprecation warning will be
-           added in a future PR.
+        .. deprecated::
+            Use :meth:`ingest` instead. ``run`` will be removed in a future release.
         """
+        warnings.warn(
+            "OsiConnector.run() is deprecated; use OsiConnector.ingest() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.ingest(spec_source)
 
     # ------------------------------------------------------------------ #
-    # Loader orchestration
+    # Internal helpers
     # ------------------------------------------------------------------ #
 
-    def _check_spec_version(self, spec: dict, expected_version: str) -> None:
+    def _check_spec_version(self, spec: dict | None, expected_version: str) -> None:
         """
         Warn (don't raise) when the parsed spec's ``version`` doesn't match
         ``expected_version`` or is missing entirely. Compatibility is best-effort —
         the ingest proceeds either way.
         """
+        if spec is None:
+            return
         spec_version = spec.get("version")
         if spec_version is None:
             warnings.warn(

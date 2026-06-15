@@ -1,10 +1,14 @@
 """Utility functions for ingesting data into Neo4j."""
 
+import logging
+
 from neo4j import Driver, RoutingControl
 from pydantic import BaseModel
 
 from ..enums import NodeLabel, RelationshipType
 from ..errors import ConfigError
+
+logger = logging.getLogger(__name__)
 
 
 def is_enterprise_edition(neo4j_driver: Driver, database_name: str = "neo4j") -> bool:
@@ -37,7 +41,7 @@ return name, versions, edition
         )
         return results[0]["edition"] == "enterprise"
     except Exception as e:
-        print(f"Error checking enterprise edition: {e}")
+        logger.warning("Error checking enterprise edition: %s", e)
         return False
 
 
@@ -125,6 +129,36 @@ def _validate_properties_list(model: BaseModel, properties_list: list[str]) -> N
         raise ConfigError(
             f"Properties list contains invalid properties for model {model.__class__.__name__}: {invalid_props}"
         )
+
+
+def _node_pattern(node_label: NodeLabel) -> str:
+    """
+    Return a human-readable Cypher-style node pattern for logging.
+
+    Examples:
+    --------
+    >>> _node_pattern(NodeLabel.COLUMN)
+    '(:Column)'
+    """
+    return f"(:{node_label})"
+
+
+def _relationship_pattern(
+    relationship_type: RelationshipType,
+    source_node_label: NodeLabel,
+    target_node_label: NodeLabel,
+) -> str:
+    """
+    Return a human-readable Cypher-style relationship pattern for logging.
+
+    Examples:
+    --------
+    >>> _relationship_pattern(
+    ...     RelationshipType.TAGGED_WITH, NodeLabel.COLUMN, NodeLabel.BUSINESS_TERM
+    ... )
+    '(:Column)-[:TAGGED_WITH]->(:BusinessTerm)'
+    """
+    return f"(:{source_node_label})-[:{relationship_type}]->(:{target_node_label})"
 
 
 def _build_node_ingest_query(

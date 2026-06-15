@@ -1,10 +1,14 @@
 """Connector for creating OpenAI embeddings."""
 
+import logging
+
 from neo4j import Driver
 from openai import AsyncOpenAI, OpenAI
 
 from ...errors import ConfigError
 from .base import BaseEmbeddingsConnector
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
@@ -76,7 +80,7 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0].embedding
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
 
     async def _create_embedding_async(self, description: str) -> list[float] | None:
@@ -106,5 +110,67 @@ class OpenAIEmbeddingsConnector(BaseEmbeddingsConnector):
             )
             return response.data[0].embedding
         except Exception as e:
-            print(e)
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
             return None
+
+    def _create_embeddings_sync(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of node descriptions (sync version).
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding per description, in input order.
+        """
+        if self.client is None:
+            raise ConfigError("Sync client is not provided")
+        try:
+            response = self.client.embeddings.create(
+                model=self.embedding_model,
+                input=descriptions,
+                encoding_format="float",
+                dimensions=self.dimensions,
+            )
+            ordered = sorted(response.data, key=lambda item: item.index)
+            return [item.embedding for item in ordered]
+        except Exception as e:
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
+            raise
+
+    async def _create_embeddings_async(self, descriptions: list[str]) -> list[list[float] | None]:
+        """
+        Create embeddings for a batch of node descriptions (async version).
+        Raises if the batch request fails, rather than silently falling back to
+        slow per-item calls.
+
+        Parameters
+        ----------
+        descriptions: list[str]
+            The descriptions of the nodes.
+
+        Returns:
+        -------
+        list[Optional[list[float]]]
+            One embedding per description, in input order.
+        """
+        if self.async_client is None:
+            raise ConfigError("Async client is not provided")
+        try:
+            response = await self.async_client.embeddings.create(
+                model=self.embedding_model,
+                input=descriptions,
+                encoding_format="float",
+                dimensions=self.dimensions,
+            )
+            ordered = sorted(response.data, key=lambda item: item.index)
+            return [item.embedding for item in ordered]
+        except Exception as e:
+            logger.warning("Embedding request failed (%s)", type(e).__name__)
+            raise

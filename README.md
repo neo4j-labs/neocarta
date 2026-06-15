@@ -96,38 +96,7 @@ This project provides connector classes that organize the ETL process into reusa
 * **Loaders** - Ingest transformed data into Neo4j
 * **Connectors** - Orchestrate the extract, transform, and load process
 
-Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for metadata ingestion.
-
-### Connector Class Architecture
-
-All connectors follow a consistent class-based architecture:
-
-```python
-class Connector:
-    def __init__(self, clients, config):
-        # Initialize with required clients and configuration
-        self.extractor = Extractor(...)
-        self.transformer = Transformer(...)
-        self.loader = Loader(...)
-
-    def extract_metadata(self):
-        # Extract data from source and cache
-        pass
-
-    def transform_metadata(self):
-        # Transform extracted data to graph schema and cache
-        pass
-
-    def load_metadata(self):
-        # Load transformed data into Neo4j
-        pass
-
-    def run(self):
-        # Orchestrate the full ETL pipeline
-        self.extract_metadata()
-        self.transform_metadata()
-        self.load_metadata()
-```
+Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for ingestion.
 
 ### Connectors
 
@@ -252,13 +221,12 @@ bigquery_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
 connector = BigQuerySchemaConnector(
     client=bigquery_client,
     project_id=os.getenv("GCP_PROJECT_ID"),
-    dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
 
 # Run the connector to extract, transform, and load BigQuery schema metadata into Neo4j
-connector.run()
+connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 ##### Code Example - Logs Connector
@@ -286,7 +254,7 @@ connector = BigQueryLogsConnector(
 )
 
 # Run the connector to extract query logs, parse SQL, and load into Neo4j
-connector.run(
+connector.ingest(
     dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     region="region-us",
     start_timestamp="2024-01-01 00:00:00",  # Optional
@@ -303,11 +271,11 @@ For the most complete picture, run both connectors:
 ```python
 # 1. Extract schema metadata
 schema_connector = BigQuerySchemaConnector(...)
-schema_connector.run()
+schema_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 
 # 2. Extract query logs
 logs_connector = BigQueryLogsConnector(...)
-logs_connector.run(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+logs_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 This allows you to compare declared schema vs. actual usage patterns.
@@ -522,11 +490,11 @@ connector = CSVConnector(
 )
 
 # Run the connector to load all CSV files into Neo4j
-connector.run()
+connector.ingest()
 
 # Alternatively, load specific nodes and relationships
 # Enum members are recommended, but exact string values (e.g. "Database", "HAS_SCHEMA") also work.
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
@@ -543,7 +511,7 @@ connector = CSVConnector(
     database_name=neo4j_database,
     csv_file_map=custom_file_map,
 )
-connector.run()
+connector.ingest()
 ```
 
 ##### Sample Dataset
@@ -751,6 +719,11 @@ Today the CLI ships these connector commands:
 | `neocarta bigquery schema` | `BigQuerySchemaConnector` — load `Database`, `Schema`, `Table`, `Column` nodes |
 | `neocarta bigquery logs` | `BigQueryLogsConnector` — load `Query`, `CTE`, and reference relationships from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` |
 | `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
+| `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
+| `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
+| `neocarta osi ingest` | `OsiConnector` — load an OSI YAML semantic model from a local path or HTTP(S) URL |
+| `neocarta osi export` | `OsiConnector` — export an OSI semantic model from Neo4j back to an OSI YAML file |
+| `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
 
 Plus one introspection verb:
 
@@ -763,9 +736,14 @@ Plus one introspection verb:
 ```bash
 # Set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY in your shell or .env
 neocarta bigquery schema --project-id my-proj --dataset-id sales
-neocarta bigquery schema --no-embeddings
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
 neocarta bigquery logs --dataset-id sales --limit 500 --json
 neocarta csv ingest --csv-directory ./datasets/csv
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+neocarta query-log ingest --query-log-file ./query_logs.json
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
@@ -806,7 +784,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.6.0",
+        "neocarta[mcp]@0.7.0",
         "neocarta-mcp"
       ],
       "env": {
@@ -878,6 +856,25 @@ The project is organized into the following dependency groups:
 - **mcp**: neocarta MCP server for metadata retrieval from Neo4j semantic layer
 - **agent**: Text2SQL agent with LangChain (includes mcp-server dependencies)
 - **dev**: Development tools (Jupyter notebooks)
+
+### Adding a New Connector
+
+Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/neocarta-add-source-connector/connector-contract.md). Read it before designing a connector.
+
+The repository ships a `neocarta-add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/neocarta-add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
+
+```bash
+# List connectors and their detected kind (source/format)
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py list
+
+# Scaffold a new source connector package + conformance test
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold <name>
+
+# Verify a connector against the contract (static checks + conformance pytest)
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py verify <name>
+```
+
+A scaffolded connector is lint-clean as generated; fill in the `extract` / `transform` / `load` stages, then re-run `verify`. Connector creation and CLI integration are separate PRs.
 
 ### Sample Datasets
 

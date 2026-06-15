@@ -24,8 +24,13 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `GCP_PROJECT_ID` | Yes for `bigquery *` | — | Google Cloud project ID |
 | `BIGQUERY_DATASET_ID` | Yes for `bigquery *` | — | Default BigQuery dataset ID |
 | `BIGQUERY_REGION` | No | `region-us` | BigQuery region for `INFORMATION_SCHEMA` queries |
+| `GCP_PROJECT_NUMBER` | Yes for `dataplex *` | — | Google Cloud project number |
+| `DATAPLEX_LOCATION` | Yes for `dataplex *` | — | Dataplex location, e.g. `us` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | When running outside a GCP-authenticated shell | — | Path to a GCP service-account JSON (secret) |
 | `CSV_DIRECTORY` | For `csv ingest` | — | Directory containing CSV metadata files |
+| `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
+| `OSI_SEMANTIC_MODEL_NAME` | For `osi export` | — | Name of the `OsiSemanticModel` to export |
+| `QUERY_LOG_FILE` | For `query-log ingest` | — | Path to a query-log JSON file |
 
 Secrets are env-only and never logged.
 
@@ -43,12 +48,12 @@ Secrets are env-only and never logged.
 
 ### `neocarta bigquery schema`
 
-Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `Column` nodes plus their relationships into the Neocarta graph. When `--embeddings` is enabled (default), description embeddings are generated and written back.
+Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `Column` nodes plus their relationships into the Neocarta graph. When `--embeddings` is passed, description embeddings are generated and written back (off by default).
 
 - **Flags:**
   - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
   - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
-  - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: enabled.
+  - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: disabled.
   - `--embedding-model TEXT` — OpenAI embedding model (default: `text-embedding-3-small`).
   - `--embedding-dimensions INT` — Embedding vector dimensions (default: `768`).
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or BigQuery.
@@ -57,7 +62,7 @@ Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `
 
 ```bash
 neocarta bigquery schema --project-id acme-data --dataset-id sales
-neocarta bigquery schema --no-embeddings
+neocarta bigquery schema --project-id acme-data --dataset-id sales --embeddings
 BIGQUERY_DATASET_ID=sales neocarta bigquery schema --json
 ```
 
@@ -105,6 +110,106 @@ Loads metadata from a directory of CSV files into the Neocarta graph using `CSVC
 neocarta csv ingest --csv-directory ./datasets/csv
 neocarta csv ingest --csv-directory ./datasets/csv --embeddings
 CSV_DIRECTORY=./datasets/csv neocarta csv ingest --dry-run --json
+```
+
+---
+
+### `neocarta dataplex schema`
+
+Loads BigQuery schema metadata (`Database`, `Schema`, `Table`, `Column`) plus their relationships from the Dataplex Universal Catalog using `DataplexSchemaConnector`. When `--embeddings` is enabled, `Table` and `Column` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
+  - `--project-number TEXT` — GCP project number. Overrides `GCP_PROJECT_NUMBER`.
+  - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
+  - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
+  - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading the physical schema of a BigQuery dataset that is catalogued in Dataplex.
+
+```bash
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales --embeddings
+neocarta dataplex schema --dataset-id sales --dry-run --json
+```
+
+---
+
+### `neocarta dataplex glossary`
+
+Loads the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) plus their relationships using `DataplexGlossaryConnector`. With `--entry-links` (the default), it also loads catalog↔glossary entry links as `(:Column|:Table)-[:TAGGED_WITH]->(:BusinessTerm)` edges; those attach to existing schema nodes, so run `neocarta dataplex schema` first for the tags to land. Dataset-independent (no `--dataset-id`). When `--embeddings` is enabled, `BusinessTerm` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
+  - `--project-number TEXT` — GCP project number. Overrides `GCP_PROJECT_NUMBER`.
+  - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
+  - `--entry-links / --no-entry-links` — Load `TAGGED_WITH` catalog entry links. Default: enabled. Use `--no-entry-links` to load glossary content only (skips the REST round-trips).
+  - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading curated business terminology from a Dataplex glossary and tagging the schema with it (run after `dataplex schema`).
+
+```bash
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us --embeddings
+neocarta dataplex glossary --no-entry-links --dry-run --json
+```
+
+---
+
+### `neocarta osi ingest`
+
+Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)) YAML semantic model into the Neocarta graph using `OsiConnector`. The spec source may be a local filesystem path or an HTTP(S) URL. Ingests `OsiSemanticModel`, `OsiTable`, `OsiColumn`, `Query`, `Metric`, `Join`, and aspect nodes plus their relationships; synonyms in `ai_context` are upserted as `BusinessTerm` nodes (merged on name, so they dedupe against catalog-derived terms). When `--embeddings` is enabled, `Database`, `Schema`, `Table`, and `Column` description embeddings are generated via LiteLLM and written back.
+
+- **Flags:**
+  - `--spec-source TEXT` — Local filesystem path or HTTP(S) URL to the OSI YAML spec. Overrides `OSI_SPEC_SOURCE`.
+  - `--embeddings / --no-embeddings` — Generate embeddings after ingest (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading a semantic model published as an OSI YAML spec, from disk or directly from a URL.
+
+```bash
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml --embeddings
+OSI_SPEC_SOURCE=./datasets/osi/acme_semantic_model.yaml neocarta osi ingest --dry-run --json
+```
+
+---
+
+### `neocarta osi export`
+
+Exports an OSI semantic model from Neo4j back to an OSI YAML file using `OsiConnector`. Reads the `OsiSemanticModel` with the given name and everything it owns (tables, columns, metrics, joins, aspects) and serializes it to OSI YAML. This is the inverse of `osi ingest`.
+
+- **Flags:**
+  - `--semantic-model-name TEXT` — Name of the `OsiSemanticModel` to export. Overrides `OSI_SEMANTIC_MODEL_NAME`.
+  - `--output-path TEXT` — Destination path for the exported OSI YAML file. Required.
+  - `--dry-run` — Print the planned export as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** round-tripping a semantic model out of the graph, or producing an OSI spec from a model assembled in Neo4j.
+- **Exit codes:** a `--semantic-model-name` with no matching model exits `3` (not found).
+
+```bash
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+OSI_SEMANTIC_MODEL_NAME=acme_corp_model neocarta osi export --output-path acme.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml --dry-run --json
+### `neocarta query-log ingest`
+
+Parses a local query-log JSON file (currently the BigQuery export format) using `QueryLogConnector` and loads `Query` and `CTE` nodes plus the `Database` / `Schema` / `Table` / `Column` structure and the table/column references each query touches. This is **distinct from `neocarta bigquery logs`**, which reads query logs live from the Cloud Logging API; this command reads a file already on disk. No embeddings are generated (query-log nodes carry no descriptions).
+
+- **Flags:**
+  - `--query-log-file TEXT` — Path to the query-log JSON file. Overrides `QUERY_LOG_FILE`.
+  - `--source TEXT` — Source/format of the query-log file (default: `bigquery`; the only value supported today).
+  - `--dry-run` — Print the planned ingestion as JSON; do not read the file or touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** loading queries from an exported BigQuery query-log file (rather than pulling them live via `bigquery logs`).
+
+```bash
+neocarta query-log ingest --query-log-file ./query_logs.json
+QUERY_LOG_FILE=./query_logs.json neocarta query-log ingest --dry-run --json
 ```
 
 ---

@@ -15,12 +15,13 @@ from ...enums import NodeLabel
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
-from ..output import emit_json
+from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
+    _run_embeddings,
 )
 
 
@@ -39,19 +40,19 @@ def bigquery() -> None:
 @click.option(
     "--embeddings/--no-embeddings",
     "embeddings",
-    default=True,
-    help="Generate embeddings for ingested nodes after load (default: enabled).",
+    default=False,
+    help="Generate embeddings for ingested nodes after load (default: disabled).",
 )
 @click.option(
     "--embedding-model",
     default=None,
-    help="OpenAI embedding model name (default: text-embedding-3-small).",
+    help="Embedding model id in LiteLLM format (default: text-embedding-3-small).",
 )
 @click.option(
     "--embedding-dimensions",
     type=int,
     default=None,
-    help="Embedding vector dimensions (default: 768).",
+    help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
     "--dry-run",
@@ -81,11 +82,11 @@ def bigquery_schema(
     """Extract BigQuery schema metadata into the Neo4j semantic graph.
 
     Loads Database, Schema, Table, and Column nodes plus their relationships.
-    When --embeddings is enabled (default), description embeddings are
-    generated and written back to the graph. Pass --no-embeddings to skip the
-    OpenAI step, or --dry-run to print the planned ingestion without touching
-    Neo4j or BigQuery. The project ID and dataset ID can come from --project-id
-    / --dataset-id flags, or from GCP_PROJECT_ID / BIGQUERY_DATASET_ID env vars.
+    Pass --embeddings to generate description embeddings after load and write
+    them back to the graph (off by default). Use --dry-run to print the planned
+    ingestion without touching Neo4j or BigQuery. The project ID and dataset ID
+    can come from --project-id / --dataset-id flags, or from GCP_PROJECT_ID /
+    BIGQUERY_DATASET_ID env vars.
     """
     settings = load_settings()
     project_id = require(
@@ -134,23 +135,21 @@ def bigquery_schema(
 
     from ...connectors.bigquery import BigQuerySchemaConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting BigQuery schema connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = BigQuerySchemaConnector(
                 client=bq_client.Client(project=project_id),
                 project_id=project_id,
-                dataset_id=dataset_id,
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run()
+            with cli_status(stderr, "Ingesting BigQuery schema..."):
+                connector.ingest(dataset_id=dataset_id)
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=node_labels)
+                with cli_status(stderr, "Generating embeddings..."):
+                    _run_embeddings(embedder, node_labels)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -292,8 +291,6 @@ def bigquery_logs(
 
     from ...connectors.bigquery import BigQueryLogsConnector  # noqa: PLC0415
 
-    stderr.print("[dim]Starting BigQuery logs connector...[/dim]")
-
     with _neo4j_driver(settings) as driver:
         try:
             connector = BigQueryLogsConnector(
@@ -302,19 +299,20 @@ def bigquery_logs(
                 neo4j_driver=driver,
                 database_name=settings.neo4j_database,
             )
-            connector.run(
-                dataset_id=dataset_id,
-                region=region,
-                start_timestamp=start_timestamp,
-                end_timestamp=end_timestamp,
-                limit=limit,
-                drop_failed_queries=drop_failed,
-            )
+            with cli_status(stderr, "Ingesting BigQuery query logs..."):
+                connector.ingest(
+                    dataset_id=dataset_id,
+                    region=region,
+                    start_timestamp=start_timestamp,
+                    end_timestamp=end_timestamp,
+                    limit=limit,
+                    drop_failed_queries=drop_failed,
+                )
 
             if embeddings:
-                stderr.print("[dim]Generating embeddings...[/dim]")
                 embedder = _build_embedder(settings, driver)
-                embedder.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN])
+                with cli_status(stderr, "Generating embeddings..."):
+                    _run_embeddings(embedder, [NodeLabel.TABLE, NodeLabel.COLUMN])
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 

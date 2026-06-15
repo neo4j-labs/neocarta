@@ -26,7 +26,7 @@ The embedding vector dimension is auto-detected from the model — no manual con
 ## Running the server
 
 ```bash
-uvx --from "neocarta[mcp]@0.6.0" neocarta-mcp
+uvx --from "neocarta[mcp]@0.7.0" neocarta-mcp
 ```
 
 By default the server runs in `stdio` transport mode, which is how an MCP client launches it as a subprocess. It reads all configuration parameters from the environment.
@@ -160,7 +160,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.6.0",
+        "neocarta[mcp]@0.7.0",
         "neocarta-mcp"
       ],
       "env": {

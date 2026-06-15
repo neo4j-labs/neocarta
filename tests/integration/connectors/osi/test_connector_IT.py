@@ -218,7 +218,7 @@ def test_extractor_and_export_transformer_produce_yaml_with_field_names(
 ):
     """Ingest TPC-DS, run extractor + export transformer, confirm fields appear in YAML output."""
     # Stage the graph via the full ingest path
-    spec = OsiSpecExtractor(tpcds_yaml_path).extract()
+    spec = OsiSpecExtractor().extract(tpcds_yaml_path)
     ingest = OsiIngestTransformer()
     ingest.transform(spec)
     OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)

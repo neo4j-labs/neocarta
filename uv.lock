@@ -2354,7 +2354,7 @@ wheels = [
 
 [[package]]
 name = "neocarta"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "databricks-sdk" },
@@ -2456,7 +2456,7 @@ dev = [
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "ruff", specifier = ">=0.15.10" },
-    { name = "testcontainers", extras = ["neo4j"], specifier = ">=4.14.2" },
+    { name = "testcontainers", extras = ["neo4j", "postgres"], specifier = ">=4.14.2" },
 ]
 eval = [
     { name = "fastmcp", specifier = ">=2.14.4" },
