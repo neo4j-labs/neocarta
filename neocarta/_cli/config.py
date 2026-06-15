@@ -31,6 +31,15 @@ ENV_VARS: dict[str, str] = {
         "OPENAI_API_KEY; other providers use their own vars (GEMINI_API_KEY, "
         "COHERE_API_KEY, AZURE_*, AWS_*, ...)."
     ),
+    "EMBEDDING_MODEL": "LiteLLM embedding model id (default: text-embedding-3-small).",
+    "EMBEDDING_DIMENSIONS": (
+        "Embedding vector dimension for models that support truncation; ignored "
+        "by models that do not. Default: auto-detected from the model."
+    ),
+    "EMBEDDING_BATCH_SIZE": (
+        "Nodes per embedding batch during CLI ingest runs (default: 100). Not "
+        "used by the MCP server, which embeds a single query at a time."
+    ),
     "GCP_PROJECT_ID": "Google Cloud project ID.",
     "GCP_PROJECT_NUMBER": "Google Cloud project number (for `dataplex *`).",
     "BIGQUERY_DATASET_ID": "Default BigQuery dataset ID.",
@@ -61,11 +70,13 @@ class CLISettings(BaseSettings):
     # Embeddings (LiteLLM, multi-provider). Provider auth (OPENAI_API_KEY,
     # GEMINI_API_KEY, AZURE_*, AWS_*, ...) is read directly from the environment
     # by LiteLLM, so no API key is parsed onto this settings object.
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = Field(
+        default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL"
+    )
     # None => let LiteLLM use the model's native dimension. Set via
     # --embedding-dimensions to request truncation on models that support it.
-    embedding_dimensions: int | None = None
-    embedding_batch_size: int = 100
+    embedding_dimensions: int | None = Field(default=None, validation_alias="EMBEDDING_DIMENSIONS")
+    embedding_batch_size: int = Field(default=100, validation_alias="EMBEDDING_BATCH_SIZE")
 
     # BigQuery
     gcp_project_id: str | None = Field(default=None, validation_alias="GCP_PROJECT_ID")

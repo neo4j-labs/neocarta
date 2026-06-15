@@ -91,22 +91,18 @@ def _build_embedder(
     # Lazy import: the embedding stack is only loaded when embeddings run.
     from ...enrichment.embeddings import LiteLLMEmbeddingsConnector  # noqa: PLC0415
 
-    litellm_kwargs = (
-        {"dimensions": settings.embedding_dimensions}
-        if settings.embedding_dimensions is not None
-        else None
-    )
     return LiteLLMEmbeddingsConnector(
         neo4j_driver=neo4j_driver,
         embedding_model=settings.embedding_model,
         database_name=settings.neo4j_database,
-        litellm_kwargs=litellm_kwargs,
+        dimensions=settings.embedding_dimensions,
     )
 
 
 def _run_embeddings(
     embedder: BaseEmbeddingsConnector,
     node_labels: list[NodeLabel],
+    batch_size: int = 100,
 ) -> None:
     """Run an embedder and normalise failures into the CLI error contract.
 
@@ -117,13 +113,16 @@ def _run_embeddings(
     as a plain ``RuntimeError`` from the dimension probe — is wrapped in a
     structured :class:`CLIError` so agents get a clean envelope instead of a
     raw traceback.
+
+    ``batch_size`` is the number of nodes embedded per provider request,
+    resolved from ``--embedding-batch-size`` / ``EMBEDDING_BATCH_SIZE``.
     """
     # Local imports keep the error deps off the --help / --dry-run path.
     from ...errors import NeocartaError  # noqa: PLC0415
     from ..errors import CLIError  # noqa: PLC0415
 
     try:
-        embedder.run(node_labels=node_labels)
+        embedder.run(node_labels=node_labels, batch_size=batch_size)
     except NeocartaError:
         raise
     except Exception as exc:  # provider/probe failures aren't NeocartaError

@@ -20,7 +20,10 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `NEO4J_USERNAME` | Yes | — | Neo4j username |
 | `NEO4J_PASSWORD` | Yes | — | Neo4j password (secret) |
 | `NEO4J_DATABASE` | No | `neo4j` | Neo4j database name |
-| `OPENAI_API_KEY` | When `--embeddings` | — | OpenAI API key for embedding generation (secret) |
+| `OPENAI_API_KEY` | When `--embeddings` | — | OpenAI API key for embedding generation (secret). Other providers use their own vars (`GEMINI_API_KEY`, `COHERE_API_KEY`, `AZURE_*`, `AWS_*`, …). |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | LiteLLM embedding model id (provider prefix optional for OpenAI) |
+| `EMBEDDING_DIMENSIONS` | No | auto-detected | Vector dimension for models that support truncation; ignored by models that don't |
+| `EMBEDDING_BATCH_SIZE` | No | `100` | Nodes embedded per provider request during ingest runs |
 | `GCP_PROJECT_ID` | Yes for `bigquery *` | — | Google Cloud project ID |
 | `BIGQUERY_DATASET_ID` | Yes for `bigquery *` | — | Default BigQuery dataset ID |
 | `BIGQUERY_REGION` | No | `region-us` | BigQuery region for `INFORMATION_SCHEMA` queries |
@@ -54,8 +57,9 @@ Extracts BigQuery schema metadata and loads `Database`, `Schema`, `Table`, and `
   - `--project-id TEXT` — GCP project ID. Overrides `GCP_PROJECT_ID`.
   - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
   - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: disabled.
-  - `--embedding-model TEXT` — OpenAI embedding model (default: `text-embedding-3-small`).
-  - `--embedding-dimensions INT` — Embedding vector dimensions (default: `768`).
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or BigQuery.
   - `--json` — Emit JSON on stdout.
 - **Use when:** ingesting structural metadata from a BigQuery dataset for the first time, or refreshing it after schema changes.
@@ -81,6 +85,9 @@ Extracts query history from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` and loads `Quer
   - `--limit INT` — Maximum number of queries to extract. Default: `100`.
   - `--include-failed-queries` — Retain queries that errored (default: exclude).
   - `--embeddings / --no-embeddings` — Generate embeddings after load. Default: disabled for logs.
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or BigQuery.
   - `--json` — Emit JSON on stdout.
 - **Use when:** building lineage and usage context from real query traffic to complement the static schema graph.
@@ -100,8 +107,9 @@ Loads metadata from a directory of CSV files into the Neocarta graph using `CSVC
 - **Flags:**
   - `--csv-directory TEXT` — Directory containing the CSV metadata files. Overrides `CSV_DIRECTORY`.
   - `--embeddings / --no-embeddings` — Generate embeddings after ingest. Default: disabled.
-  - `--embedding-model TEXT` — OpenAI embedding model (default: `text-embedding-3-small`).
-  - `--embedding-dimensions INT` — Embedding vector dimensions (default: `768`).
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
   - `--json` — Emit JSON on stdout.
 - **Use when:** ingesting curated metadata from CSV files, or loading the bundled sample dataset for local testing.
@@ -124,7 +132,9 @@ Loads BigQuery schema metadata (`Database`, `Schema`, `Table`, `Column`) plus th
   - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
   - `--dataset-id TEXT` — BigQuery dataset to ingest. Overrides `BIGQUERY_DATASET_ID`.
   - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
-  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
   - `--json` — Emit JSON on stdout.
 - **Use when:** loading the physical schema of a BigQuery dataset that is catalogued in Dataplex.
@@ -147,7 +157,9 @@ Loads the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) pl
   - `--dataplex-location TEXT` — Dataplex location, e.g. `us`. Overrides `DATAPLEX_LOCATION`.
   - `--entry-links / --no-entry-links` — Load `TAGGED_WITH` catalog entry links. Default: enabled. Use `--no-entry-links` to load glossary content only (skips the REST round-trips).
   - `--embeddings / --no-embeddings` — Generate embeddings after load (via LiteLLM). Default: disabled.
-  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or Dataplex.
   - `--json` — Emit JSON on stdout.
 - **Use when:** loading curated business terminology from a Dataplex glossary and tagging the schema with it (run after `dataplex schema`).
@@ -167,7 +179,9 @@ Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-inter
 - **Flags:**
   - `--spec-source TEXT` — Local filesystem path or HTTP(S) URL to the OSI YAML spec. Overrides `OSI_SPEC_SOURCE`.
   - `--embeddings / --no-embeddings` — Generate embeddings after ingest (via LiteLLM). Default: disabled.
-  - `--embedding-model TEXT` — LiteLLM embedding model (default: `text-embedding-3-small`).
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
   - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j.
   - `--json` — Emit JSON on stdout.
 - **Use when:** loading a semantic model published as an OSI YAML spec, from disk or directly from a URL.

@@ -73,12 +73,13 @@ See [examples/sync_embeddings.py](../../../examples/sync_embeddings.py) and [exa
 | Parameter | Default | Description |
 |---|---|---|
 | `embedding_model` | `"text-embedding-3-small"` | LiteLLM model identifier (provider prefix optional for OpenAI) |
-| `litellm_kwargs` | `None` | Extra keyword arguments forwarded to `litellm.embedding` / `litellm.aembedding`. Use this for `dimensions` (models that support truncation), `api_key` / `api_base` (LiteLLM Proxy or custom endpoints), `api_version`, etc. |
+| `dimensions` | `None` | Requested vector dimension for models that support truncation. When set it is sent to the provider; if the model rejects it (doesn't support truncation), the connector drops it and retries, keeping the native dimension. `None` = auto-detect. |
+| `litellm_kwargs` | `None` | Extra keyword arguments forwarded to `litellm.embedding` / `litellm.aembedding`. Use this for `api_key` / `api_base` (LiteLLM Proxy or custom endpoints) or `api_version`. |
 | `database_name` | `"neo4j"` | Target Neo4j database |
 | `node_labels` | `[NodeLabel.TABLE, NodeLabel.COLUMN]` | Node labels to embed |
 | `batch_size` | `100` | Nodes processed per batch |
 
-The vector dimension is **not** a configurable parameter — it's read directly from the model's response on first use. To request a non-default size from a model that supports it (e.g. OpenAI `text-embedding-3-large` truncated to 1024), pass `litellm_kwargs={"dimensions": 1024}`; the probe call will then detect 1024 and the index will be created at 1024.
+By default the vector dimension is read directly from the model's response on first use. To request a non-default size from a model that supports it (e.g. OpenAI `text-embedding-3-large` truncated to 1024), pass `dimensions=1024`; the probe call then detects 1024 and the index is created at 1024. Models that don't support truncation reject the parameter; the connector then drops it and retries, keeping the model's native dimension, so the index always matches the vectors actually returned.
 
 **Authentication:** Set the appropriate environment variable for your provider, e.g.:
 

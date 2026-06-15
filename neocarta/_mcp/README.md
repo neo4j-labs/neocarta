@@ -20,8 +20,9 @@ The server is configured via environment variables (or a `.env` file):
 | `NEO4J_PASSWORD` | Yes | — | Neo4j password |
 | `NEO4J_DATABASE` | No | `neo4j` | Neo4j database name |
 | `EMBEDDING_MODEL` | No | `text-embedding-3-small` | LiteLLM embedding model id (provider prefix optional for OpenAI) |
+| `EMBEDDING_DIMENSIONS` | No | auto-detected | Vector dimension for models that support truncation; ignored by models that don't. Must match the dimension the graph was embedded at so query and stored vectors agree. |
 
-The embedding vector dimension is auto-detected from the model — no manual configuration is needed.
+The embedding vector dimension is auto-detected from the model — no manual configuration is needed. Set `EMBEDDING_DIMENSIONS` only if the graph was embedded at a non-native (truncated) size, so the server embeds queries at the same dimension; models that don't support truncation ignore it. `EMBEDDING_BATCH_SIZE` does **not** apply to the MCP server, which embeds a single query at a time.
 
 ## Running the server
 

@@ -1,8 +1,9 @@
 """Tests for the shared CLI connector helpers in ``_common.py``.
 
 Covers the LiteLLM embedder construction (provider-agnostic, optional
-dimensions forwarded via ``litellm_kwargs``) and the embedding-run error wrapper
-that keeps the CLI's structured-error contract intact.
+``dimensions`` argument), the ``batch_size`` threaded into ``run()``, and the
+embedding-run error wrapper that keeps the CLI's structured-error contract
+intact.
 """
 
 from unittest.mock import MagicMock, patch
@@ -30,7 +31,7 @@ def test_build_embedder_returns_litellm_connector_without_dimensions():
         neo4j_driver=driver,
         embedding_model="text-embedding-3-small",
         database_name="neo4j",
-        litellm_kwargs=None,
+        dimensions=None,
     )
     assert result is mock_cls.return_value
 
@@ -49,7 +50,7 @@ def test_build_embedder_forwards_dimensions_when_set():
         neo4j_driver=driver,
         embedding_model="gemini-embedding-001",
         database_name="graph",
-        litellm_kwargs={"dimensions": 512},
+        dimensions=512,
     )
 
 
@@ -65,7 +66,19 @@ def test_run_embeddings_wraps_non_neocarta_error():
 
     assert excinfo.value.code == "upstream_error"
     assert excinfo.value.__cause__ is probe_failure
-    embedder.run.assert_called_once_with(node_labels=[NodeLabel.TABLE])
+    embedder.run.assert_called_once_with(node_labels=[NodeLabel.TABLE], batch_size=100)
+
+
+def test_run_embeddings_forwards_batch_size():
+    # EMBEDDING_BATCH_SIZE / --embedding-batch-size resolves onto the settings and
+    # must reach embedder.run() — it was previously dropped.
+    embedder = MagicMock()
+
+    _run_embeddings(embedder, [NodeLabel.TABLE, NodeLabel.COLUMN], batch_size=32)
+
+    embedder.run.assert_called_once_with(
+        node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN], batch_size=32
+    )
 
 
 def test_run_embeddings_passes_neocarta_error_through():

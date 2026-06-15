@@ -24,6 +24,10 @@ Environment Variables Required:
     - NEO4J_DATABASE: Neo4j database name (optional, defaults to 'neo4j')
     - EMBEDDING_MODEL: LiteLLM model id (optional, defaults to 'text-embedding-3-small').
       The vector dimension is auto-detected from the model on first use.
+    - EMBEDDING_DIMENSIONS: requested vector dimension for models that support
+      truncation (optional; ignored by models that don't). Overridden by --dimensions.
+    - EMBEDDING_BATCH_SIZE: nodes per embedding batch (optional, defaults to 100).
+      Overridden by --batch-size.
     - Provider credentials, e.g. OPENAI_API_KEY, GEMINI_API_KEY, COHERE_API_KEY,
       AZURE_API_KEY/AZURE_API_BASE, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION_NAME
 """
@@ -40,7 +44,8 @@ from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 def main(
     node_labels: list[NodeLabel] = [NodeLabel.TABLE, NodeLabel.COLUMN],
-    batch_size: int = 100,
+    batch_size: int | None = None,
+    dimensions: int | None = None,
 ) -> None:
     """Compute and store embeddings for specified node labels synchronously."""
     load_dotenv()
@@ -53,6 +58,12 @@ def main(
     )
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
 
+    # Fall back to EMBEDDING_BATCH_SIZE / EMBEDDING_DIMENSIONS when not passed explicitly.
+    if batch_size is None:
+        batch_size = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
+    if dimensions is None and os.getenv("EMBEDDING_DIMENSIONS"):
+        dimensions = int(os.environ["EMBEDDING_DIMENSIONS"])
+
     print(f"Generating embeddings synchronously for: {', '.join(node_labels)}")
     print(f"Batch size: {batch_size}")
 
@@ -60,6 +71,7 @@ def main(
         neo4j_driver=neo4j_driver,
         embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
         database_name=neo4j_database,
+        dimensions=dimensions,
     )
     embeddings_connector.run(
         node_labels=node_labels,
@@ -83,12 +95,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=100,
-        help="Number of nodes to process in each batch (default: 100)",
+        default=None,
+        help="Number of nodes to process in each batch (default: EMBEDDING_BATCH_SIZE or 100)",
+    )
+    parser.add_argument(
+        "--dimensions",
+        type=int,
+        default=None,
+        help="Embedding vector dimensions (default: EMBEDDING_DIMENSIONS or auto-detected)",
     )
     args = parser.parse_args()
 
     main(
         node_labels=args.node_labels,
         batch_size=args.batch_size,
+        dimensions=args.dimensions,
     )

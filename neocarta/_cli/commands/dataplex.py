@@ -67,6 +67,7 @@ def _run_ingest(
     if embeddings:
         body["embedding_model"] = settings.embedding_model
         body["embedding_dimensions"] = settings.embedding_dimensions
+        body["embedding_batch_size"] = settings.embedding_batch_size
         body["node_labels"] = [label.value for label in node_labels]
 
     if dry_run:
@@ -88,7 +89,7 @@ def _run_ingest(
             if embeddings:
                 embedder = _build_embedder(settings, driver)
                 with cli_status(stderr, "Generating embeddings..."):
-                    _run_embeddings(embedder, node_labels)
+                    _run_embeddings(embedder, node_labels, batch_size=settings.embedding_batch_size)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -138,6 +139,12 @@ def _run_ingest(
     help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
+    "--embedding-batch-size",
+    type=int,
+    default=None,
+    help="Nodes per embedding batch (default: 100). Overrides EMBEDDING_BATCH_SIZE.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -161,6 +168,7 @@ def dataplex_schema(
     embeddings: bool,
     embedding_model: str | None,
     embedding_dimensions: int | None,
+    embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -197,6 +205,8 @@ def dataplex_schema(
         settings.embedding_model = embedding_model
     if embedding_dimensions is not None:
         settings.embedding_dimensions = embedding_dimensions
+    if embedding_batch_size is not None:
+        settings.embedding_batch_size = embedding_batch_size
 
     def make_connector(driver: Driver) -> Any:
         # Lazy imports: heavy GCP / connector deps only load when the command runs.
@@ -269,6 +279,12 @@ def dataplex_schema(
     help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
+    "--embedding-batch-size",
+    type=int,
+    default=None,
+    help="Nodes per embedding batch (default: 100). Overrides EMBEDDING_BATCH_SIZE.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -292,6 +308,7 @@ def dataplex_glossary(
     embeddings: bool,
     embedding_model: str | None,
     embedding_dimensions: int | None,
+    embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -325,6 +342,8 @@ def dataplex_glossary(
         settings.embedding_model = embedding_model
     if embedding_dimensions is not None:
         settings.embedding_dimensions = embedding_dimensions
+    if embedding_batch_size is not None:
+        settings.embedding_batch_size = embedding_batch_size
 
     def make_connector(driver: Driver) -> Any:
         # Lazy imports: heavy GCP / connector deps only load when the command runs.

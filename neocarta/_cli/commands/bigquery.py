@@ -55,6 +55,12 @@ def bigquery() -> None:
     help="Embedding vector dimensions (default: auto-detected from the model).",
 )
 @click.option(
+    "--embedding-batch-size",
+    type=int,
+    default=None,
+    help="Nodes per embedding batch (default: 100). Overrides EMBEDDING_BATCH_SIZE.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -76,6 +82,7 @@ def bigquery_schema(
     embeddings: bool,
     embedding_model: str | None,
     embedding_dimensions: int | None,
+    embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -103,6 +110,8 @@ def bigquery_schema(
         settings.embedding_model = embedding_model
     if embedding_dimensions is not None:
         settings.embedding_dimensions = embedding_dimensions
+    if embedding_batch_size is not None:
+        settings.embedding_batch_size = embedding_batch_size
 
     stdout = ctx.obj["stdout"]
     stderr = ctx.obj["stderr"]
@@ -118,6 +127,7 @@ def bigquery_schema(
                 "embeddings": embeddings,
                 "embedding_model": settings.embedding_model if embeddings else None,
                 "embedding_dimensions": settings.embedding_dimensions if embeddings else None,
+                "embedding_batch_size": settings.embedding_batch_size if embeddings else None,
                 "node_labels": [label.value for label in node_labels],
             }
         }
@@ -149,7 +159,7 @@ def bigquery_schema(
             if embeddings:
                 embedder = _build_embedder(settings, driver)
                 with cli_status(stderr, "Generating embeddings..."):
-                    _run_embeddings(embedder, node_labels)
+                    _run_embeddings(embedder, node_labels, batch_size=settings.embedding_batch_size)
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
@@ -209,6 +219,23 @@ def bigquery_schema(
     help="Generate embeddings for ingested nodes after load (default: disabled for logs).",
 )
 @click.option(
+    "--embedding-model",
+    default=None,
+    help="Embedding model id in LiteLLM format (default: text-embedding-3-small).",
+)
+@click.option(
+    "--embedding-dimensions",
+    type=int,
+    default=None,
+    help="Embedding vector dimensions (default: auto-detected from the model).",
+)
+@click.option(
+    "--embedding-batch-size",
+    type=int,
+    default=None,
+    help="Nodes per embedding batch (default: 100). Overrides EMBEDDING_BATCH_SIZE.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -233,6 +260,9 @@ def bigquery_logs(
     limit: int,
     include_failed_queries: bool,
     embeddings: bool,
+    embedding_model: str | None,
+    embedding_dimensions: int | None,
+    embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
 ) -> None:
@@ -257,6 +287,12 @@ def bigquery_logs(
         env_var="BIGQUERY_DATASET_ID",
     )
     region = resolve(region, settings.bigquery_region)
+    if embedding_model is not None:
+        settings.embedding_model = embedding_model
+    if embedding_dimensions is not None:
+        settings.embedding_dimensions = embedding_dimensions
+    if embedding_batch_size is not None:
+        settings.embedding_batch_size = embedding_batch_size
 
     stdout = ctx.obj["stdout"]
     stderr = ctx.obj["stderr"]
@@ -275,6 +311,9 @@ def bigquery_logs(
                 "end_timestamp": end_timestamp,
                 "drop_failed_queries": drop_failed,
                 "embeddings": embeddings,
+                "embedding_model": settings.embedding_model if embeddings else None,
+                "embedding_dimensions": settings.embedding_dimensions if embeddings else None,
+                "embedding_batch_size": settings.embedding_batch_size if embeddings else None,
             }
         }
         if as_json:
@@ -312,7 +351,11 @@ def bigquery_logs(
             if embeddings:
                 embedder = _build_embedder(settings, driver)
                 with cli_status(stderr, "Generating embeddings..."):
-                    _run_embeddings(embedder, [NodeLabel.TABLE, NodeLabel.COLUMN])
+                    _run_embeddings(
+                        embedder,
+                        [NodeLabel.TABLE, NodeLabel.COLUMN],
+                        batch_size=settings.embedding_batch_size,
+                    )
         except NeocartaError as exc:
             raise cli_error_from(exc) from exc
 
