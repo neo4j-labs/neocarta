@@ -105,7 +105,9 @@ class MetricContext(BaseModel):
     metric_description: str | None = Field(
         default=None, description="The description of the metric"
     )
-    domain_name: str = Field(..., description="The name of the domain (semantic model) that owns the metric")
+    domain_name: str = Field(
+        ..., description="The name of the domain (semantic model) that owns the metric"
+    )
     expressions: list[ExpressionContext] = Field(
         default=[], description="The dialect-specific SQL expressions that define the metric"
     )
@@ -114,7 +116,8 @@ class MetricContext(BaseModel):
         description="Business-term synonyms the metric is tagged with (from TAGGED_WITH BusinessTerm)",
     )
     aspects: list[AspectContext] = Field(
-        default=[], description="OSI aspects (ai_context / custom_extensions) attached to the metric"
+        default=[],
+        description="OSI aspects (ai_context / custom_extensions) attached to the metric",
     )
     metric_score: float | None = Field(
         default=None, description="The metric embedding/search similarity score"
@@ -159,7 +162,8 @@ class DomainContext(BaseModel):
         default=[], description="The joins between the domain's datasets"
     )
     aspects: list[AspectContext] = Field(
-        default=[], description="OSI aspects (ai_context / custom_extensions) attached to the domain"
+        default=[],
+        description="OSI aspects (ai_context / custom_extensions) attached to the domain",
     )
 
 

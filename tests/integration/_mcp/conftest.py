@@ -9,10 +9,16 @@ import pytest
 from neo4j import GraphDatabase
 
 from neocarta.connectors.csv import CSVConnector
+from neocarta.connectors.osi import OsiConnector
 from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 from neocarta.enums import NodeLabel
 
 DATABASE_NAME = "neo4j"
+
+#: The sample OSI semantic model shipped with the repo, loaded by the OSI fixtures.
+OSI_SEMANTIC_MODEL_PATH = (
+    Path(__file__).resolve().parents[3] / "datasets" / "osi" / "acme_semantic_model.yaml"
+)
 
 # Fixed-seed random vector reused for every input so that cosine similarity
 # between stored node embeddings and query embeddings is always 1.0.
@@ -149,6 +155,39 @@ def loaded_graph(setup, sample_csv_dir):
             neo4j_driver=sync_driver,
             database_name=DATABASE_NAME,
         ).run(node_labels=[NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN])
+
+    finally:
+        sync_driver.close()
+
+
+@pytest.fixture(scope="module")
+def osi_loaded_graph(setup):
+    """Load the sample OSI semantic model and write mock metric embeddings once per module.
+
+    Ingests ``datasets/osi/acme_semantic_model.yaml`` via the OSI connector, then writes
+    mock embeddings (and creates the vector indexes) for the Metric, Table, and Column
+    labels so the metric vector-search tool registers and the existing table/column
+    vector-search tools surface the OSI expression/aspect enrichment. The fixture owns the
+    Neo4j driver and closes it after setup, including setup failures.
+    """
+    sync_driver = GraphDatabase.driver(
+        setup.get_connection_url(),
+        auth=(setup.username, setup.password),
+    )
+
+    try:
+        with sync_driver.session(database=DATABASE_NAME) as session:
+            session.run("MATCH (n) DETACH DELETE n")
+
+        OsiConnector(
+            neo4j_driver=sync_driver,
+            database_name=DATABASE_NAME,
+        ).ingest(OSI_SEMANTIC_MODEL_PATH)
+
+        MockEmbeddingsConnector(
+            neo4j_driver=sync_driver,
+            database_name=DATABASE_NAME,
+        ).run(node_labels=[NodeLabel.METRIC, NodeLabel.TABLE, NodeLabel.COLUMN])
 
     finally:
         sync_driver.close()

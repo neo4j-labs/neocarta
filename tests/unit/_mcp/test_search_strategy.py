@@ -36,3 +36,28 @@ def test_select_search_strategy_is_per_label() -> None:
     inventory = {("Table", "VECTOR"), ("Table", "FULLTEXT")}
     assert _select_search_strategy("Column", inventory, True) is None
     assert _select_search_strategy("Table", inventory, True) == "business_term_hybrid"
+
+
+@pytest.mark.parametrize(
+    ("inventory", "business_term_search_available", "expected"),
+    [
+        # No Metric indexes → no metric tool.
+        (set(), False, None),
+        ({("Table", "VECTOR")}, True, None),
+        # Vector only → vector.
+        ({("Metric", "VECTOR")}, False, "vector"),
+        # Full-text only → full_text.
+        ({("Metric", "FULLTEXT")}, False, "full_text"),
+        # Vector + FT, no BT → hybrid.
+        ({("Metric", "VECTOR"), ("Metric", "FULLTEXT")}, False, "hybrid"),
+        # Vector + FT, BT available → BT-hybrid (top priority).
+        ({("Metric", "VECTOR"), ("Metric", "FULLTEXT")}, True, "business_term_hybrid"),
+    ],
+)
+def test_select_search_strategy_for_metric(
+    inventory: set[tuple[str, str]],
+    business_term_search_available: bool,
+    expected: str | None,
+) -> None:
+    """The same priority ladder drives Metric tool selection (keyed on the Metric label)."""
+    assert _select_search_strategy("Metric", inventory, business_term_search_available) == expected
