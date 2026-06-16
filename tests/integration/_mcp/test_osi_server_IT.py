@@ -87,6 +87,12 @@ def test_get_domain_context(neo4j_connection, osi_loaded_graph):
     a_table = next(t for t in data["tables"] if t["columns"])
     assert all(c["expressions"] for c in a_table["columns"])
 
+    # OSI richness is surfaced: table primary keys and column time dimensions.
+    employees = next(t for t in data["tables"] if t["table_name"] == "employees")
+    assert employees["primary_key"] == ["employee_id"]
+    hire_date = next(c for c in employees["columns"] if c["column_name"] == "hire_date")
+    assert hire_date["is_time_dimension"] is True
+
 
 def test_get_context_by_metric_vector_search(neo4j_connection, osi_loaded_graph):
     """Metric vector search returns metrics with their domain, expressions, and synonyms."""

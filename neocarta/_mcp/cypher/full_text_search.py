@@ -48,6 +48,8 @@ WITH
         column_name: col.name,
         column_description: col.description,
         data_type: col.type,
+        label: col.label,
+        is_time_dimension: col.is_time_dimension,
         examples: exampleValues,
         key_type: CASE
             WHEN col.is_primary_key THEN "primary"
@@ -85,6 +87,7 @@ RETURN {
     schema_name: schema.name,
     columns: columns,
     num_columns: size(columns),
+    primary_key: coalesce(table.primary_key, []),
     aspects: COLLECT {
         MATCH (table)-[:HAS_ASPECT]->(a:Aspect)
         RETURN {
@@ -148,6 +151,8 @@ WITH
         column_name: col.name,
         column_description: col.description,
         data_type: col.type,
+        label: col.label,
+        is_time_dimension: col.is_time_dimension,
         examples: exampleValues,
         key_type: CASE
             WHEN col.is_primary_key THEN "primary"
@@ -185,6 +190,7 @@ RETURN {
     schema_name: schema.name,
     columns: columns,
     num_columns: size(columns),
+    primary_key: coalesce(table.primary_key, []),
     aspects: COLLECT {
         MATCH (table)-[:HAS_ASPECT]->(a:Aspect)
         RETURN {

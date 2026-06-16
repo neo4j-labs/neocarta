@@ -30,19 +30,23 @@ RETURN {
     domain_description: d.description,
     osi_version: d.osi_version,
     tables: COLLECT {
-        MATCH (d)-[:HAS_TABLE]->(t:Table)
+        // Datasets are OsiTable (HAS_TABLE) or query-backed Query (HAS_QUERY) nodes.
+        MATCH (d)-[:HAS_TABLE|HAS_QUERY]->(t:Table|Query)
         RETURN {
             table_name: t.name,
             table_description: t.description,
             database_name: head([(t)<-[:HAS_TABLE]-(s:Schema)<-[:HAS_SCHEMA]-(db:Database) | db.name]),
             schema_name: head([(t)<-[:HAS_TABLE]-(s:Schema) | s.name]),
-            num_columns: COUNT { (t)-[:HAS_COLUMN]->(:Column) },
+            primary_key: coalesce(t.primary_key, []),
+            num_columns: COUNT { (t)-[:HAS_COLUMN|USES_COLUMN]->(:Column) },
             columns: COLLECT {
-                MATCH (t)-[:HAS_COLUMN]->(col:Column)
+                MATCH (t)-[:HAS_COLUMN|USES_COLUMN]->(col:Column)
                 RETURN {
                     column_name: col.name,
                     column_description: col.description,
                     data_type: col.type,
+                    label: col.label,
+                    is_time_dimension: col.is_time_dimension,
                     nullable: col.nullable,
                     key_type: CASE
                         WHEN col.is_primary_key THEN "primary"

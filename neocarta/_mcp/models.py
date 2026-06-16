@@ -43,6 +43,13 @@ class ColumnContext(BaseModel):
     nullable: bool | None = Field(default=None, description="Whether the column can be null")
     examples: list[str] | None = Field(default=None, description="Example values for the column")
     key_type: str | None = Field(default=None, description="The key type of the column")
+    label: str | None = Field(
+        default=None, description="The OSI display label for the column. Null on non-OSI graphs."
+    )
+    is_time_dimension: bool | None = Field(
+        default=None,
+        description="Whether the column is a time-based dimension (OSI). Null when not declared.",
+    )
     references: list[str] = Field(
         default=[],
         description="The referenced columns from another table of the column. Have format of 'table_name.column_name'",
@@ -62,13 +69,24 @@ class TableContext(BaseModel):
 
     table_name: str = Field(..., description="The name of the table")
     table_description: str | None = Field(default=None, description="The description of the table")
-    database_name: str = Field(..., description="The name of the database")
-    schema_name: str = Field(..., description="The name of the schema")
+    database_name: str | None = Field(
+        default=None,
+        description="The name of the database. Null for an OSI query-backed dataset, which has "
+        "no database/schema.",
+    )
+    schema_name: str | None = Field(
+        default=None,
+        description="The name of the schema. Null for an OSI query-backed dataset.",
+    )
     columns: list[ColumnContext] = Field(..., description="The relevant columns of the table")
     joins: list[JoinContext] = Field(
         default=[], description="The relevant join tables of the table"
     )
     num_columns: int | None = Field(default=None, description="The number of columns in the table")
+    primary_key: list[str] = Field(
+        default=[],
+        description="Ordered primary-key column names (OSI datasets). Empty on non-OSI graphs.",
+    )
     aspects: list[AspectContext] = Field(
         default=[],
         description="OSI aspects (ai_context / custom_extensions) attached to the table. Empty on non-OSI graphs.",

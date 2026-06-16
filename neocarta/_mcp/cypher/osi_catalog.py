@@ -21,9 +21,9 @@ RETURN
     d.name AS domain_name,
     d.description AS domain_description,
     COUNT { (d)-[:HAS_METRIC]->(:Metric) } AS num_metrics,
-    COUNT { (d)-[:HAS_TABLE]->(:Table) } AS num_tables,
-    COUNT { (d)-[:HAS_TABLE]->(:Table)-[:HAS_COLUMN]->(:Column) } AS num_columns,
-    COUNT { MATCH (d)-[:HAS_TABLE]->(:Table)<-[:HAS_SOURCE_TABLE]-(j:Join) RETURN DISTINCT j } AS num_joins
+    COUNT { (d)-[:HAS_TABLE|HAS_QUERY]->(ds:Table|Query) } AS num_tables,
+    COUNT { (d)-[:HAS_TABLE|HAS_QUERY]->(ds:Table|Query)-[:HAS_COLUMN|USES_COLUMN]->(:Column) } AS num_columns,
+    COUNT { MATCH (d)-[:HAS_TABLE|HAS_QUERY]->(ds:Table|Query)<-[:HAS_SOURCE_TABLE]-(j:Join) RETURN DISTINCT j } AS num_joins
 ORDER BY domain_name
     """
 
