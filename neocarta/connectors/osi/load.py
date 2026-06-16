@@ -56,10 +56,22 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         nodes: list[OsiSemanticModel],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description", "osi_version"],
+        create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
-        """Load OsiSemanticModel nodes (``:Domain:OsiSemanticModel``)."""
+        """Load OsiSemanticModel nodes (``:Domain:OsiSemanticModel``).
+
+        ``OsiSemanticModel`` augments the core ``:Domain`` node and is a search
+        entry point, so — mirroring the other OSI search-node loaders — name-range
+        and full-text indexes are created on ``Domain`` so the MCP full-text/hybrid
+        domain-search tiers register on a pure-OSI graph.
+        """
         _validate_properties_list(OsiSemanticModel, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.DOMAIN])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.DOMAIN)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.DOMAIN])
         query = _build_node_ingest_query(
             NodeLabel.DOMAIN,
             overwrite_existing,
@@ -80,6 +92,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
             "unique_keys",
         ],
         create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
         """
         Load OsiTable nodes (``:Table:OsiTable``).
@@ -87,11 +100,18 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         Neo4j cannot store nested lists as property values, so ``unique_keys``
         (``list[list[str]]``) is JSON-encoded to a single string at write time
         and decoded on export by the graph extractor.
+
+        A full-text index on ``Table`` is created (mirroring the base loader's
+        ``load_table_nodes``) so the MCP full-text/hybrid table-search tiers
+        register on a pure-OSI graph — the ``:OsiTable`` nodes augment the core
+        ``:Table`` nodes and back the same search surface.
         """
         _validate_properties_list(OsiTable, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.TABLE])
         if create_name_index:
             self._create_name_range_index(node_label=NodeLabel.TABLE)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.TABLE])
         query = _build_node_ingest_query(
             NodeLabel.TABLE,
             overwrite_existing,
@@ -119,12 +139,21 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
             "is_time_dimension",
         ],
         create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
-        """Load OsiColumn nodes (``:Column:OsiColumn``)."""
+        """Load OsiColumn nodes (``:Column:OsiColumn``).
+
+        A full-text index on ``Column`` is created (mirroring the base loader's
+        ``load_column_nodes``) so the MCP full-text/hybrid column-search tiers
+        register on a pure-OSI graph — the ``:OsiColumn`` nodes augment the core
+        ``:Column`` nodes and back the same search surface.
+        """
         _validate_properties_list(OsiColumn, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.COLUMN])
         if create_name_index:
             self._create_name_range_index(node_label=NodeLabel.COLUMN)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.COLUMN])
         query = _build_node_ingest_query(
             NodeLabel.COLUMN,
             overwrite_existing,
@@ -139,12 +168,20 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description"],
         create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
-        """Load Metric nodes."""
+        """Load Metric nodes.
+
+        Mirrors the base loader's Table/Column handling by creating a full-text
+        index on ``Metric`` so the MCP full-text, hybrid, and business-term-bridged
+        metric-search tiers can register against a pure-OSI graph.
+        """
         _validate_properties_list(Metric, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.METRIC])
         if create_name_index:
             self._create_name_range_index(node_label=NodeLabel.METRIC)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.METRIC])
         query = _build_node_ingest_query(NodeLabel.METRIC, overwrite_existing, properties_list)
         return self._run_write(query, [n.model_dump() for n in nodes])
 
@@ -220,6 +257,7 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         nodes: list[BusinessTerm],
         properties_list: list[str] = ["description"],
         create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
         """
         MERGE BusinessTerm nodes on ``name`` rather than ``id``.
@@ -227,11 +265,17 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         Used for OSI synonyms-derived BTs so they dedupe against catalog BTs
         (e.g. from Dataplex) that share the same name. Existing BTs keep their
         original id; new BTs get the id provided by the OSI ingest transformer.
+
+        A full-text index on ``BusinessTerm`` is created (mirroring the base
+        loader) so the business-term-bridged metric-search tier — which bridges
+        metric synonyms — can register on a pure-OSI graph.
         """
         _validate_properties_list(BusinessTerm, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.BUSINESS_TERM])
         if create_name_index:
             self._create_name_range_index(node_label=NodeLabel.BUSINESS_TERM)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.BUSINESS_TERM])
         set_extras = ", ".join(f"n.{p} = row.{p}" for p in properties_list)
         # Only set id on first create — never overwrite an existing BT's id.
         cypher = f"""

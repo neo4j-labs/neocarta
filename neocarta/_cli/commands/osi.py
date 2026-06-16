@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import click
 
+from ...enums import NodeLabel
 from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import CLIError, cli_error_from
@@ -111,7 +112,12 @@ def osi_ingest(
     stdout = ctx.obj["stdout"]
     stderr = ctx.obj["stderr"]
     as_json = ctx.obj["as_json"] or json_flag
-    node_labels = list(DEFAULT_SCHEMA_NODE_LABELS)
+    # OSI graphs add Metric and Domain (OsiSemanticModel) search nodes on top of
+    # the shared schema labels. Embedding their descriptions creates
+    # metric_vector_index / domain_vector_index, without which the MCP
+    # vector/hybrid metric- and domain-search tiers never register on a pure-OSI
+    # graph.
+    node_labels = [*DEFAULT_SCHEMA_NODE_LABELS, NodeLabel.METRIC, NodeLabel.DOMAIN]
 
     if dry_run:
         payload = {
