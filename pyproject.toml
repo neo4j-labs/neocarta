@@ -38,6 +38,7 @@ dependencies = [
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
     "google-cloud-bigquery-storage>=2.36.2",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
