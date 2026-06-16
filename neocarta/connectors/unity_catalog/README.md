@@ -60,14 +60,15 @@ neo4j_driver = GraphDatabase.driver(
     auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
 )
 
-connector = UnityCatalogSchemaConnector(
+# The connector owns its HTTP client; use it as a context manager (or call
+# connector.close()) to release the connection pool when done.
+with UnityCatalogSchemaConnector(
     base_url=os.getenv("UC_SERVER_URL", "http://localhost:8080/api/2.1/unity-catalog"),
     token=os.getenv("UC_TOKEN"),  # optional; None for a local OSS server
     neo4j_driver=neo4j_driver,
     database_name=os.getenv("NEO4J_DATABASE", "neo4j"),
-)
-
-connector.ingest(catalog="unity")          # optional: schemas=["default", ...]
+) as connector:
+    connector.ingest(catalog="unity")      # optional: schemas=["default", ...]
 ```
 
 ### Environment variables

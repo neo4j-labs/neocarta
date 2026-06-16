@@ -1,16 +1,23 @@
 """Unity Catalog schema sub-connector."""
 
+from __future__ import annotations
+
 import logging
 import warnings
-
-from neo4j import Driver
+from typing import TYPE_CHECKING
 
 from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
-from ...utils import NodeLabel, RelationshipType
 from .extract import UnityCatalogSchemaExtractor
 from .transform import UnityCatalogSchemaTransformer
+
+if TYPE_CHECKING:
+    from typing import Self
+
+    from neo4j import Driver
+
+    from ...utils import NodeLabel, RelationshipType
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +43,9 @@ class UnityCatalogSchemaConnector:
     The open API exposes no primary/foreign-key constraints, so no ``REFERENCES``
     edges are produced and column key flags stay ``False``. Glossary/tags are not
     available via the REST API and are handled by a separate connector.
+
+    The connector owns its HTTP client; call :meth:`close` (or use it as a context
+    manager) when done to release the connection pool.
 
     Parameters
     ----------
@@ -76,6 +86,18 @@ class UnityCatalogSchemaConnector:
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
         self._transformed = False
+
+    def close(self) -> None:
+        """Close the underlying HTTP client and release its connection pool."""
+        self.extractor.close()
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Close the HTTP client on context-manager exit."""
+        self.close()
 
     def extract(
         self,

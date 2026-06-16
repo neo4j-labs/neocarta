@@ -186,3 +186,46 @@ def test_timeout_maps_to_operation_timeout_error():
     extractor = _extractor_with_get(_get)
     with pytest.raises(OperationTimeoutError):
         extractor.extract_catalog_info("main")
+
+
+# --------------------------------------------------------------------------- #
+# malformed payload guards
+# --------------------------------------------------------------------------- #
+def test_missing_table_name_raises_extraction_error():
+    """A table payload without a 'name' field fails loud rather than emitting an empty id."""
+
+    def _get(path, params=None):
+        return _ok_response(
+            {
+                "tables": [{"catalog_name": "main", "schema_name": "sales", "columns": []}],
+                "next_page_token": "",
+            }
+        )
+
+    extractor = _extractor_with_get(_get)
+    with pytest.raises(ExtractionError):
+        extractor.extract_table_info("main", ["sales"])
+
+
+def test_missing_column_name_raises_extraction_error():
+    """A column payload without a 'name' field fails loud during flattening."""
+
+    def _get(path, params=None):
+        return _ok_response(
+            {
+                "tables": [
+                    {
+                        "name": "orders",
+                        "catalog_name": "main",
+                        "schema_name": "sales",
+                        "columns": [{"type_text": "int", "nullable": True}],
+                    }
+                ],
+                "next_page_token": "",
+            }
+        )
+
+    extractor = _extractor_with_get(_get)
+    extractor.extract_table_info("main", ["sales"])  # stashes the raw table payloads
+    with pytest.raises(ExtractionError):
+        extractor.extract_column_info()

@@ -78,3 +78,31 @@ def test_load_before_transform_raises_state_error():
     connector = _make_connector()
     with pytest.raises(StateError):
         connector.load()
+
+
+def test_run_forwards_args_to_ingest():
+    """run() forwards its catalog/schemas/filters through to ingest()."""
+    connector = _make_connector()
+    connector.ingest = MagicMock()
+    with pytest.warns(DeprecationWarning, match="run"):
+        connector.run("main")
+    connector.ingest.assert_called_once_with(
+        "main", None, include_nodes=None, include_relationships=None
+    )
+
+
+def test_close_closes_http_client():
+    """close() releases the extractor's owned HTTP client."""
+    connector = _make_connector()
+    connector.extractor._client = MagicMock()
+    connector.close()
+    connector.extractor._client.close.assert_called_once()
+
+
+def test_context_manager_closes_http_client():
+    """Using the connector as a context manager closes the HTTP client on exit."""
+    connector = _make_connector()
+    connector.extractor._client = MagicMock()
+    with connector as ctx:
+        assert ctx is connector
+    connector.extractor._client.close.assert_called_once()

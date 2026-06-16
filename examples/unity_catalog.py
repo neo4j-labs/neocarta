@@ -35,13 +35,14 @@ def main(
     node_labels = [NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN]
 
     print("Extracting, transforming, and loading Unity Catalog schema metadata into Neo4j...")
-    connector = UnityCatalogSchemaConnector(
+    # The connector owns its HTTP client; the context manager closes it on exit.
+    with UnityCatalogSchemaConnector(
         base_url=os.getenv("UC_SERVER_URL", "http://localhost:8080/api/2.1/unity-catalog"),
         token=os.getenv("UC_TOKEN"),  # optional; None for a local OSS server
         neo4j_driver=neo4j_driver,
         database_name=neo4j_database,
-    )
-    connector.ingest(catalog=catalog, schemas=schemas)
+    ) as connector:
+        connector.ingest(catalog=catalog, schemas=schemas)
 
     if with_embeddings:
         print("Generating embeddings for nodes...")

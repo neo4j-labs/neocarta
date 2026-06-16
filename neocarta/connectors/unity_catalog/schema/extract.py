@@ -202,6 +202,14 @@ class UnityCatalogSchemaExtractor:
         for schema_name in schema_names:
             params = {"catalog_name": catalog, "schema_name": schema_name}
             for item in self._paginate("/tables", params, "tables", page_size=_PAGE_SIZE_TABLES):
+                # A table without a name can't form a valid id — fail loud on a
+                # malformed/non-conformant payload rather than emit an empty-id node.
+                name = item.get("name")
+                if not name:
+                    raise ExtractionError(
+                        "Unity Catalog table payload missing required 'name' field.",
+                        details={"catalog": catalog, "schema": schema_name},
+                    )
                 # Pin catalog/schema so column flattening stays consistent even if
                 # a server omits them on the embedded payload.
                 item["catalog_name"] = item.get("catalog_name") or catalog
@@ -211,7 +219,7 @@ class UnityCatalogSchemaExtractor:
                     TableInfo(
                         catalog_name=item["catalog_name"],
                         schema_name=item["schema_name"],
-                        table_name=item.get("name"),
+                        table_name=name,
                         table_type=item.get("table_type") or None,
                         comment=item.get("comment") or None,
                     )
@@ -224,13 +232,21 @@ class UnityCatalogSchemaExtractor:
         """Flatten the columns embedded in the table payloads from the last fetch."""
         rows: list[ColumnInfo] = []
         for table in self._raw_tables:
+            # table["name"] was validated non-empty in extract_table_info.
+            table_name = table["name"]
             for column in table.get("columns") or []:
+                column_name = column.get("name")
+                if not column_name:
+                    raise ExtractionError(
+                        "Unity Catalog column payload missing required 'name' field.",
+                        details={"table": table_name},
+                    )
                 rows.append(
                     ColumnInfo(
                         catalog_name=table["catalog_name"],
                         schema_name=table["schema_name"],
-                        table_name=table.get("name"),
-                        column_name=column.get("name"),
+                        table_name=table_name,
+                        column_name=column_name,
                         # type_text carries the full SQL type (e.g. decimal(10,2));
                         # fall back to the coarse type_name, then None.
                         column_type=column.get("type_text") or column.get("type_name") or None,
