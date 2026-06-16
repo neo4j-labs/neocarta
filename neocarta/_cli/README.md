@@ -34,6 +34,16 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 | `OSI_SPEC_SOURCE` | For `osi ingest` | — | Path or URL to an OSI YAML semantic-model spec |
 | `OSI_SEMANTIC_MODEL_NAME` | For `osi export` | — | Name of the `OsiSemanticModel` to export |
 | `QUERY_LOG_FILE` | For `query-log ingest` | — | Path to a query-log JSON file |
+| `JDBC_URL` | Yes for `jdbc schema` | — | JDBC connection URL, e.g. `jdbc:postgresql://host:5432/mydb` |
+| `JDBC_DRIVER` | Yes for `jdbc schema` | — | Fully-qualified JDBC driver class, e.g. `org.postgresql.Driver` |
+| `JDBC_DRIVER_JAR` | Yes for `jdbc schema` | — | Filesystem path to the JDBC driver JAR |
+| `SCHEMACRAWLER_JAR` | Yes for `jdbc schema` | — | Filesystem path or classpath glob to the SchemaCrawler distribution JARs |
+| `JDBC_USER` | No | — | Database username |
+| `JDBC_PASSWORD` | No | — | Database password (secret). Read only from the env, never a flag. |
+| `JDBC_SOURCE_DATABASE_NAME` | No | — | Name for the graph `Database` node; needed when it cannot be derived from `JDBC_URL` (e.g. Oracle SID, SQL Server URLs) |
+| `JDBC_PLATFORM` | No | — | Hosting platform for the graph `Database` node, e.g. `AWS_RDS` |
+| `JDBC_SERVICE` | No | product reported by SchemaCrawler | Database service/engine for the graph `Database` node |
+| `JDBC_TIMEOUT` | No | `120` | Max seconds to wait for the SchemaCrawler subprocess |
 
 Secrets are env-only and never logged.
 
@@ -42,7 +52,8 @@ Secrets are env-only and never logged.
 | Flag | Meaning |
 |---|---|
 | `--json` | Emit JSON on stdout. Automatically enabled when stdout is not a TTY. Also accepted on each subcommand. |
-| `--debug` | Verbose diagnostics on stderr. |
+| `--log-level [DEBUG\|INFO\|WARNING\|ERROR]` | Diagnostics verbosity on stderr. Default: `INFO`. |
+| `--debug` | Alias for `--log-level DEBUG`. Verbose diagnostics on stderr. |
 | `--no-color` | Strip ANSI colors. `NO_COLOR=1` env also honored. |
 | `-v` / `--version` | Print CLI version and exit. |
 | `-h` / `--help` | Show help and exit. |
@@ -172,6 +183,45 @@ neocarta dataplex glossary --no-entry-links --dry-run --json
 
 ---
 
+### `neocarta jdbc schema`
+
+Extracts relational schema metadata (`Database`, `Schema`, `Table`, `Column` nodes plus foreign-key references) from any JDBC-accessible database and loads it into the Neocarta graph using `JdbcSchemaConnector`. It shells out to SchemaCrawler (Java) to read the catalog, so it works against PostgreSQL, MySQL, SQL Server, Oracle, and other JDBC sources. When `--embeddings` is enabled, description embeddings are generated via LiteLLM and written back.
+
+The database password is read **only** from `JDBC_PASSWORD` (never a flag), so the raw secret never appears in shell history or process arguments.
+
+- **Requires:** Java 11+, a SchemaCrawler distribution JAR, and a JDBC driver JAR on the host. See `neocarta/connectors/jdbc/README.md`.
+- **Flags:**
+  - `--jdbc-url TEXT` — JDBC connection URL, e.g. `jdbc:postgresql://host:5432/mydb`. Overrides `JDBC_URL`.
+  - `--jdbc-driver TEXT` — Fully-qualified JDBC driver class, e.g. `org.postgresql.Driver`. Overrides `JDBC_DRIVER`.
+  - `--jdbc-driver-jar TEXT` — Filesystem path to the JDBC driver JAR. Overrides `JDBC_DRIVER_JAR`.
+  - `--schemacrawler-jar TEXT` — Path/classpath glob to the SchemaCrawler distribution JARs. Overrides `SCHEMACRAWLER_JAR`.
+  - `--db-user TEXT` — Database username. Overrides `JDBC_USER`. (The password is env-only via `JDBC_PASSWORD`.)
+  - `--source-database-name TEXT` — Name for the graph `Database` node; required when it cannot be derived from the JDBC URL (e.g. Oracle SID, SQL Server URLs). Overrides `JDBC_SOURCE_DATABASE_NAME`.
+  - `--platform TEXT` — Hosting platform for the graph `Database` node, e.g. `AWS_RDS`. Overrides `JDBC_PLATFORM`.
+  - `--service TEXT` — Database service/engine for the graph `Database` node (default: the product SchemaCrawler reports). Overrides `JDBC_SERVICE`.
+  - `--timeout INT` — Maximum seconds to wait for the SchemaCrawler subprocess (default: `120`). Overrides `JDBC_TIMEOUT`.
+  - `--schema TEXT` — Schema name to include; repeatable. Omit to include all schemas.
+  - `--embeddings / --no-embeddings` — Generate embeddings after ingest (via LiteLLM). Default: disabled.
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Embedding vector dimensions for models that support truncation (default: auto-detected). Overrides `EMBEDDING_DIMENSIONS`.
+  - `--embedding-batch-size INT` — Nodes per embedding batch (default: `100`). Overrides `EMBEDDING_BATCH_SIZE`.
+  - `--dry-run` — Print the planned ingestion as JSON; do not touch Neo4j or the source database.
+  - `--json` — Emit JSON on stdout.
+- **Use when:** ingesting structural metadata from a relational database that speaks JDBC (PostgreSQL, MySQL, SQL Server, Oracle, …) rather than BigQuery or Dataplex.
+
+```bash
+neocarta jdbc schema \
+  --jdbc-url jdbc:postgresql://localhost:5432/sales \
+  --jdbc-driver org.postgresql.Driver \
+  --jdbc-driver-jar ./drivers/postgresql.jar \
+  --schemacrawler-jar './schemacrawler/lib/*' \
+  --db-user analytics
+neocarta jdbc schema --jdbc-url jdbc:postgresql://localhost:5432/sales --schema public --schema sales --embeddings
+JDBC_URL=jdbc:postgresql://localhost:5432/sales neocarta jdbc schema --dry-run --json
+```
+
+---
+
 ### `neocarta osi ingest`
 
 Loads an OSI ([Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)) YAML semantic model into the Neocarta graph using `OsiConnector`. The spec source may be a local filesystem path or an HTTP(S) URL. Ingests `OsiSemanticModel`, `OsiTable`, `OsiColumn`, `Query`, `Metric`, `Join`, and aspect nodes plus their relationships; synonyms in `ai_context` are upserted as `BusinessTerm` nodes (merged on name, so they dedupe against catalog-derived terms). When `--embeddings` is enabled, `Database`, `Schema`, `Table`, and `Column` description embeddings are generated via LiteLLM and written back.
@@ -210,6 +260,10 @@ Exports an OSI semantic model from Neo4j back to an OSI YAML file using `OsiConn
 neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
 OSI_SEMANTIC_MODEL_NAME=acme_corp_model neocarta osi export --output-path acme.yaml
 neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml --dry-run --json
+```
+
+---
+
 ### `neocarta query-log ingest`
 
 Parses a local query-log JSON file (currently the BigQuery export format) using `QueryLogConnector` and loads `Query` and `CTE` nodes plus the `Database` / `Schema` / `Table` / `Column` structure and the table/column references each query touches. This is **distinct from `neocarta bigquery logs`**, which reads query logs live from the Cloud Logging API; this command reads a file already on disk. No embeddings are generated (query-log nodes carry no descriptions).

@@ -50,6 +50,25 @@ ENV_VARS: dict[str, str] = {
     "OSI_SPEC_SOURCE": "Path or URL to an OSI YAML spec (for `osi ingest`).",
     "OSI_SEMANTIC_MODEL_NAME": "Name of the OsiSemanticModel to export (for `osi export`).",
     "QUERY_LOG_FILE": "Path to a query-log JSON file (for `query-log ingest`).",
+    "JDBC_URL": "JDBC connection URL, e.g. jdbc:postgresql://host:5432/mydb (for `jdbc schema`).",
+    "JDBC_DRIVER": "Fully-qualified JDBC driver class, e.g. org.postgresql.Driver (for `jdbc schema`).",
+    "JDBC_DRIVER_JAR": "Filesystem path to the JDBC driver JAR (for `jdbc schema`).",
+    "SCHEMACRAWLER_JAR": (
+        "Filesystem path or classpath glob to the SchemaCrawler distribution JARs "
+        "(for `jdbc schema`)."
+    ),
+    "JDBC_USER": "Database username (for `jdbc schema`).",
+    "JDBC_PASSWORD": "Database password (secret; for `jdbc schema`).",
+    "JDBC_SOURCE_DATABASE_NAME": (
+        "Name for the graph Database node; needed when it cannot be derived from "
+        "JDBC_URL (for `jdbc schema`)."
+    ),
+    "JDBC_PLATFORM": "Hosting platform for the graph Database node, e.g. AWS_RDS (for `jdbc schema`).",
+    "JDBC_SERVICE": (
+        "Database service/engine for the graph Database node; defaults to the "
+        "product SchemaCrawler reports (for `jdbc schema`)."
+    ),
+    "JDBC_TIMEOUT": "Max seconds for the SchemaCrawler subprocess (default: 120; for `jdbc schema`).",
 }
 
 
@@ -97,6 +116,20 @@ class CLISettings(BaseSettings):
     )
     # Query log
     query_log_file: str | None = Field(default=None, validation_alias="QUERY_LOG_FILE")
+
+    # JDBC (via SchemaCrawler)
+    jdbc_url: str | None = Field(default=None, validation_alias="JDBC_URL")
+    jdbc_driver: str | None = Field(default=None, validation_alias="JDBC_DRIVER")
+    jdbc_driver_jar: str | None = Field(default=None, validation_alias="JDBC_DRIVER_JAR")
+    schemacrawler_jar: str | None = Field(default=None, validation_alias="SCHEMACRAWLER_JAR")
+    jdbc_user: str | None = Field(default=None, validation_alias="JDBC_USER")
+    jdbc_password: SecretStr | None = Field(default=None, validation_alias="JDBC_PASSWORD")
+    jdbc_source_database_name: str | None = Field(
+        default=None, validation_alias="JDBC_SOURCE_DATABASE_NAME"
+    )
+    jdbc_platform: str | None = Field(default=None, validation_alias="JDBC_PLATFORM")
+    jdbc_service: str | None = Field(default=None, validation_alias="JDBC_SERVICE")
+    jdbc_timeout: int = Field(default=120, validation_alias="JDBC_TIMEOUT")
 
 
 def load_settings() -> CLISettings:
