@@ -76,7 +76,7 @@ class UnityCatalogSchemaTransformer:
         """Build :Column nodes from one row per (catalog, schema, table, column).
 
         The open Unity Catalog API exposes no key/constraint metadata, so
-        ``is_primary_key`` and ``is_foreign_key`` are always ``False``.
+        ``is_primary_key`` and ``is_foreign_key`` are left ``None`` (unknown).
         """
         nodes = [
             Column(
@@ -90,8 +90,8 @@ class UnityCatalogSchemaTransformer:
                 description=row["comment"],
                 type=row["column_type"],
                 nullable=row["nullable"],
-                is_primary_key=False,
-                is_foreign_key=False,
+                is_primary_key=None,
+                is_foreign_key=None,
             )
             for row in column_info
         ]

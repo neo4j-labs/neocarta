@@ -67,8 +67,14 @@ class Column(BaseModel):
         description="The data type of the column. Data types may be unavailable in source data such as query logs.",
     )
     nullable: bool = Field(default=True, description="Whether the column can be null")
-    is_primary_key: bool = Field(default=False, description="Whether the column is a primary key")
-    is_foreign_key: bool = Field(default=False, description="Whether the column is a foreign key")
+    is_primary_key: bool | None = Field(
+        default=False,
+        description="Whether the column is a primary key; None when the source exposes no key metadata",
+    )
+    is_foreign_key: bool | None = Field(
+        default=False,
+        description="Whether the column is a foreign key; None when the source exposes no key metadata",
+    )
 
     _normalize = field_validator("description", "type", mode="before")(coerce_str_or_none)
 

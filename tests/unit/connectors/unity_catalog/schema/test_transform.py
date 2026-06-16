@@ -28,9 +28,9 @@ def test_column_nodes_ids_types_and_key_flags(extractor_with_cache, transformer)
     amount = by_id["main.sales.orders.amount"]
     assert amount.type == "decimal(10,2)"
     assert amount.nullable is True
-    # The open Unity Catalog API exposes no constraints; key flags stay False.
-    assert all(node.is_primary_key is False for node in nodes)
-    assert all(node.is_foreign_key is False for node in nodes)
+    # The open Unity Catalog API exposes no constraints; key flags are left null (unknown).
+    assert all(node.is_primary_key is None for node in nodes)
+    assert all(node.is_foreign_key is None for node in nodes)
 
 
 def test_has_schema_relationships(extractor_with_cache, transformer):

@@ -27,8 +27,7 @@ Catalogs map to `Database`, schemas to `Schema`, tables and views to `Table` (th
 table's embedded columns to `Column`.
 
 The open Unity Catalog API exposes **no** primary-key, foreign-key, or other constraint metadata, so no
-`REFERENCES` edges are produced and every column is loaded with `is_primary_key=False` and
-`is_foreign_key=False`.
+`REFERENCES` edges are produced and `is_primary_key` / `is_foreign_key` are left **null** (not populated).
 
 ```mermaid
 ---
@@ -40,7 +39,7 @@ graph LR
 Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>platform: STRING<br/>service: STRING<br/>embedding: VECTOR")
 Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
 Table("Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
-Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN")
+Column("Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN")
 
 %% Relationships
 Database -->|HAS_SCHEMA| Schema
@@ -101,8 +100,10 @@ applies a client-side filter to restrict ingestion to specific schemas.
 
 ## Source-specific setup
 
-1. Run or point at a Unity Catalog server exposing the open REST API. A local OSS server
-   (`bin/start-uc-server`) listens on `http://localhost:8080` and requires no authentication by default.
+1. Run or point at a Unity Catalog server exposing the open REST API. For local testing, the open-source
+   Unity Catalog distribution ([github.com/unitycatalog/unitycatalog](https://github.com/unitycatalog/unitycatalog))
+   provides a `bin/start-uc-server` script that listens on `http://localhost:8080` with no authentication by
+   default — that script is part of that external project, not neocarta.
 2. If the server enforces auth, obtain a bearer token and pass it via `token=` (sent as
    `Authorization: Bearer <token>`).
 3. Identify the `catalog` name to ingest (and optionally the `schemas` to restrict to).
