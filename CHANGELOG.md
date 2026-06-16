@@ -7,7 +7,11 @@
 
 ### Changed
 
+- `is_primary_key` / `is_foreign_key` on `Column` class are now optional fields for connectors that don't provide these fields, such as the Unity Catalog connector.
+
 ### Added
+
+- `UnityCatalogSchemaConnector` (`neocarta.connectors.unity_catalog`): a source connector that ingests structural metadata (`Database`, `Schema`, `Table`, `Column` nodes plus `HAS_SCHEMA` / `HAS_TABLE` / `HAS_COLUMN` edges) from the **open** Unity Catalog REST API (`/api/2.1/unity-catalog`, the Apache-2.0 project at github.com/unitycatalog/unitycatalog — not the Databricks SDK), so it works against any conformant Unity Catalog server. Catalogs map to `Database`, schemas to `Schema`, tables and views to `Table` (the UC `table_type` is recorded during extraction but views are not modeled as a distinct node label), and each table's inline `columns` to `Column`. The connector owns its `httpx.Client` and is usable as a context manager (or via `close()`) to release the connection pool. The open UC API exposes no primary/foreign-key constraints, so `is_primary_key` / `is_foreign_key` are left null (unpopulated) and no `REFERENCES` edges are produced; no value sampling or glossary/tags are performed.
 
 
 ## v0.8.0

@@ -1,0 +1,15 @@
+{
+  "tables": [
+    {
+      "name": "orders",
+      "catalog_name": "main",
+      "schema_name": "sales",
+      "table_type": "MANAGED",
+      "comment": "Order facts",
+      "columns": [
+        {"name": "order_id", "type_text": "bigint", "type_name": "LONG", "nullable": false, "comment": null}
+      ]
+    }
+  ],
+  "next_page_token": "PAGE2"
+}
