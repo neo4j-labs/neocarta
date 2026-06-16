@@ -1,5 +1,10 @@
 """Dataplex glossary sub-connector."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
 import logging
 import warnings
 
@@ -11,6 +16,10 @@ from ....errors import StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import DataplexGlossaryExtractor
 from .transform import DataplexGlossaryTransformer
+
+
+if TYPE_CHECKING:
+    from typing import Self
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +89,19 @@ class DataplexGlossaryConnector:
         self._extracted = False
         self._transformed = False
         self._include_entry_links = True
+
+
+    def close(self) -> None:
+        """Close the Neo4j driver and release resources."""
+        self.neo4j_driver.close()
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Close resources on context-manager exit."""
+        self.close()
 
     def extract(self, include_entry_links: bool = True) -> None:
         """

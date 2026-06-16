@@ -1,5 +1,10 @@
 """JDBC schema connector."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
 import logging
 import warnings
 
@@ -10,6 +15,10 @@ from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import JdbcSchemaExtractor, derive_source_database_name
 from .transform import JdbcSchemaTransformer
+
+
+if TYPE_CHECKING:
+    from typing import Self
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +129,19 @@ class JdbcSchemaConnector:
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
         self._transformed = False
+
+
+    def close(self) -> None:
+        """Close the Neo4j driver and release resources."""
+        self.neo4j_driver.close()
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Close resources on context-manager exit."""
+        self.close()
 
     def extract(self, schemas: list[str] | None = None) -> None:
         """
