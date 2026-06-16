@@ -550,3 +550,29 @@ def test_ingest_writes_constraints_for_new_osi_node_labels(neo4j_driver, tpcds_y
     expected = {"Domain", "Metric", "Join", "Expression", "Aspect"}
     missing = expected - constraint_labels
     assert not missing, f"Missing constraints for OSI labels: {missing}"
+
+
+def test_ingest_creates_full_text_indexes_for_search_nodes(neo4j_driver, tpcds_yaml_path: Path):
+    """OSI ingest creates the full-text indexes the MCP search tiers gate on.
+
+    The OSI loaders override the base Table/Column loaders, so without explicitly
+    creating these the full-text, hybrid, and business-term-bridged search tools
+    never register on a pure-OSI graph (issue #209). ``:OsiTable`` / ``:OsiColumn``
+    augment the core ``:Table`` / ``:Column`` nodes and back the same search surface.
+    """
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        result = session.run("SHOW INDEXES YIELD name, type RETURN name, type")
+        full_text_index_names = {
+            record["name"] for record in result if record["type"] == "FULLTEXT"
+        }
+
+    expected = {
+        "table_full_text_index",
+        "column_full_text_index",
+        "metric_full_text_index",
+        "businessterm_full_text_index",
+    }
+    missing = expected - full_text_index_names
+    assert not missing, f"Missing full-text indexes after OSI ingest: {missing}"

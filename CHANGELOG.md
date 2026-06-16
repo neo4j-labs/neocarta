@@ -8,6 +8,7 @@
 ### Changed
 
 ### Added
+- The OSI loader now creates full-text indexes on all of its search nodes — `Table`, `Column`, `Metric`, and `BusinessTerm` — at load time (mirroring how `Neo4jRDBMSLoader` does for the core RDBMS labels). The OSI loaders override the base Table/Column loaders, so previously a pure-OSI graph had none of `table_full_text_index` / `column_full_text_index` / `metric_full_text_index` / `businessterm_full_text_index`, leaving the MCP full-text, hybrid, and business-term-bridged search tiers unregistered. (`:OsiTable` / `:OsiColumn` augment the core `:Table` / `:Column` nodes and back the same search surface.) `osi ingest --embeddings` now also embeds `Metric.description` (in addition to the shared `Database`/`Schema`/`Table`/`Column` labels), creating `metric_vector_index` so the vector and hybrid metric-search tiers register.
 
 
 ## v0.8.0

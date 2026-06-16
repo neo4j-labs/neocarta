@@ -166,6 +166,37 @@ def test_osi_ingest_routes_library_errors_to_exit_codes(
     )
 
 
+@pytest.mark.usefixtures("_cli_env")
+def test_ingest_embeddings_include_metric_label():
+    """``--embeddings`` embeds Metric on top of the default schema labels.
+
+    metric_vector_index is only created when Metric.description is embedded, so
+    the MCP vector/hybrid metric-search tiers depend on Metric being in the set
+    (issue #209).
+    """
+    from neocarta.enums import NodeLabel
+
+    runner = CliRunner()
+    with (
+        patch("neocarta._cli.commands.osi._neo4j_driver") as mock_driver_ctx,
+        patch("neocarta.connectors.osi.OsiConnector", return_value=MagicMock()),
+        patch("neocarta._cli.commands.osi._build_embedder", return_value=MagicMock()),
+        patch("neocarta._cli.commands.osi._run_embeddings") as mock_run_embeddings,
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(cli, ["--json", "osi", "ingest", "--embeddings"])
+
+    assert result.exit_code == 0, result.output
+    mock_run_embeddings.assert_called_once()
+    node_labels = mock_run_embeddings.call_args.args[1]
+    assert NodeLabel.METRIC in node_labels
+    # The shared schema labels are still embedded alongside Metric.
+    assert NodeLabel.TABLE in node_labels
+    assert NodeLabel.COLUMN in node_labels
+
+
 # --------------------------------------------------------------------------- #
 # osi export
 # --------------------------------------------------------------------------- #
