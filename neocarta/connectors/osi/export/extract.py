@@ -101,9 +101,14 @@ class OsiGraphExtractor:
     # ------------------------------------------------------------------ #
 
     def _read_semantic_model(self, session: Any, name: str) -> dict[str, Any] | None:
-        """Read the OsiSemanticModel root node by name."""
+        """Read the OsiSemanticModel root node by name.
+
+        Matches on ``:OsiSemanticModel&Domain`` (both labels are always written
+        together at load time) so the planner can use the ``Domain`` name-range
+        index to seek; an ``:OsiSemanticModel``-only pattern would label-scan.
+        """
         cypher = (
-            "MATCH (sm:OsiSemanticModel {name: $name}) "
+            "MATCH (sm:OsiSemanticModel&Domain {name: $name}) "
             "RETURN sm.id AS id, sm.name AS name, sm.description AS description, "
             "sm.osi_version AS osi_version "
             "LIMIT 1"

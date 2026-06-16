@@ -56,10 +56,22 @@ class OsiNeo4jLoader(Neo4jRDBMSLoader):
         nodes: list[OsiSemanticModel],
         overwrite_existing: bool = False,
         properties_list: list[str] = ["name", "description", "osi_version"],
+        create_name_index: bool = True,
+        create_full_text_index: bool = True,
     ) -> dict:
-        """Load OsiSemanticModel nodes (``:Domain:OsiSemanticModel``)."""
+        """Load OsiSemanticModel nodes (``:Domain:OsiSemanticModel``).
+
+        ``OsiSemanticModel`` augments the core ``:Domain`` node and is a search
+        entry point, so — mirroring the other OSI search-node loaders — name-range
+        and full-text indexes are created on ``Domain`` so the MCP full-text/hybrid
+        domain-search tiers register on a pure-OSI graph.
+        """
         _validate_properties_list(OsiSemanticModel, properties_list)
         self._write_node_constraint(node_labels=[NodeLabel.DOMAIN])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.DOMAIN)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.DOMAIN])
         query = _build_node_ingest_query(
             NodeLabel.DOMAIN,
             overwrite_existing,

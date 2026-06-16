@@ -167,12 +167,12 @@ def test_osi_ingest_routes_library_errors_to_exit_codes(
 
 
 @pytest.mark.usefixtures("_cli_env")
-def test_ingest_embeddings_include_metric_label():
-    """``--embeddings`` embeds Metric on top of the default schema labels.
+def test_ingest_embeddings_include_osi_search_node_labels():
+    """``--embeddings`` embeds Metric and Domain on top of the default schema labels.
 
-    metric_vector_index is only created when Metric.description is embedded, so
-    the MCP vector/hybrid metric-search tiers depend on Metric being in the set
-    (issue #209).
+    metric_vector_index / domain_vector_index are only created when their
+    descriptions are embedded, so the MCP vector/hybrid metric- and domain-search
+    tiers depend on these labels being in the set (issue #209).
     """
     from neocarta.enums import NodeLabel
 
@@ -191,8 +191,10 @@ def test_ingest_embeddings_include_metric_label():
     assert result.exit_code == 0, result.output
     mock_run_embeddings.assert_called_once()
     node_labels = mock_run_embeddings.call_args.args[1]
+    # OSI search-entry-point nodes beyond the shared schema labels.
     assert NodeLabel.METRIC in node_labels
-    # The shared schema labels are still embedded alongside Metric.
+    assert NodeLabel.DOMAIN in node_labels
+    # The shared schema labels are still embedded alongside them.
     assert NodeLabel.TABLE in node_labels
     assert NodeLabel.COLUMN in node_labels
 

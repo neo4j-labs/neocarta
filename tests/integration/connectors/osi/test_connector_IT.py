@@ -569,6 +569,7 @@ def test_ingest_creates_full_text_indexes_for_search_nodes(neo4j_driver, tpcds_y
         }
 
     expected = {
+        "domain_full_text_index",
         "table_full_text_index",
         "column_full_text_index",
         "metric_full_text_index",

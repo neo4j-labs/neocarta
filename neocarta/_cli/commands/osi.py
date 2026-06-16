@@ -112,10 +112,12 @@ def osi_ingest(
     stdout = ctx.obj["stdout"]
     stderr = ctx.obj["stderr"]
     as_json = ctx.obj["as_json"] or json_flag
-    # OSI graphs add Metric nodes on top of the shared schema labels. Embedding
-    # Metric.description creates metric_vector_index, without which the MCP
-    # vector/hybrid metric-search tiers never register on a pure-OSI graph.
-    node_labels = [*DEFAULT_SCHEMA_NODE_LABELS, NodeLabel.METRIC]
+    # OSI graphs add Metric and Domain (OsiSemanticModel) search nodes on top of
+    # the shared schema labels. Embedding their descriptions creates
+    # metric_vector_index / domain_vector_index, without which the MCP
+    # vector/hybrid metric- and domain-search tiers never register on a pure-OSI
+    # graph.
+    node_labels = [*DEFAULT_SCHEMA_NODE_LABELS, NodeLabel.METRIC, NodeLabel.DOMAIN]
 
     if dry_run:
         payload = {
