@@ -784,7 +784,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.7.0",
+        "neocarta[mcp]@0.8.0",
         "neocarta-mcp"
       ],
       "env": {
