@@ -239,5 +239,10 @@ def write_embeddings_to_graph(
         routing_=RoutingControl.WRITE,
     )
 
-    logger.info("Wrote %d embeddings to (:%s)", summary.counters.properties_set, node_label)
+    # db.create.setNodeVectorProperty is a procedure call; Neo4j's query summary
+    # counters (e.g. properties_set) do not track property writes performed via
+    # procedure calls, so they always report 0 here even though the write
+    # succeeds. Report the number of rows actually sent instead.
+    written = len(embeddings_df)
+    logger.info("Wrote %d embeddings to (:%s)", written, node_label)
     return summary.counters.__dict__

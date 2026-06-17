@@ -4,6 +4,7 @@
 ## Upcoming
 
 ### Fixed
+- `write_embeddings_to_graph` now logs the actual number of embeddings written based on input row count, instead of `summary.counters.properties_set`, which is always 0 because `db.create.setNodeVectorProperty` is a procedure call and Neo4j query summary counters do not track procedure-call writes. (#216)
 
 ### Changed
 
