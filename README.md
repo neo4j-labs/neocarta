@@ -1,6 +1,6 @@
 # Neocarta
 
-An end-to-end library for reliable SQL query generation using metadata knowledge graphs in Neo4j.
+An end-to-end library for reliable SQL generation using metadata knowledge graphs in Neo4j.
 
 *Note: This library is not a Neo4j product. It is a Neo4j Labs project supported by the Neo4j field team.*
 
