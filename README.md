@@ -1,6 +1,6 @@
 # Neocarta
 
-An end-to-end library for generating metadata knowledge graphs in Neo4j for query generation and routing workflows.
+An end-to-end library for building a semantic layer in Neo4j — giving AI agents systemic understanding of how your data is organized, what it means, and where it lives.
 
 *Note: This library is not a Neo4j product. It is a Neo4j Labs project supported by the Neo4j field team.*
 
@@ -10,6 +10,127 @@ An end-to-end library for generating metadata knowledge graphs in Neo4j for quer
 [![PyPI version](https://badge.fury.io/py/neocarta.svg)](https://badge.fury.io/py/neocarta)
 [![Python versions](https://img.shields.io/pypi/pyversions/neocarta.svg)](https://pypi.org/project/neocarta/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+## What it is
+
+Neocarta builds a **semantic layer** in Neo4j from your data sources and serves it to your agents through an **MCP server**. The graph unifies more than raw schema — it brings together:
+
+- **Schema metadata** — tables, columns, foreign keys, and sample values
+- **Business glossary** — terms and categories linked to the columns and tables they describe
+- **Metrics** — governed metric definitions and their expressions
+- **Query history** — real queries and the tables and columns they touch
+
+…with more on the way. Across a growing set of database types, only the metadata crosses into Neo4j; your data stays in the source.
+
+This gives agents systemic familiarity with the data landscape — what data exists, what it means, how it joins, and which database holds it. Agents use the graph to **discover insights, ground their answers, and route queries to the right database**, making Text2Query, query routing, and data discovery reliable.
+
+![Neocarta builds a semantic layer in Neo4j from your data sources and serves it to your agents over MCP, so they can discover, understand, and query the underlying data](assets/images/architecture/quickstart-flow.png)
+
+## Quickstart
+
+**1. Ingest** — read your source's schema into the semantic graph (your data stays in the source). Use the Python library or the CLI.
+
+Python — this is the [BigQuery connector example](examples/bigquery.py):
+
+```python
+import os
+from google.cloud import bigquery
+from neo4j import GraphDatabase
+from neocarta import NodeLabel as nl
+from neocarta.connectors.bigquery import BigQuerySchemaConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
+
+driver = GraphDatabase.driver(
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
+)
+client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
+
+# Extract, transform, and load BigQuery schema metadata into Neo4j
+BigQuerySchemaConnector(
+    client=client,
+    project_id=os.getenv("GCP_PROJECT_ID"),
+    neo4j_driver=driver,
+).ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+
+# Optional: generate embeddings to turn on semantic table/column search
+LiteLLMEmbeddingsConnector(
+    neo4j_driver=driver,
+    embedding_model="text-embedding-3-small",
+).run(node_labels=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN])
+```
+
+CLI — the same ingest without writing Python (`--embeddings` is optional):
+
+```bash
+pip install "neocarta[cli]"
+# reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY from the environment or a .env file
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
+```
+
+See the [Neocarta CLI](#neocarta-cli) section for the full command set.
+
+**2. Serve** — expose the graph to your agent as tools:
+
+```bash
+pip install "neocarta[mcp]"
+# reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD from the environment or a .env file
+neocarta-mcp
+```
+
+The server gives the agent retrieval tools — `list_schemas`, `list_tables_by_schema`, and full-text, vector, or hybrid search over tables, columns, and business terms — each returning a table with its columns, types, example values, and **foreign-key references**.
+
+**3. Use** — connect your agent to the `neocarta` MCP server plus a query-execution tool for your database. The agent searches the graph for relevant tables, follows the foreign keys to build the join, and runs the query:
+
+> *Which customers placed the largest orders last quarter?*
+> → the agent calls `get_context_by_table_hybrid_search`, finds `orders` and `customers`, sees `orders.customer_id → customers.id`, writes the join, and returns the results.
+
+A complete runnable agent (LangGraph + the MCP + a BigQuery query tool) is in [`run_agent.py`](run_agent.py).
+
+The above will result in an agent architecture like below:
+
+```mermaid
+---
+config:
+    layout: dagre
+---
+
+graph LR
+    
+    subgraph GCP["GCP Environment"]
+        BQMCP(BigQuery<br>MCP)
+
+        subgraph DataWarehouse["Data Warehouse"]
+            BQData[(BigQuery)]
+        end
+        
+        BQMCP <--> BQData
+    end
+
+    subgraph Local["Local Environment"]
+        Agent("Text2SQL Agent")
+        MetadataMCP("Neocarta<br/>MCP")
+        
+        subgraph Graph["Database"]
+            NEO[(Neo4j Graph)]
+        end
+        
+        Agent <--> MetadataMCP
+        MetadataMCP <--> NEO
+    end
+    
+    User("User")
+    
+    subgraph LLM["LLM Service"]
+        Model("LLM")
+    end
+    
+    User <--> Agent
+    Agent <--> Model
+    Agent <--> BQMCP
+```
+
+Embeddings are optional: catalog and full-text tools work from schema alone, and adding embeddings turns on semantic table and column search. See [Embeddings](#embeddings) and [Neocarta MCP](#neocarta-mcp).
 
 ## Installation
 

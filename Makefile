@@ -80,7 +80,8 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/agent-architecture.mmd -o assets/images/architecture/agent-architecture.png
 	mmdc -i assets/mermaid/architecture/dataplex-connector-architecture.mmd -o assets/images/architecture/dataplex-connector-architecture.png
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
-	
+	mmdc -i assets/mermaid/architecture/quickstart-flow.mmd -o assets/images/architecture/quickstart-flow.png --scale 2 --backgroundColor transparent
+
 test-unit:
 	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent
 
