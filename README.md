@@ -1,6 +1,6 @@
 # Neocarta
 
-An end-to-end library for generating metadata knowledge graphs in Neo4j for query generation and routing workflows.
+An end-to-end library for reliable SQL query generation using metadata knowledge graphs in Neo4j.
 
 *Note: This library is not a Neo4j product. It is a Neo4j Labs project supported by the Neo4j field team.*
 
@@ -10,6 +10,50 @@ An end-to-end library for generating metadata knowledge graphs in Neo4j for quer
 [![PyPI version](https://badge.fury.io/py/neocarta.svg)](https://badge.fury.io/py/neocarta)
 [![Python versions](https://img.shields.io/pypi/pyversions/neocarta.svg)](https://pypi.org/project/neocarta/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+## What it is
+
+Neocarta turns a data warehouse's **schema** into a Neo4j **metadata graph** — tables, columns, foreign keys, and sample values — and serves that graph to your agent through an **MCP server**. The agent retrieves the relevant tables and their join keys, then writes SQL against the warehouse. Only the metadata crosses into Neo4j; the warehouse rows stay where they are.
+
+It makes **Text2SQL, query routing, and data discovery** reliable: the agent reads the join paths from the graph instead of inferring them from column names.
+
+![Neocarta reads your warehouse schema into a Neo4j metadata graph, serves it to your agent over MCP, and the agent writes grounded SQL back against the warehouse rows](assets/images/architecture/quickstart-flow.png)
+
+## Quickstart
+
+**1. Ingest** — read your warehouse schema into the metadata graph (rows stay in the warehouse):
+
+```python
+from google.cloud import bigquery
+from neo4j import GraphDatabase
+from neocarta.connectors.bigquery import BigQuerySchemaConnector
+
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+BigQuerySchemaConnector(
+    client=bigquery.Client(project=PROJECT),
+    project_id=PROJECT,
+    neo4j_driver=driver,
+).ingest(dataset_id="your_dataset")
+```
+
+**2. Serve** — expose the graph to your agent as tools:
+
+```bash
+pip install "neocarta[mcp]"
+# reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD from the environment or a .env file
+neocarta-mcp
+```
+
+The server gives the agent schema-retrieval tools — `get_full_metadata_schema`, `list_schemas`, `list_tables_by_schema`, and full-text or vector search over tables and columns — each returning a table with its columns, types, example values, and **foreign-key references**.
+
+**3. Use** — connect your agent to the `neocarta` MCP server plus a SQL-execution tool. The agent retrieves the schema, follows the foreign keys to build the join, and runs the SQL:
+
+> *Which customers placed the largest orders last quarter?*
+> → the agent calls `get_full_metadata_schema`, sees `orders.customer_id → customers.id`, writes the join, and returns the rows.
+
+A complete runnable agent (LangGraph + the MCP + a BigQuery SQL tool) is in [`run_agent.py`](run_agent.py).
+
+Embeddings are optional: catalog and full-text tools work from schema alone, and adding embeddings turns on semantic table and column search. See [Embeddings](#embeddings) and [Neocarta MCP](#neocarta-mcp).
 
 ## Installation
 
