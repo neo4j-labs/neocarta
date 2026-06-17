@@ -1,6 +1,6 @@
 [project]
 name = "neocarta"
-version = "0.7.0"
+version = "0.8.0"
 description = "Library that facilitates the creation of semantic layer metadata graph in Neo4j."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -38,6 +38,7 @@ dependencies = [
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
     "google-cloud-bigquery-storage>=2.36.2",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]

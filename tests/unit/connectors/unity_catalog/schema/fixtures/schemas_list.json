@@ -1,0 +1,17 @@
+{
+  "schemas": [
+    {
+      "name": "sales",
+      "catalog_name": "main",
+      "full_name": "main.sales",
+      "comment": "Sales data"
+    },
+    {
+      "name": "ops",
+      "catalog_name": "main",
+      "full_name": "main.ops",
+      "comment": null
+    }
+  ],
+  "next_page_token": ""
+}

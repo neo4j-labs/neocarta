@@ -1,6 +1,23 @@
 # Changelog of neocarta library and MCP server
 
+
 ## Upcoming
+
+### Fixed
+
+### Changed
+
+- `is_primary_key` / `is_foreign_key` on `Column` class are now optional fields for connectors that don't provide these fields, such as the Unity Catalog connector.
+
+### Added
+- All connectors now support the context-manager protocol (`__enter__` / `__exit__` / `close()`), so a connector can be used as `with FooConnector(neo4j_driver=driver) as connector: connector.ingest(...)`. `close()` releases only resources the connector itself created and owns (e.g. the Unity Catalog connector's `httpx.Client`); the **injected Neo4j driver is owned by the caller and is intentionally left open**, so sharing one driver across connectors or reusing it after the `with` block is safe. Connectors that only hold the injected driver have a no-op `close()`. (Documented in `connector-contract.md` §9b and exercised by the per-connector conformance tests.)
+
+- The OSI loader now creates full-text indexes on all of its search nodes — `Domain` (`OsiSemanticModel`), `Table`, `Column`, `Metric`, and `BusinessTerm` — at load time (mirroring how `Neo4jRDBMSLoader` does for the core RDBMS labels). The OSI loaders override the base Table/Column loaders (and `OsiSemanticModel` previously created no index at all), so a pure-OSI graph had none of `domain_/table_/column_/metric_/businessterm_full_text_index`, leaving the MCP full-text, hybrid, and business-term-bridged search tiers unregistered. (`:OsiSemanticModel` / `:OsiTable` / `:OsiColumn` augment the core `:Domain` / `:Table` / `:Column` nodes and back the same search surface.) `osi ingest --embeddings` now also embeds `Metric.description` and `Domain.description` (in addition to the shared `Database`/`Schema`/`Table`/`Column` labels), creating `metric_vector_index` / `domain_vector_index` so the vector and hybrid metric- and domain-search tiers register.
+
+- `UnityCatalogSchemaConnector` (`neocarta.connectors.unity_catalog`): a source connector that ingests structural metadata (`Database`, `Schema`, `Table`, `Column` nodes plus `HAS_SCHEMA` / `HAS_TABLE` / `HAS_COLUMN` edges) from the **open** Unity Catalog REST API (`/api/2.1/unity-catalog`, the Apache-2.0 project at github.com/unitycatalog/unitycatalog — not the Databricks SDK), so it works against any conformant Unity Catalog server. Catalogs map to `Database`, schemas to `Schema`, tables and views to `Table` (the UC `table_type` is recorded during extraction but views are not modeled as a distinct node label), and each table's inline `columns` to `Column`. The connector owns its `httpx.Client` and is usable as a context manager (or via `close()`) to release the connection pool. The open UC API exposes no primary/foreign-key constraints, so `is_primary_key` / `is_foreign_key` are left null (unpopulated) and no `REFERENCES` edges are produced; no value sampling or glossary/tags are performed.
+
+
+## v0.8.0
 
 ### Fixed
 
@@ -23,6 +40,7 @@
 - `--log-level [DEBUG|INFO|WARNING|ERROR]` global CLI option controlling diagnostics verbosity on stderr (default `INFO`). The previously-unused `--debug` flag is now a convenience alias for `--log-level DEBUG`.
 - `JdbcSchemaConnector` (`neocarta.connectors.jdbc`): a source connector that extracts schema metadata (`Database`, `Schema`, `Table`, `Column`, and `REFERENCES` foreign-key edges) from any JDBC-compatible database (PostgreSQL, MySQL, Oracle, SQL Server, Redshift, …). The Java↔Python bridge shells out to the SchemaCrawler CLI's `template` command with a bundled FreeMarker template (`schema/catalog.json.ftl`) that renders a compact JSON catalog with full table/column/primary-key/foreign-key detail, then flattens it into the shared `Neo4jRDBMSLoader` pipeline. (SchemaCrawler's `serialize` JSON omits tables and foreign keys, so the template is required to populate `REFERENCES`.) Host prerequisites — Java 11+, the SchemaCrawler distribution (its `_schemacrawler/lib/*` classpath), a FreeMarker JAR on that classpath, and a JDBC driver JAR — are user-supplied (Java availability is checked at construction; all documented in `neocarta/connectors/jdbc/README.md`). The DB password is passed to SchemaCrawler via the environment, never on the command line. Extraction is scoped with `ingest(schemas=[...])`. Ships unit tests (mocked subprocess + a real captured golden fixture) and a skip-guarded Dockerized-PostgreSQL integration test (`tests/integration/connectors/jdbc/`), plus `examples/jdbc.py` and `JDBC_*` entries in `.env.example`.
 - CLI connector commands now show a progress spinner on stderr during the long-running stages (`Ingesting ...` while a connector runs, `Generating embeddings...` while embeddings are written, `Exporting OSI semantic model...` on `osi export`), so a slow ingest visibly indicates it is still working. The spinner shares the stderr console with the existing `RichHandler`, so INFO log lines render above it. It is shown only on an interactive terminal: under `--json`/agent mode, CI, or any non-TTY stderr it is a no-op via the new `neocarta._cli.output.cli_status` helper, so machine output and the `--json` stdout contract are unaffected. Closes #170.
+- `neocarta jdbc schema`: new CLI command wrapping `JdbcSchemaConnector`, exposing the JDBC source connector on the CLI alongside `bigquery`, `csv`, `dataplex`, `osi`, and `query-log`. Extracts relational schema metadata (`Database`, `Schema`, `Table`, `Column`, and `REFERENCES` foreign-key edges) from any JDBC-accessible database via SchemaCrawler and loads it into Neo4j. Connection inputs resolve from flags or the `JDBC_*` env vars (`JDBC_URL`, `JDBC_DRIVER`, `JDBC_DRIVER_JAR`, `SCHEMACRAWLER_JAR`, `JDBC_USER`, `JDBC_SOURCE_DATABASE_NAME`, `JDBC_PLATFORM`, `JDBC_SERVICE`, `JDBC_TIMEOUT`), all surfaced through `neocarta agent-context`; the DB password is read only from `JDBC_PASSWORD` (secret), never a flag, matching the connector's "password via the environment, never on the command line" design. Supports `--schema` (repeatable) to scope extraction, opt-in `--embeddings`, `--dry-run`, and the standard JSON/exit-code contract. Closes #198.
 
 
 ## v0.7.0 
