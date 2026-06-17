@@ -101,3 +101,22 @@ def test_context_manager_exit_leaves_injected_driver_open():
     with connector:
         pass
     connector.neo4j_driver.close.assert_not_called()
+
+
+def test_driver_usable_across_repeated_context_blocks():
+    """The caller's driver survives repeated context-managed use, ready for reuse."""
+    connector = _make_connector()
+    driver = connector.neo4j_driver
+    with connector:
+        pass
+    with connector:
+        pass
+    driver.close.assert_not_called()
+
+
+def test_context_manager_exit_on_exception_leaves_driver_open():
+    """An error inside the `with` block propagates and leaves the driver open."""
+    connector = _make_connector()
+    with pytest.raises(ValueError, match="boom"), connector:
+        raise ValueError("boom")
+    connector.neo4j_driver.close.assert_not_called()
