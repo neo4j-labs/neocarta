@@ -1,10 +1,10 @@
 """OSI (Open Semantic Interchange) connector — bidirectional Neo4j integration."""
 
+from __future__ import annotations
+
 import logging
 import warnings
-from pathlib import Path
-
-from neo4j import Driver
+from typing import TYPE_CHECKING
 
 from ..._logging import log_transform_counts
 from ...errors import StateError
@@ -14,6 +14,12 @@ from .export.transform import OsiExportTransformer
 from .ingest.extract import OsiSpecExtractor
 from .ingest.transform import OsiIngestTransformer
 from .load import OsiNeo4jLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Self
+
+    from neo4j import Driver
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +108,17 @@ class OsiConnector:
     # ------------------------------------------------------------------ #
     # Ingest direction
     # ------------------------------------------------------------------ #
+
+    def close(self) -> None:
+        """No connector-owned resources to release; the injected Neo4j driver is the caller's."""
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Release owned resources on context-manager exit."""
+        self.close()
 
     def extract(self, spec_source: str | Path, *, version: str = "0.1.1") -> None:
         """

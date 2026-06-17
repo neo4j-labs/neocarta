@@ -1,16 +1,23 @@
 """CSV Connector for loading metadata from CSV files into Neo4j."""
 
+from __future__ import annotations
+
 import logging
 import warnings
-
-from neo4j import Driver
+from typing import TYPE_CHECKING
 
 from ..._logging import log_transform_counts
-from ...enums import NodeLabel, RelationshipType
 from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import CSVExtractor
 from .transform import CSVTransformer
+
+if TYPE_CHECKING:
+    from typing import Self
+
+    from neo4j import Driver
+
+    from ...enums import NodeLabel, RelationshipType
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +71,21 @@ class CSVConnector:
         """Initialize the CSV connector."""
         self.extractor = CSVExtractor(csv_directory, csv_file_map)
         self.transformer = CSVTransformer()
+        self.neo4j_driver = neo4j_driver
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
         self._transformed = False
+
+    def close(self) -> None:
+        """No connector-owned resources to release; the injected Neo4j driver is the caller's."""
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Release owned resources on context-manager exit."""
+        self.close()
 
     def extract(
         self,

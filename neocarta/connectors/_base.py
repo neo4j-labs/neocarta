@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from typing_extensions import Self
+
 
 @runtime_checkable
 class SourceConnectorProtocol(Protocol):
@@ -51,6 +53,22 @@ class SourceConnectorProtocol(Protocol):
         Must emit a :class:`DeprecationWarning` and delegate to :meth:`ingest`.
         Removed after approximately three releases.
         """
+        ...
+
+    def close(self) -> None:
+        """Release any long-lived resources the connector itself owns.
+
+        The injected Neo4j driver is owned by the caller and is left open;
+        connectors that create their own clients release them here.
+        """
+        ...
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        ...
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Release owned resources on context-manager exit."""
         ...
 
 

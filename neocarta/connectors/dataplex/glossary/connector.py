@@ -1,16 +1,22 @@
 """Dataplex glossary sub-connector."""
 
+from __future__ import annotations
+
 import logging
 import warnings
-
-from google.cloud import dataplex_v1
-from neo4j import Driver
+from typing import TYPE_CHECKING
 
 from ...._logging import log_transform_counts
 from ....errors import StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import DataplexGlossaryExtractor
 from .transform import DataplexGlossaryTransformer
+
+if TYPE_CHECKING:
+    from typing import Self
+
+    from google.cloud import dataplex_v1
+    from neo4j import Driver
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,17 @@ class DataplexGlossaryConnector:
         self._extracted = False
         self._transformed = False
         self._include_entry_links = True
+
+    def close(self) -> None:
+        """No connector-owned resources to release; the injected Neo4j driver is the caller's."""
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Release owned resources on context-manager exit."""
+        self.close()
 
     def extract(self, include_entry_links: bool = True) -> None:
         """
