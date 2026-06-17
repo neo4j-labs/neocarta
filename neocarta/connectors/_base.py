@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from typing_extensions import Self
+
 
 @runtime_checkable
 class SourceConnectorProtocol(Protocol):
@@ -54,15 +56,19 @@ class SourceConnectorProtocol(Protocol):
         ...
 
     def close(self) -> None:
-        """Close the Neo4j driver and release any long-lived resources."""
+        """Release any long-lived resources the connector itself owns.
+
+        The injected Neo4j driver is owned by the caller and is left open;
+        connectors that create their own clients release them here.
+        """
         ...
 
-    def __enter__(self) -> SourceConnectorProtocol:
+    def __enter__(self) -> Self:
         """Return self for use as a context manager."""
         ...
 
     def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
-        """Close resources on context-manager exit."""
+        """Release owned resources on context-manager exit."""
         ...
 
 

@@ -83,3 +83,25 @@ def test_load_before_transform_raises_state_error():
     connector = _make_connector()
     with pytest.raises(StateError):
         connector.load()
+
+
+def test_context_manager_returns_self():
+    """The connector is usable as a context manager and yields itself."""
+    connector = _make_connector()
+    with connector as ctx:
+        assert ctx is connector
+
+
+def test_close_leaves_injected_driver_open():
+    """close() must not close the caller-owned Neo4j driver."""
+    connector = _make_connector()
+    connector.close()
+    connector.neo4j_driver.close.assert_not_called()
+
+
+def test_context_manager_exit_leaves_injected_driver_open():
+    """Exiting the context manager must not close the caller-owned Neo4j driver."""
+    connector = _make_connector()
+    with connector:
+        pass
+    connector.neo4j_driver.close.assert_not_called()

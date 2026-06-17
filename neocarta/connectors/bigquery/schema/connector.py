@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-
 import logging
 import warnings
-
-from google.cloud import bigquery
-from neo4j import Driver
+from typing import TYPE_CHECKING
 
 from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
@@ -17,9 +12,11 @@ from ....ingest.rdbms import Neo4jRDBMSLoader
 from .extract import BigQuerySchemaExtractor
 from .transform import BigQuerySchemaTransformer
 
-
 if TYPE_CHECKING:
     from typing import Self
+
+    from google.cloud import bigquery
+    from neo4j import Driver
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +87,15 @@ class BigQuerySchemaConnector:
         self._extracted = False
         self._transformed = False
 
-
     def close(self) -> None:
-        """Close the Neo4j driver and release resources."""
-        self.neo4j_driver.close()
+        """No connector-owned resources to release; the injected Neo4j driver is the caller's."""
 
     def __enter__(self) -> Self:
         """Return self for use as a context manager."""
         return self
 
     def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
-        """Close resources on context-manager exit."""
+        """Release owned resources on context-manager exit."""
         self.close()
 
     def extract(self, dataset_id: str | None = None) -> None:
