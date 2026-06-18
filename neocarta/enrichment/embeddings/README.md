@@ -4,14 +4,14 @@ Generates and stores vector embeddings for nodes in the semantic graph, enabling
 
 ## Overview
 
-The embeddings module embeds a composed `name | type | description` text for each graph node using any embedding provider supported by [LiteLLM](https://docs.litellm.ai/) (OpenAI, Azure OpenAI, Cohere, Bedrock, Vertex AI, Gemini, Ollama, HuggingFace, etc.) and writes the resulting vectors back to Neo4j. The parts are joined with `` | `` and null or blank parts are dropped (`type` exists only on Column nodes), so a node always embeds on at least its name and a missing description never skips it. Embedding this composed text rather than the bare description keeps every connector and embedding mode embedding the identical text. The vector dimension is auto-detected from the model on first use, the Neo4j vector index is created at that size, and only nodes without an existing `embedding` property are processed — making reruns safe and incremental.
+The embeddings module embeds the `description` field of graph nodes using any embedding provider supported by [LiteLLM](https://docs.litellm.ai/) (OpenAI, Azure OpenAI, Cohere, Bedrock, Vertex AI, Gemini, Ollama, HuggingFace, etc.) and writes the resulting vectors back to Neo4j. The vector dimension is auto-detected from the model on first use, the Neo4j vector index is created at that size, and only nodes without an existing `embedding` property are processed — making reruns safe and incremental.
 
 ## Process
 
 ```
 Neo4j (nodes missing embeddings)
         ↓  get_nodes_to_embed()
-   DataFrame [id, node_label, description]   # description column = composed `name | type | description`
+   DataFrame [id, node_label, description]
         ↓  create_embeddings_in_batches_{sync|async}()
    DataFrame [id, embedding]
         ↓  write_embeddings_to_graph()
@@ -20,8 +20,8 @@ Neo4j (embedding property set on each node)
 
 1. **Probe** — embed a tiny test string once to discover the model's native vector size
 2. **Index** — create the Neo4j vector index at that size (idempotent, skips if it already exists)
-3. **Fetch** — queries Neo4j for nodes of a given label where `embedding IS NULL`, composing each node's `name | type | description` embed text (dropping null/blank parts)
-4. **Embed** — calls the embeddings API for each composed text, in batches
+3. **Fetch** — queries Neo4j for nodes of a given label where `description IS NOT NULL` and `embedding IS NULL`
+4. **Embed** — calls the embeddings API for each description, in batches
 5. **Write** — sets the `embedding` vector property on each matched node using `db.create.setNodeVectorProperty`
 
 A cosine-similarity vector index (e.g. `table_vector_index`) is created for each node label before embedding begins, if one does not already exist.

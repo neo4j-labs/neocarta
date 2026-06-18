@@ -211,7 +211,7 @@ class BaseEmbeddingsConnector:
             logger.info("Embedding %s nodes...", label)
             create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
             nodes_to_embed_dataframe = get_nodes_to_embed(
-                self.neo4j_driver, label, self.database_name
+                self.neo4j_driver, label, 20, self.database_name
             )
             embeddings = self.create_embeddings_sync(
                 nodes_to_embed_dataframe=nodes_to_embed_dataframe,
@@ -243,7 +243,7 @@ class BaseEmbeddingsConnector:
             logger.info("Embedding %s nodes...", label)
             create_vector_index(self.neo4j_driver, label, dimensions, self.database_name)
             nodes_to_embed_dataframe = get_nodes_to_embed(
-                self.neo4j_driver, label, self.database_name
+                self.neo4j_driver, label, 20, self.database_name
             )
             embeddings = await self.create_embeddings_async(
                 nodes_to_embed_dataframe=nodes_to_embed_dataframe,

@@ -2398,10 +2398,6 @@ agent = [
     { name = "langchain-openai" },
     { name = "langgraph" },
 ]
-databricks = [
-    { name = "neocarta", extra = ["databricks-spark"] },
-    { name = "pytest" },
-]
 dev = [
     { name = "ipykernel" },
     { name = "pytest" },
@@ -2447,10 +2443,6 @@ agent = [
     { name = "langchain-mcp-adapters", specifier = ">=0.2.1" },
     { name = "langchain-openai", specifier = ">=1.1.7" },
     { name = "langgraph", specifier = ">=1.0.7" },
-]
-databricks = [
-    { name = "neocarta", extras = ["databricks-spark"] },
-    { name = "pytest" },
 ]
 dev = [
     { name = "ipykernel", specifier = ">=7.1.0" },

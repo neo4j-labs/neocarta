@@ -8,9 +8,9 @@
 # MAGIC model-serving endpoint. One run produces a fully embedded semantic graph.
 # MAGIC
 # MAGIC This is the **inline mode** described in the connector README. It runs on
-# MAGIC the cluster; there is no separate enrichment step. (The alternative is
-# MAGIC external mode: ingest first, then run `neocarta databricks embed` to add
-# MAGIC vectors. See the connector README for that two-step flow.)
+# MAGIC the cluster; there is no separate enrichment step. The alternative is
+# MAGIC external mode: ingest first, then embed the graph as a separate step. See
+# MAGIC the connector README.
 # MAGIC
 # MAGIC **Requires a classic cluster.** The Neo4j Spark Connector is a JVM library
 # MAGIC and is not supported on serverless compute.
@@ -100,7 +100,7 @@ NEO4J_PASSWORD = "<password>"
 EMBEDDING_ENDPOINT = "openai-text-embedding-3-small"
 EMBEDDING_DIMENSION = 1536
 # Set to False to run external mode: ingest only, no inline embeddings (vectors
-# are added later by `neocarta databricks embed`). When False, EMBEDDING_ENDPOINT,
+# are added by a separate embedding step afterward). When False, EMBEDDING_ENDPOINT,
 # EMBEDDING_DIMENSION, and EMBEDDING_STAGING_VOLUME below are unused.
 INCLUDE_EMBEDDINGS = True
 # Writable UC Volume subpath for the transient per-batch ai_query materialization.

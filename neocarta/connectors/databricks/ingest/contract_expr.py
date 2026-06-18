@@ -1,90 +1,64 @@
 """Graph-contract identifier builders for the Databricks connector.
 
-This module owns the connector's node-identity scheme. It deliberately does NOT
-reuse the shared ``neocarta.connectors.utils.generate_id`` helpers: those are
-shared by the BigQuery / CSV / Dataplex connectors and use a *lossy*
-normalization (lowercase, then space and hyphen both folded to underscore). That
-folding is unsafe as a Unity Catalog identity key — see "Why a hash" below — so
-this connector builds its own ids here, where the Python and Spark
-implementations live side by side and can be kept byte-identical.
+This module owns the connector's node-identity scheme. ``node_id`` uses the
+shared ``neocarta.connectors.utils.generate_id`` recipe (``compose_id``) so the
+Databricks connector's ids are uniform with the BigQuery / CSV / Dataplex
+connectors. The Python and Spark implementations live side by side here so they
+can be kept byte-identical.
 
 Two id forms, two jobs
 ----------------------
-``qualified_name`` — the human-readable, *lossless* dotted path,
-``catalog.schema.table.column``, lowercased but otherwise verbatim. Stored as a
-node property for debugging and hand-written Cypher. NOT used as the MERGE key.
+``node_id``: the normalized, dot-joined identifier from ``compose_id``. Each part
+is lowercased with spaces and hyphens folded to underscore, then joined with
+``.``. This is the Neo4j MERGE key that the NODE KEY / uniqueness constraints are
+enforced against. It is never parsed apart; the structural parts
+are carried as their own node properties ``catalog`` / ``schema`` / ``table``.
 
-``node_id`` — ``md5(qualified_name)``: an opaque 32-hex-char digest. This is the
-Neo4j MERGE key (the value NODE KEY / uniqueness constraints are enforced
-against). It is never parsed apart; the structural parts are carried as their own
-node properties (``catalog`` / ``schema`` / ``table``), so the id only ever needs
-to be a stable, collision-free key.
+``qualified_name``: the human-readable, *lossless* dotted path,
+``catalog.schema.table.column``, lowercased but otherwise verbatim. Hyphens and
+other legal characters are preserved. Stored as a node property for debugging and
+hand-written Cypher. NOT the MERGE key.
 
-Why a hash, and how it avoids data corruption
----------------------------------------------
-The MERGE key must be *injective*: two distinct Unity Catalog objects must never
-produce the same id, or Neo4j MERGE silently folds them into one node and the
-graph is corrupted (the surviving ``name`` is just whichever row wrote last).
-
-The previous scheme folded both spaces and hyphens to ``_`` before joining on
-``.``. That is NOT injective: a schema named ``graph-enriched-schema`` and a
-schema named ``graph_enriched_schema`` are two distinct, co-existing Unity
-Catalog securable objects, yet both folded to the id ``graph_enriched_schema``
-and collided.
-
-The fix relies on a Unity Catalog naming guarantee. UC object names (catalog,
-schema, table, column) **cannot contain** the period ``.``, the space, the
-forward slash, ASCII control characters (0x00-0x1F), or DELETE (0x7F), and UC
-stores every object name lowercased. See the SQL identifier rules:
-https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-names.html
-
-Two consequences make this scheme correct:
-
-1. Because ``.`` can never appear inside a part, joining the lowercased parts
-   with ``.`` is an *unambiguous, reversible* encoding of the
-   ``(catalog, schema, table, column)`` tuple: ``(a, b.c)`` is impossible, so it
-   can never be confused with ``(a.b, c)``. ``qualified_name`` is therefore an
-   injective function of the tuple.
-2. ``node_id = md5(qualified_name)`` is then injective up to an md5 collision
-   (the same assumption already relied on for Value-node ids). Distinct objects
-   get distinct ids; identical objects (UC is case-insensitive, hence the
-   lowercase) collapse to one node, which is exactly what we want. Hyphens,
-   underscores, and every other legal character survive into the digest input
-   unchanged, so ``graph-enriched-schema`` and ``graph_enriched_schema`` now hash
-   to different ids and stay separate nodes.
+The normalization is lossy: spaces and hyphens both fold to ``_``, so a schema
+named ``graph-enriched-schema`` and one named ``graph_enriched_schema`` produce
+the same ``node_id`` and MERGE collapses them into one node. This matches the
+shared scheme used by every other connector; ``qualified_name`` keeps the
+distinct readable paths even where the id folds them.
 
 Byte-for-byte Python/Spark agreement
 ------------------------------------
 Ids are produced on the driver (Python: ``node_id`` / ``qualified_name``) and
 inside Spark (``node_id_expr`` / ``qualified_name_expr``); both must yield the
 identical string for the same input or edges (matched by id) would not connect to
-their nodes. Agreement is maintained by construction: both lowercase, both join
-with ``.``, both md5 the result, and md5 hex is lowercase 32 chars on both sides.
-There is no separate runtime check enforcing it, so keep the two in lockstep when
-editing either.
+their nodes. Agreement is maintained by construction: both lowercase, both fold
+space and hyphen to ``_``, and both join with ``.``. There is no separate runtime
+check enforcing it, so keep the two in lockstep when editing either.
 """
 
 from __future__ import annotations
 
-import hashlib
 from typing import TYPE_CHECKING
+
+from neocarta.connectors.utils.generate_id import compose_id
 
 if TYPE_CHECKING:
     from pyspark.sql import Column
 
-# The part separator. Safe as a delimiter precisely because Unity Catalog forbids
-# it inside any object name (see module docstring), so the dotted join is an
-# injective encoding of the identifier tuple.
+# The part separator, matching the shared ``compose_id`` dotted join.
 _PART_SEP = "."
+# Characters folded to underscore by the shared ``_normalize`` (space, hyphen),
+# replicated in Spark via ``translate``. Order pairs with ``_FOLD_TO``.
+_FOLD_FROM = " -"
+_FOLD_TO = "__"
 
 
 def qualified_name(*parts: str) -> str:
     """Return the lossless, lowercased dotted path for an identifier tuple.
 
     ``catalog.schema.table.column`` (or any prefix), lowercased to match Unity
-    Catalog's lowercase storage but otherwise verbatim — hyphens and other legal
-    characters are preserved. This is a node property and the input to
-    :func:`node_id`; it is never the MERGE key itself.
+    Catalog's lowercase storage but otherwise verbatim. Hyphens and other legal
+    characters are preserved. This is a node property only; it is never the MERGE
+    key. The MERGE key is :func:`node_id`, which normalizes the same parts.
 
     Examples:
     --------
@@ -95,18 +69,18 @@ def qualified_name(*parts: str) -> str:
 
 
 def node_id(*parts: str) -> str:
-    """Return the opaque MERGE key for an identifier tuple: ``md5(qualified_name)``.
+    """Return the MERGE key for an identifier tuple: the shared ``compose_id``.
 
-    Collision-free across distinct Unity Catalog objects (modulo md5), because
-    :func:`qualified_name` is an injective encoding of the tuple. See the module
-    docstring for why this matters.
+    Each part is lowercased with spaces and hyphens folded to underscore, then the
+    parts are joined with ``.``. This is the canonical neocarta id recipe shared by
+    every connector. The normalization is lossy; see the module docstring.
 
     Examples:
     --------
     >>> node_id("my-catalog", "sales", "orders")
-    '8f9e5e6d...'  # doctest: +SKIP
+    'my_catalog.sales.orders'
     """
-    return hashlib.md5(qualified_name(*parts).encode(), usedforsecurity=False).hexdigest()
+    return compose_id(*parts)
 
 
 def qualified_name_expr_from_columns(*parts: Column) -> Column:
@@ -114,7 +88,7 @@ def qualified_name_expr_from_columns(*parts: Column) -> Column:
 
     Accepts arbitrary Column expressions, including literals. ``lower`` after
     ``concat_ws('.')`` is identical to lowercasing each part then joining, since
-    the ``.`` separator is unaffected by ``lower`` — keeping it byte-identical to
+    the ``.`` separator is unaffected by ``lower``. This keeps it byte-identical to
     the Python ``'.'.join(p.lower() ...)``.
     """
     from pyspark.sql import functions as F
@@ -132,12 +106,15 @@ def qualified_name_expr(*column_names: str) -> Column:
 def node_id_expr_from_columns(*parts: Column) -> Column:
     """Spark Column expression equal to :func:`node_id`.
 
-    Accepts arbitrary Column expressions, including literals. Use this when an
-    identifier combines Python-known values with Spark row values.
+    Replicates ``compose_id`` byte-for-byte: ``translate`` folds space and hyphen
+    to underscore over the lowercased dotted join. ``translate`` is character-wise,
+    and the ``.`` separator is not in the fold set, so applying it after the join
+    is identical to normalizing each part before joining. Accepts arbitrary Column
+    expressions, including literals.
     """
     from pyspark.sql import functions as F
 
-    return F.md5(qualified_name_expr_from_columns(*parts))
+    return F.translate(qualified_name_expr_from_columns(*parts), _FOLD_FROM, _FOLD_TO)
 
 
 def node_id_expr(*column_names: str) -> Column:
@@ -150,11 +127,11 @@ def node_id_expr(*column_names: str) -> Column:
 def value_id_expr() -> Column:
     """Spark Column expression for a Value-node id: ``<col_id>.md5(val)``.
 
-    Built from the column's already-hashed ``col_id`` plus the md5 of the value,
-    so it is collision-free whenever ``col_id`` is (it is — ``col_id`` is a
-    :func:`node_id`). The ``.`` join is unambiguous because an md5 digest never
-    contains ``.``. Expects the input DataFrame to expose ``col_id`` and ``val``,
-    matching the sample-value transform's intermediate schema.
+    Built from the column's ``col_id`` (a :func:`node_id`) plus the md5 of the
+    value, matching the shared ``generate_value_id`` recipe
+    (``compose_id(...).<value-hash>``). Expects the input DataFrame to expose
+    ``col_id`` and ``val``, matching the sample-value transform's intermediate
+    schema.
     """
     from pyspark.sql import functions as F
 

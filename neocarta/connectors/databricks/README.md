@@ -4,10 +4,12 @@ Builds the neocarta semantic graph from Databricks Unity Catalog. The connector
 extracts schema facts (databases, schemas, tables, columns), declared foreign
 keys, and optional sampled column values, then writes them into Neo4j.
 
-[neo4j-partners/dbxcarta](https://github.com/neo4j-partners/dbxcarta) provides a
-Databricks job that runs the Spark ingestion, and the neocarta examples show how
-to use it (see
-[`examples/databricks/submit_finance_genie.env`](../../../examples/databricks/submit_finance_genie.env)).
+This connector's Spark ingestion code originated in
+[neo4j-partners/dbxcarta](https://github.com/neo4j-partners/dbxcarta), the
+original source for this Databricks semantic-layer work. Beyond the ingestion
+logic ported here, dbxcarta additionally provides job-submission tooling,
+`dbxcarta-submit`, for packaging the neocarta wheel and launching the ingest as a
+Spark wheel job on a cluster. neocarta itself does not ship that tooling.
 
 ## Quick start
 
@@ -21,21 +23,12 @@ Databricks cluster.
 Building and staging this wheel is the step that updates a cluster so it can run
 the neocarta Databricks Spark ingest. The schema ingest runs as a Spark wheel
 job on a Databricks cluster, so the connector is delivered as a wheel staged on a
-UC Volume. Build it from the repo root with `make`:
+UC Volume. Build it from the repo root with `uv`:
 
 ```bash
 # In the neocarta repo root
-make build
+uv build
 # produces dist/neocarta-<version>-py3-none-any.whl (and the sdist)
-```
-
-Optionally verify the built wheel before shipping it. `make databricks-wheel-test`
-clean-room installs `neocarta[databricks-spark]` into a fresh venv and runs the
-smoke suite against the wheel, catching modules or dependencies missing from the
-package that the editable source tree hides:
-
-```bash
-make databricks-wheel-test
 ```
 
 Copy the `.whl` from `dist/` to a UC Volume (workspace uploader,
@@ -64,94 +57,13 @@ pip install "neocarta[databricks-spark]"
 `databricks-sdk` ships in the base install, so the only thing the extra adds is
 the heavy Spark dependency needed to actually run the ingest job.
 
-### Set up the OpenAI external embedding endpoint
-
-`scripts/setup_openai_external_model_endpoint.py` registers a Databricks Mosaic
-AI External Model serving endpoint that proxies OpenAI `text-embedding-3-small`
-(1536-dim). Run it so the Databricks connector embeds with the same OpenAI
-embedding model as the rest of neocarta, keeping vector search consistent across
-datasources in one graph. Key points:
-
-- It makes inline embedding mode call OpenAI instead of a native Databricks
-  model, matching an OpenAI-based neocarta graph.
-- It is a standalone `uv` script with PEP 723 inline dependencies, so it runs
-  without installing neocarta.
-
-Store the OpenAI key in a Databricks secret scope first, then run the script:
-
-```bash
-databricks secrets create-scope neocarta-openai
-databricks secrets put-secret neocarta-openai OPENAI_API_KEY
-
-uv run scripts/setup_openai_external_model_endpoint.py --profile <profile>
-```
-
-The script creates the endpoint and probes it through `ai_query` to assert the
-returned vector dimension. See
-[Registering the OpenAI endpoint (manual step)](#registering-the-openai-endpoint-manual-step)
-for the full flag list and details.
-
 ### Examples
 
 [`examples/databricks/README.md`](../../../examples/databricks/README.md) covers
-two runnable ways to drive the connector against Unity Catalog:
+runnable ways to drive the connector against Unity Catalog:
 
-- **Local submit** (`submit_finance_genie.py`): a `uv` script that stages the
-  connector wheel and submits the ingest job to a cluster.
 - **Notebooks** (`inline_embed_ingest.py`, `graph_text2sql.py`): interactive
   ingest and queries inside a Databricks workspace.
-
-### Run external embedding with the neocarta CLI
-
-After the Spark ingest job builds the graph, embed the node descriptions with
-OpenAI and write the vectors back using the neocarta CLI:
-
-```bash
-uv run neocarta databricks embed
-# or override the model and dimensions:
-uv run neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 1536
-```
-
-The CLI loads a `.env` from the **current working directory** (not the Spark
-job's env or any overlay) and reads these variables:
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `NEO4J_URI` | Bolt URI of the graph to embed | required |
-| `NEO4J_USERNAME` | Neo4j username | required |
-| `NEO4J_PASSWORD` | Neo4j password | required |
-| `NEO4J_DATABASE` | Target database | `neo4j` |
-| `OPENAI_API_KEY` | OpenAI credential for the embedding model | required |
-| `EMBEDDING_MODEL` | OpenAI embedding model | `text-embedding-3-small` |
-| `EMBEDDING_DIMENSIONS` | Vector dimension to request | `768` |
-
-> **Dimension must match the vector index.** The Spark ingest creates the
-> `{label}_vector_index` indexes at `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION`
-> (default `1024`; `1536` for the OpenAI endpoint). The CLI's `EMBEDDING_DIMENSIONS`
-> default is `768`, which matches **neither** — embedding at the default writes
-> 768-dim vectors that the index silently refuses to index, so vector search
-> returns zero results. Set `EMBEDDING_DIMENSIONS` (or `--embedding-dimensions`)
-> to the **same** value the index was built with.
-
-`neocarta` is the console script installed with the package, so a bare
-`neocarta …` invocation works once you have `pip install neocarta` into an
-active environment. Developing from this repo with `uv`, the binary is not on
-your `PATH`; prefix the command with `uv run` to run it inside the managed
-environment:
-
-```bash
-uv run neocarta databricks embed
-```
-
-- Embeds Database, Schema, Table, and Column nodes, using a composed
-  `name | type | description` text per node (null/blank parts dropped), so a
-  node embeds on at least its name even without a comment.
-- Requires `OPENAI_API_KEY`.
-- `--dry-run` prints the planned run without touching Neo4j.
-- `--json` produces machine-readable output.
-
-See [Two-step external flow](#two-step-external-flow) for the full external mode
-walkthrough.
 
 ## Execution model
 
@@ -175,25 +87,22 @@ Databricks SDK's own `DATABRICKS_*` variables and are not redefined here.
 
 Every node carries two identity fields with two distinct jobs:
 
-- `id` — the Neo4j MERGE key. It is an md5 hash of the node's lowercased dotted
-  path (`md5("catalog.schema.table.column")`), so it is a stable, opaque,
-  collision-free key. It is never parsed apart; the structural parts are stored
-  as their own properties (`catalog` / `schema` / `table`).
-- `qualified_name` — the human-readable form of that path
-  (`catalog.schema.table.column`), lowercased but otherwise verbatim. Kept for
-  debugging and hand-written Cypher.
+- `id`: the Neo4j MERGE key. It is the shared neocarta `compose_id` of the node's
+  parts: each part lowercased with spaces and hyphens folded to underscore, joined
+  with `.` (`catalog.schema.table.column`). It is never parsed apart; the
+  structural parts are stored as their own properties `catalog` / `schema` /
+  `table`.
+- `qualified_name`: the human-readable, lossless form of that path
+  (`catalog.schema.table.column`), lowercased but otherwise verbatim, so hyphens
+  are preserved. Kept for debugging and hand-written Cypher.
 
-The id is hashed rather than stored as the dotted string to guarantee
-collision-safety. Unity Catalog allows hyphens in names (e.g.
-`graph-enriched-schema`), so a normalization that folded hyphens to underscores
-would let two distinct schemas collapse to one id and silently corrupt the graph
-on MERGE. Hashing the lossless lowercased path avoids this: because Unity Catalog
-forbids `.` (and spaces and control characters) inside object names, the dotted
-path is an unambiguous encoding of the identifier tuple, and its md5 is a
-collision-free key. This differs from the in-process connectors (BigQuery, CSV,
-Dataplex), which use the shared dotted-id scheme in
-`neocarta.connectors.utils.generate_id`. See
-`neocarta/connectors/databricks/ingest/contract_expr.py` for the full rationale.
+The `id` uses the same scheme as the in-process connectors (BigQuery, CSV,
+Dataplex) in `neocarta.connectors.utils.generate_id`, so node ids are uniform
+across connectors. The normalization is lossy: a schema named
+`graph-enriched-schema` and one named `graph_enriched_schema` fold to the same
+`id` and MERGE collapses them into one node. `qualified_name` keeps the distinct
+readable paths even where the id folds them. See
+`neocarta/connectors/databricks/ingest/contract_expr.py` for details.
 
 ## Keyword search indexes
 
@@ -211,11 +120,11 @@ Each index covers `name`, `qualified_name`, and `description`. Including
 `qualified_name` (the dotted `catalog.schema.table` path) lets keyword search
 disambiguate by catalog or schema: Lucene tokenizes the dotted path into separate
 words, so the bare name still matches exactly while the catalog and schema words
-become searchable too. This is a lexical-only choice — embeddings stay on the
-bare `name | type | comment` text (see [Embedding modes](#embedding-modes)) to
-keep every connector embedding identical text and avoid diluting vectors with
-non-semantic catalog/schema words. The indexes are created with `IF NOT EXISTS`,
-so reruns are safe.
+become searchable too. This is a lexical-only choice. Embeddings stay on the
+`description` text only (see [Embedding modes](#embedding-modes)) to keep every
+connector embedding identical text and avoid diluting vectors with non-semantic
+catalog/schema words. The indexes are created with `IF NOT EXISTS`, so reruns are
+safe.
 
 ## Embedding modes
 
@@ -226,28 +135,28 @@ to off.
 Only inline mode creates the per-label `{label}_vector_index` cosine indexes
 during the Spark job (at `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION`, one index per
 label whose embedding flag is on), because only inline writes embeddings in the
-job. External mode creates no vector indexes during ingest: the `neocarta
-databricks embed` CLI creates each index at the dimension it actually embeds, so
-the index dimension always matches the stored vectors. Value nodes are never
+job. External mode creates no vector indexes during ingest; the separate
+external embedding step creates each index at the dimension it actually embeds,
+so the index dimension always matches the stored vectors. Value nodes are never
 indexed.
 
 ### External mode (default)
 
 The Spark job writes Database, Schema, Table, and Column nodes with no
-`embedding` property and creates no vector indexes. A separate run of
-`neocarta.enrichment` adds the vectors afterward and creates each vector index at
-the dimension it embeds, so the index always matches the stored vectors. This is
-a two-step flow, and neocarta ships a CLI verb for the second step. See
-[Two-step external flow](#two-step-external-flow) below.
+`embedding` property and creates no vector indexes. Embedding is a separate step
+performed against the graph after ingest: it adds the vectors and creates each
+vector index at the dimension it embeds, so the index always matches the stored
+vectors.
 
 ### Inline mode
 
 * **How it runs**: during the node-write loop, each batch runs
   `ai_query('<endpoint>', embedding_text, failOnError => false)` natively in Spark
   against a Databricks model-serving endpoint.
-* **Embedding text**: `embedding_text` is the composed `name | type | comment`
-  string (null/blank parts dropped), the same text the external/shared embed path
-  composes, so inline and external embed identically.
+* **Embedding text**: `embedding_text` is the node's `description` only, the same
+  text the external/shared embed path uses, so inline and external embed
+  identically. A node with no description is written without an embedding (and is
+  not vector-indexed), mirroring neocarta's description-only embedding.
 * **Per-label control**: each label can be enabled independently, and a per-label
   `{label}_vector_index` cosine index is created for each enabled label at the
   configured dimension.
@@ -272,14 +181,13 @@ an OpenAI model), or want to re-embed without re-running the Spark job.
 Each mode owns its index. Inline creates the index during the Spark job at
 `NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION` (default: the Databricks
 `databricks-gte-large-en` endpoint at 1024 dimensions). External creates no index
-during ingest; the `neocarta databricks embed` CLI creates it at the dimension it
-embeds (`EMBEDDING_DIMENSIONS`, default 768; set 1536 for OpenAI
-`text-embedding-3-small`). The index is created with `IF NOT EXISTS` and is fixed
-at one dimension, so two rules apply:
+during ingest; the separate external embedding step creates it at the dimension
+it embeds. The index is created with `IF NOT EXISTS` and is fixed at one
+dimension, so two rules apply:
 
-- In external mode, the CLI's `EMBEDDING_DIMENSIONS` must match the model it
-  embeds with, and the query side (MCP server / agent) must use the same model
-  and dimension or vector search returns nothing.
+- In external mode, the embedding step's dimension must match the model it embeds
+  with, and the query side (MCP server / agent) must use the same model and
+  dimension or vector search returns nothing.
 - You cannot mix modes against the same graph without rebuilding the vector
   index, and if the graph holds data from more than one neocarta datasource, the
   embedding model and dimension must match what the rest of neocarta uses or
@@ -299,10 +207,7 @@ register an "External Model" serving endpoint. "External Model" is the Databrick
 Mosaic AI term for a serving endpoint that proxies an outside provider; the one
 here proxies OpenAI `text-embedding-3-small` (1536-dim) and is then callable with
 `ai_query` exactly like a native endpoint. This is a one-time manual step done
-outside the connector run, and the repo ships a helper,
-`scripts/setup_openai_external_model_endpoint.py`, that automates it. The helper
-is a standalone `uv` script (PEP 723 inline dependencies), so it runs without
-installing neocarta.
+outside the connector run.
 
 1. Store the OpenAI key in a Databricks secret scope. The endpoint references the
    secret and authenticates to OpenAI itself at query time, so the key value
@@ -314,18 +219,10 @@ installing neocarta.
    databricks secrets put-secret neocarta-openai OPENAI_API_KEY
    ```
 
-2. Create and verify the endpoint. The script creates the External Model serving
-   endpoint that proxies OpenAI `text-embedding-3-small` (1536-dim), then probes
-   it through the same `ai_query` path the connector uses to assert the returned
-   vector dimension:
-
-   ```bash
-   uv run scripts/setup_openai_external_model_endpoint.py --profile <profile>
-   ```
-
-   Pass `--skip-verify` to create the endpoint without the dimension probe, or
-   `--endpoint-name` / `--secret-scope` / `--secret-key` to override the
-   defaults. Run with `--help` for the full flag list.
+2. Create the External Model serving endpoint that proxies OpenAI
+   `text-embedding-3-small` (1536-dim), referencing the secret above for the
+   OpenAI credential. Create it through the Databricks Serving UI or the
+   Databricks REST API / SDK.
 
 3. Point the connector at the endpoint:
 
@@ -334,44 +231,26 @@ installing neocarta.
    export NEOCARTA_DATABRICKS_EMBEDDING_DIMENSION=1536
    ```
 
-## Two-step external flow
+## Running the Spark ingest
 
-External mode is two steps: run the Spark ingest job, then run the CLI embedding
-command against the graph it produced.
-
-**Step 1: Spark ingest job (on a Databricks cluster).** Configure the
-`NEOCARTA_DATABRICKS_*` variables and run the connector as a wheel job. The
-schema ingest cannot run in-process off-cluster because it writes through the
-Neo4j Spark Connector.
+Configure the `NEOCARTA_DATABRICKS_*` variables and run the connector as a wheel
+job on a Databricks cluster. The schema ingest cannot run in-process off-cluster
+because it writes through the Neo4j Spark Connector.
 
 ```python
 from neocarta.connectors.databricks import DatabricksSparkSchemaConnector
 
 # On a cluster: Neo4j credentials come from the Databricks secret scope.
-summary = DatabricksSparkSchemaConnector().run()
+summary = DatabricksSparkSchemaConnector().ingest()
 ```
 
-**Step 2: CLI embedding command.** After the graph exists, embed the
-descriptions with OpenAI and write the vectors back (prefix with `uv run` when
-working from this repo):
-
-```bash
-neocarta databricks embed
-# or override the model and dimensions:
-neocarta databricks embed --embedding-model text-embedding-3-small --embedding-dimensions 768
-```
-
-The command embeds Database, Schema, Table, and Column nodes — each on a composed
-`name | type | description` text (null/blank parts dropped) — and requires
-`OPENAI_API_KEY`. Pass `--dry-run` to print the planned run without touching
-Neo4j, and `--json` for machine-readable output. The Spark ingest itself is not a
-CLI verb, and inline embeddings remain a setting on the Spark job rather than a
-CLI flag.
+In external mode the job stops here, having written the schema graph; embedding
+is a separate step performed against that graph afterward.
 
 ## Capturing the run report
 
 Every run produces a `RunSummary` with extract, sample-value, foreign-key, and
-embedding counters. The `run()` call returns it in memory, and the Neo4j write
+embedding counters. The `ingest()` call returns it in memory, and the Neo4j write
 counts are logged. A detached cluster job leaves no durable artifact beyond those
 logs, so set `NEOCARTA_DATABRICKS_SUMMARY_VOLUME` to a writable UC Volume subpath
 to persist the report:

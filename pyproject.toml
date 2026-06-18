@@ -72,11 +72,6 @@ databricks-spark = [
 [project.scripts]
 neocarta = "neocarta._cli:main"
 neocarta-mcp = "neocarta._mcp.server:run"
-# Databricks Spark ingest is a wheel-job entry point, not a CLI verb: it writes
-# through the Neo4j Spark Connector and must run on a cluster. Registering it as
-# a console script lets a wheel-job launcher resolve and invoke run_ingest() by
-# name from the installed neocarta distribution.
-neocarta-databricks-ingest = "neocarta.connectors.databricks.run:run_ingest"
 
 [dependency-groups]
 # Development tools
@@ -101,14 +96,6 @@ eval = [
     "mcp>=1.26.0",
     "tiktoken>=0.12.0",
 ]
-# Spark tooling for developing/testing the Databricks connector. pyspark and
-# pydantic-settings arrive via the `databricks-spark` extra; pytest runs the
-# connector's local (no-cluster) Spark tests. Run with
-# `uv run --group databricks ...` (see the `test-databricks` Make target).
-databricks = [
-    "neocarta[databricks-spark]",
-    "pytest",
-]
 
 [build-system]
 requires = ["hatchling"]
@@ -127,10 +114,6 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-# Lint target stays inferred from neocarta's requires-python (3.10) so neocarta's
-# own 3.10-compatibility rules (e.g. UP017) keep firing. The ported Databricks
-# connector code is 3.10-compatible (PEP 695 type-parameter syntax was removed
-# during the migration), so a single lint target covers the whole tree.
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -206,43 +189,20 @@ ignore = [
     "ERA001",  # `# MAGIC` / `# COMMAND` are Databricks notebook markers
     "S105",    # Placeholder credentials the operator fills in
 ]
-# Ported Databricks connector + FK-enrichment source. Missing-docstring
-# presence rules (D1xx) and the PySpark `functions as F` alias (N812) are
-# ignored for this code, which predates neocarta's docstring gate; backfilling
-# docstrings is tracked separately, not part of the migration. Scoping these
-# per-path keeps neocarta's own docstring/naming enforcement intact. N804 is
-# ignored because the Spark settings' model_validators run mode="after"
-# (instance methods taking `self`), but neocarta's repo-wide
-# classmethod-decorators lists model_validator, so ruff would otherwise demand
-# `cls`. PLC0415 allows the deliberate lazy imports of the optional Spark deps.
+# Databricks connector + FK-enrichment source. These three exceptions are
+# technical necessities, not relaxed style: pyspark is an optional dependency,
+# so it must be imported lazily inside functions (PLC0415) or `import neocarta`
+# would fail without the `databricks-spark` extra installed (the same reason
+# eval/retrievers ignores PLC0415 above). `functions as F` is the canonical
+# PySpark import alias (N812). N804 fires because the Spark settings'
+# model_validators run mode="after" as instance methods taking `self`, but
+# neocarta's repo-wide classmethod-decorators lists model_validator, so ruff
+# would otherwise wrongly demand `cls`. All other rules, including the
+# docstring (D1xx) gate, are enforced here as everywhere else.
 "neocarta/connectors/databricks/**/*.py" = [
-    "D100",    # Missing docstring in public module
-    "D101",    # Missing docstring in public class
-    "D102",    # Missing docstring in public method
-    "D103",    # Missing docstring in public function
-    "D105",    # Missing docstring in magic method
-    "D107",    # Missing docstring in __init__
-    "D213",    # Multi-line summary on second line — dbxcarta uses first-line summaries
     "N804",    # after-mode model_validator takes self, not cls (see note above)
     "N812",    # `functions as F` is the canonical PySpark import alias
     "PLC0415", # Lazy imports are intentional for optional Spark deps
-]
-# Operational setup scripts (run via `uv run scripts/...`), not importable
-# modules: they predate neocarta's docstring gate the same way the connector
-# source does, so the missing-docstring presence rules (D1xx) are ignored here.
-"scripts/*.py" = [
-    "D100",    # Missing docstring in public module
-    "D103",    # Missing docstring in public function
-]
-"neocarta/enrichment/foreign_keys/**/*.py" = [
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D105",
-    "D107",
-    "N812",
-    "PLC0415",
 ]
 "tests/unit/connectors/databricks/**/*.py" = [
     "S101",    # assert is idiomatic in pytest

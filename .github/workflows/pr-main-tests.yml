@@ -51,6 +51,3 @@ jobs:
       
       - name: Run smoke tests
         run: make test-smoke
-
-      - name: Run Databricks connector tests
-        run: make test-databricks

@@ -46,47 +46,50 @@ def _tables_schema():
     )
 
 
-def test_database_nodes_embedding_text_equals_name(local_spark):
-    """The Database embedding text is the catalog name (EXPR[DATABASE] == 'name')."""
+def test_database_nodes_embedding_text_is_null(local_spark):
+    """Database carries no catalog comment, so its embedding_text is null.
+
+    neocarta embeds the description field only; with no description, inline mode
+    writes the Database node without an embedding.
+    """
     df = build_database_nodes(local_spark, ["sales"], platform="AWS")
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "sales"
-    assert _one(df, "embedding_text") == _one(df, "name")
+    assert _one(df, "embedding_text") is None
 
 
-def test_schema_nodes_embedding_text_is_name_and_comment(local_spark):
-    """Schema embedding text is `name | comment`, matching the shared embed path."""
+def test_schema_nodes_embedding_text_is_comment(local_spark):
+    """Schema embedding text is the description only, matching the shared path."""
     schemata = local_spark.createDataFrame(
         [("sales", "public", "customer facing")],
         ["catalog_name", "schema_name", "comment"],
     )
     df = build_schema_nodes(schemata)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "public | customer facing"
+    assert _one(df, "embedding_text") == "customer facing"
 
 
-def test_schema_nodes_embedding_text_drops_blank_comment(local_spark):
-    """A blank/whitespace comment is dropped, leaving just the name."""
+def test_schema_nodes_embedding_text_blank_comment_is_null(local_spark):
+    """A blank/whitespace comment yields null embedding_text (no description)."""
     schemata = local_spark.createDataFrame(
         [("sales", "public", "   ")],
         ["catalog_name", "schema_name", "comment"],
     )
-    assert _one(build_schema_nodes(schemata), "embedding_text") == "public"
+    assert _one(build_schema_nodes(schemata), "embedding_text") is None
 
 
-def test_table_nodes_embedding_text_is_name_and_comment(local_spark):
-    """Table embedding text is `name | comment`."""
+def test_table_nodes_embedding_text_is_comment(local_spark):
+    """Table embedding text is the description only."""
     tables = local_spark.createDataFrame(
         [("sales", "public", "orders", "order facts", "MANAGED", None, None)],
         _tables_schema(),
     )
     df = build_table_nodes(tables)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "orders | order facts"
+    assert _one(df, "embedding_text") == "order facts"
 
 
-def test_column_nodes_embedding_text_includes_type_and_comment(local_spark):
-    """Column embedding text is `name | type | comment`."""
+def test_column_nodes_embedding_text_is_comment(local_spark):
+    """Column embedding text is the description only (no name or type)."""
     columns = local_spark.createDataFrame(
         [("sales", "public", "orders", "total", "DECIMAL", "YES", "line total", 3)],
         [
@@ -102,13 +105,14 @@ def test_column_nodes_embedding_text_includes_type_and_comment(local_spark):
     )
     df = build_column_nodes(columns)
     assert "embedding_text" in df.columns
-    assert _one(df, "embedding_text") == "total | DECIMAL | line total"
+    assert _one(df, "embedding_text") == "line total"
 
 
 def test_schema_node_id_and_qualified_name_agree_with_python(local_spark):
     """The Spark builder's id/qualified_name match the Python builders byte-for-
     byte, so driver-built edge endpoints (FK, candidates) connect to their nodes.
-    Hyphens are preserved in qualified_name and the id is the md5 of it."""
+    The id is the normalized compose_id (hyphen folded to ``_``); qualified_name
+    keeps the hyphen."""
     schemata = local_spark.createDataFrame(
         [("sales", "graph-enriched-schema", "curated")],
         ["catalog_name", "schema_name", "comment"],
@@ -117,7 +121,7 @@ def test_schema_node_id_and_qualified_name_agree_with_python(local_spark):
     assert _one(df, "id") == node_id("sales", "graph-enriched-schema")
     assert _one(df, "qualified_name") == qualified_name("sales", "graph-enriched-schema")
     assert _one(df, "qualified_name") == "sales.graph-enriched-schema"
-    assert len(_one(df, "id")) == 32  # md5 hex, not the readable path
+    assert _one(df, "id") == "sales.graph_enriched_schema"  # normalized, not the readable path
 
 
 def test_builders_do_not_leak_information_schema_helpers(local_spark):

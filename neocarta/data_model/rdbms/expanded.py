@@ -434,7 +434,7 @@ class DatabricksDatabase(Database):
     """Database node emitted by the Databricks connector."""
 
     qualified_name: str = Field(
-        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+        ..., description="Lossless lowercased dotted path; the readable form of the normalized id"
     )
     contract_version: str = Field(..., description="Graph contract version marker")
 
@@ -443,7 +443,7 @@ class DatabricksSchema(Schema):
     """Schema node emitted by the Databricks connector."""
 
     qualified_name: str = Field(
-        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+        ..., description="Lossless lowercased dotted path; the readable form of the normalized id"
     )
     contract_version: str = Field(..., description="Graph contract version marker")
 
@@ -454,7 +454,7 @@ class DatabricksTable(Table):
     model_config = ConfigDict(populate_by_name=True)
 
     qualified_name: str = Field(
-        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+        ..., description="Lossless lowercased dotted path; the readable form of the normalized id"
     )
     catalog: str = Field(..., description="Unity Catalog catalog containing the table")
     schema_: str = Field(..., alias="schema", description="Schema containing the table")
@@ -473,7 +473,7 @@ class DatabricksColumn(Column):
     model_config = ConfigDict(populate_by_name=True)
 
     qualified_name: str = Field(
-        ..., description="Lossless lowercased dotted path; the readable form of the hashed id"
+        ..., description="Lossless lowercased dotted path; the readable form of the normalized id"
     )
     catalog: str = Field(..., description="Unity Catalog catalog containing the column")
     schema_: str = Field(..., alias="schema", description="Schema containing the column")

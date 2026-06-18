@@ -32,11 +32,15 @@ _STRING_PARAM_RE = re.compile(r"^(?:STRING|VARCHAR|CHAR)(?:\(\d+\))?$")
 
 
 class NameMatchKind(Enum):
+    """How a source column name matched a target: exact or stem-suffix."""
+
     EXACT = "exact"
     SUFFIX = "suffix"
 
 
 class PKEvidence(Enum):
+    """Why a target column is treated as a key: declared PK or heuristic."""
+
     DECLARED_PK = "declared_pk"
     UNIQUE_OR_HEUR = "unique_or_heur"
 
@@ -79,6 +83,7 @@ class ColumnMeta:
 
     @property
     def table_key(self) -> tuple[str, str, str]:
+        """Return the ``(catalog, schema, table)`` triple identifying the table."""
         return (self.catalog, self.schema, self.table)
 
 

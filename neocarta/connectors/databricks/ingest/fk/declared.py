@@ -47,6 +47,7 @@ class DeclaredCounters:
     fk_edges: int = 0
 
     def as_row_counts(self) -> dict[str, int]:
+        """Return the counters as a plain dict for the run summary row counts."""
         return {
             "fk_declared": self.fk_declared,
             "fk_resolved": self.fk_resolved,

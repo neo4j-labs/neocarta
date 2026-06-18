@@ -12,7 +12,7 @@ neocarta's enrichment layer adds them afterward. Inline (when any
 `include_embeddings_*` flag is on): the node-write path embeds each batch
 in-cluster via ai_query. Only inline creates the per-label vector indexes here
 (at the configured `embedding_dimension`, for the enabled labels); external mode
-defers index creation to the `neocarta databricks embed` CLI, which builds each
+defers index creation to the separate external embedding step, which builds each
 index at the dimension it embeds. Inferred (heuristic) foreign keys live in
 `neocarta.enrichment.foreign_keys`. This module ingests catalog facts only.
 """
@@ -252,7 +252,7 @@ def _run(
                 _log_embedding_consistency_warning(settings)
                 # Only inline mode writes embeddings during ingest, so only it
                 # creates the vector indexes here. External mode writes no
-                # embeddings in the job; the `neocarta databricks embed` CLI
+                # embeddings in the job; the separate external embedding step
                 # creates each vector index at the dimension it actually embeds
                 # (see enrichment.embeddings.base), so the index dimension always
                 # matches the stored vectors. Creating it here would lock the
@@ -514,26 +514,37 @@ def _write_label_nodes(
 ) -> None:
     """Write one label's node frame to Neo4j, embedding-once when enabled.
 
-    When `embed_enabled`, the frame is embedded and frozen to a transient
-    per-(batch, label) Delta path inside `embedded_batch`: the per-batch
-    failure-count gate and this MERGE write both read that single ai_query pass,
-    and the transient is deleted as soon as the batch is written. When embedding
-    is off the built frame is projected and written directly. `_project` is the
-    fail-closed boundary in both arms.
+    When `embed_enabled`, the frame is split on its builder-attached
+    `embedding_text`: neocarta embeds the description field only, so rows with a
+    non-null `embedding_text` (a present, non-blank description) are embedded and
+    frozen to a transient per-(batch, label) Delta path inside `embedded_batch`
+    (the per-batch failure-count gate and that MERGE write both read the single
+    ai_query pass; the transient is deleted as soon as the batch is written), and
+    rows with no description are written directly without an embedding. This
+    mirrors the shared path's `WHERE description IS NOT NULL` so a node missing a
+    description is still written, just not vector-indexed. When embedding is off
+    the built frame is projected and written directly. `_project` is the
+    fail-closed boundary in every arm.
     """
-    if embed_enabled:
-        with embedded_batch(
-            df,
-            label,
-            settings,
-            ledger_path,
-            transient_root,
-            batch_tag,
-            summary,
-        ) as staged:
-            write_node(_project(staged, label), neo4j, label)
-    else:
+    if not embed_enabled:
         write_node(_project(df, label), neo4j, label)
+        return
+
+    from pyspark.sql.functions import col
+
+    to_embed = df.where(col("embedding_text").isNotNull())
+    no_description = df.where(col("embedding_text").isNull())
+    with embedded_batch(
+        to_embed,
+        label,
+        settings,
+        ledger_path,
+        transient_root,
+        batch_tag,
+        summary,
+    ) as staged:
+        write_node(_project(staged, label), neo4j, label)
+    write_node(_project(no_description, label), neo4j, label)
 
 
 def _stale_value_cleanup(

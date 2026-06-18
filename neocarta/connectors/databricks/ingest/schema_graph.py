@@ -39,9 +39,10 @@ def build_database_nodes(
 
     A single-catalog run passes a one-element list, so the historical
     one-Database-node behavior is preserved. Carries the declared Database
-    properties plus a transient `embedding_text` (equal to `name`, the Database
-    embedding-text expression) so the inline embed stage is uniform across
-    labels; the write boundary strips `embedding_text`.
+    properties plus a transient `embedding_text`. The extract reads no catalog
+    comment, so there is no description to embed and `embedding_text` is null;
+    inline mode therefore writes Database nodes without an embedding (neocarta
+    embeds the description field only). The write boundary strips `embedding_text`.
 
     `service` is the constant ``DATABASE_SERVICE`` ("DATABRICKS") — every
     catalog this connector ingests is a Unity Catalog catalog. `platform` is the
@@ -62,11 +63,11 @@ def build_database_nodes(
             StructField("service", StringType(), False),
             StructField("description", StringType(), True),
             StructField("contract_version", StringType(), False),
-            StructField("embedding_text", StringType(), False),
+            StructField("embedding_text", StringType(), True),
         ]
     )
     rows = [
-        (node_id(c), c, qualified_name(c), platform, DATABASE_SERVICE, None, CONTRACT_VERSION, c)
+        (node_id(c), c, qualified_name(c), platform, DATABASE_SERVICE, None, CONTRACT_VERSION, None)
         for c in catalogs
     ]
     return spark.createDataFrame(rows, schema)
@@ -224,7 +225,7 @@ def build_has_schema_rel(schemata_df: DataFrame) -> DataFrame:
     The Database source id is derived from each row's `catalog_name`, so a
     multi-catalog snapshot links every schema to its own Database node. This
     matches `build_database_nodes`, whose id is `node_id(catalog)` and
-    `node_id_expr("catalog_name")` produces the byte-identical hash.
+    `node_id_expr("catalog_name")` produces the byte-identical id.
     """
     return (
         schemata_df.withColumn("source_id", node_id_expr("catalog_name"))

@@ -29,15 +29,7 @@ The embedding vector dimension is auto-detected from the model — no manual con
 uvx --from "neocarta[mcp]@0.7.0" neocarta-mcp
 ```
 
-By default the server runs in `stdio` transport mode, which is how an MCP client launches it as a subprocess. It reads all configuration parameters from the environment.
-
-To run the server independently and have clients connect by URL, serve it over streamable HTTP with `--http`:
-
-```bash
-neocarta-mcp --http --port 8000
-```
-
-This serves at `http://127.0.0.1:8000/mcp` by default. Use `--host`, `--port`, and `--path` to change the bind address and endpoint.
+The server will only run in `stdio` transport mode and read all configuration parameters from the environment. 
 
 In order for the semantic layer context to be utilized, the agent must also be capable of executing queries against the databases contained within the semantic layer graph.
 

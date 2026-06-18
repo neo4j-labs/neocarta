@@ -50,7 +50,7 @@ def test_node_properties_declared_for_every_managed_label():
 
 def test_qualified_name_is_a_declared_property_for_node_labels():
     """Database/Schema/Table/Column carry the readable `qualified_name` path
-    alongside their hashed `id`. Value nodes do not (no qualified path)."""
+    alongside their normalized `id`. Value nodes do not (no qualified path)."""
     for label in (NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN):
         assert "qualified_name" in NODE_PROPERTIES[label], f"{label} missing qualified_name"
     assert "qualified_name" not in NODE_PROPERTIES[NodeLabel.VALUE]
@@ -95,23 +95,19 @@ def test_embedding_text_expr_is_never_a_graph_property():
         assert "embedding_text" not in props
 
 
-def test_embedding_text_is_name_type_comment():
-    """Embedding text is composed as `name | type | comment`, matching the
-    shared enrichment embed path so inline and external embed the identical
-    text. Only Column carries a type (`data_type`); the others are
-    `name | comment`."""
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.TABLE] == (
-        "concat_ws(' | ', name, nullif(trim(comment), ''))"
-    )
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN] == (
-        "concat_ws(' | ', name, data_type, nullif(trim(comment), ''))"
-    )
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA] == (
-        "concat_ws(' | ', name, nullif(trim(comment), ''))"
-    )
-    # Database embeds a single scalar column. Value nodes are never embedded, so
-    # they have no embedding-text expression.
-    assert EMBEDDING_TEXT_EXPR[NodeLabel.DATABASE] == "name"
+def test_embedding_text_is_description_only():
+    """Embedding text is the description only (`nullif(trim(comment), '')`),
+    matching the shared enrichment embed path: neocarta embeds the description
+    field, so inline and external embed the identical text. A missing or blank
+    comment yields null, and inline mode writes those nodes without an
+    embedding."""
+    description_only = "nullif(trim(comment), '')"
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.TABLE] == description_only
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.COLUMN] == description_only
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.SCHEMA] == description_only
+    # Database carries no catalog comment, so its embedding_text is always null.
+    # Value nodes are never embedded, so they have no embedding-text expression.
+    assert EMBEDDING_TEXT_EXPR[NodeLabel.DATABASE] == description_only
     assert NodeLabel.VALUE not in EMBEDDING_TEXT_EXPR
 
 

@@ -1,6 +1,5 @@
 """FastMCP server exposing semantic layer metadata tools."""
 
-import argparse
 import asyncio
 import logging
 from collections.abc import Callable
@@ -180,20 +179,8 @@ The retrieved context may be used for query generation, query routing or data di
     return server
 
 
-async def main(
-    transport: str = "stdio",
-    host: str = "127.0.0.1",
-    port: int = 8000,
-    path: str = "/mcp",
-) -> None:
-    """
-    Initialize drivers, create the MCP server, and run it over the chosen transport.
-
-    With ``transport="stdio"`` the server speaks over stdin/stdout, which is how
-    an MCP client launches it as a subprocess. With ``transport="http"`` it
-    serves over streamable HTTP on ``host``:``port`` at ``path``, so it can be
-    launched independently and reached by URL.
-    """
+async def main() -> None:
+    """Initialize drivers, create the MCP server, and run it over stdio."""
     neo4j_driver = AsyncGraphDatabase.driver(
         uri=mcp_server_settings.neo4j_uri,
         auth=(mcp_server_settings.neo4j_username, mcp_server_settings.neo4j_password),
@@ -205,55 +192,14 @@ async def main(
     )
     server = await create_mcp_server(neo4j_driver, neo4j_database, embedder)
 
-    if transport == "http":
-        await server.run_async(transport="http", host=host, port=port, path=path)
-    else:
-        await server.run_async(transport="stdio")
-
-
-def _parse_args() -> argparse.Namespace:
-    """Parse the transport flags for the ``neocarta-mcp`` entry point."""
-    parser = argparse.ArgumentParser(
-        prog="neocarta-mcp",
-        description="Run the neocarta MCP server over stdio (default) or streamable HTTP.",
-    )
-    parser.add_argument(
-        "--http",
-        action="store_true",
-        help="Serve over streamable HTTP instead of stdio, so the server can be "
-        "launched independently and reached by URL.",
-    )
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host to bind when serving over HTTP. Default: 127.0.0.1.",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port to bind when serving over HTTP. Default: 8000.",
-    )
-    parser.add_argument(
-        "--path",
-        default="/mcp",
-        help="URL path for the HTTP endpoint. Default: /mcp.",
-    )
-    return parser.parse_args()
+    await server.run_stdio_async()
 
 
 def run() -> None:
-    """Load environment variables, parse transport flags, and run the MCP server.
-
-    By default the server speaks stdio, the transport an MCP client uses to
-    launch it as a subprocess. Pass ``--http`` to serve over streamable HTTP so
-    the server runs independently and clients connect by URL.
-    """
+    """Load environment variables and run the MCP server."""
     load_dotenv()
     logger.setLevel(logging.INFO)
-    args = _parse_args()
-    transport = "http" if args.http else "stdio"
-    asyncio.run(main(transport=transport, host=args.host, port=args.port, path=args.path))
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

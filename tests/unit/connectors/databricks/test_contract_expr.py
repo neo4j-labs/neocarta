@@ -1,16 +1,15 @@
 """Pure-Python tests for the Databricks identifier builders.
 
-These pin the node-identity contract: ``qualified_name`` is a lossless, injective
-encoding of the identifier tuple, and ``node_id`` is its md5 — the collision-safe
-MERGE key. No Spark needed (the Spark exprs are checked for agreement in
-``test_schema_graph``).
+These pin the node-identity contract: ``node_id`` is the shared neocarta
+``compose_id`` (the MERGE key, uniform with the other connectors), and
+``qualified_name`` is the lossless readable path stored alongside it. No Spark
+needed (the Spark exprs are checked for agreement in ``test_schema_graph``).
 """
 
 from __future__ import annotations
 
-import hashlib
-
 from neocarta.connectors.databricks.ingest.contract_expr import node_id, qualified_name
+from neocarta.connectors.utils.generate_id import compose_id
 
 
 def test_qualified_name_lowercases_and_joins_with_dots():
@@ -19,17 +18,15 @@ def test_qualified_name_lowercases_and_joins_with_dots():
 
 
 def test_qualified_name_preserves_hyphens():
-    """Hyphens survive verbatim (the old scheme folded them to ``_``)."""
+    """``qualified_name`` is lossless: hyphens survive verbatim."""
     assert qualified_name("c", "graph-enriched-schema") == "c.graph-enriched-schema"
 
 
-def test_node_id_is_md5_of_qualified_name():
-    """The MERGE key is exactly ``md5(qualified_name)`` — 32 lowercase hex chars."""
-    expected = hashlib.md5(b"c.sales.orders", usedforsecurity=False).hexdigest()
-    nid = node_id("c", "sales", "orders")
-    assert nid == expected
-    assert len(nid) == 32
-    assert all(ch in "0123456789abcdef" for ch in nid)
+def test_node_id_is_the_shared_compose_id():
+    """The MERGE key is exactly the shared ``compose_id``: lowercase, spaces and
+    hyphens folded to ``_``, dot-joined."""
+    assert node_id("My-Catalog", "Sales", "Orders") == "my_catalog.sales.orders"
+    assert node_id("c", "sales", "orders") == compose_id("c", "sales", "orders")
 
 
 def test_node_id_is_case_insensitive():
@@ -37,23 +34,22 @@ def test_node_id_is_case_insensitive():
     assert node_id("C", "Sales", "Orders") == node_id("c", "sales", "orders")
 
 
-def test_hyphen_and_underscore_no_longer_collide():
-    """The regression this scheme fixes: ``a-b`` and ``a_b`` are distinct Unity
-    Catalog objects and must MERGE to distinct nodes. Under the old lossy
-    normalization they collapsed to one id and corrupted the graph."""
+def test_hyphen_and_underscore_fold_to_one_id():
+    """The shared normalization is lossy: ``a-b`` and ``a_b`` fold to the same
+    ``node_id`` and MERGE collapses them into one node. ``qualified_name`` keeps
+    the distinct readable paths even where the id folds them."""
     dashed = node_id("c", "graph-enriched-schema")
     scored = node_id("c", "graph_enriched_schema")
-    assert dashed != scored
+    assert dashed == scored
     assert qualified_name("c", "graph-enriched-schema") != qualified_name(
         "c", "graph_enriched_schema"
     )
 
 
-def test_distinct_legal_tuples_get_distinct_ids():
-    """Distinct identifier tuples produce distinct keys. Injectivity rests on a
-    Unity Catalog guarantee — object names contain no ``.`` — so the dotted join
-    is unambiguous (a part like ``b.c`` is not a legal UC name and cannot occur).
-    The builder relies on that guarantee rather than enforcing it."""
+def test_distinct_arity_tuples_get_distinct_ids():
+    """Tuples that differ by where the part boundaries fall produce distinct keys.
+    The dotted join is unambiguous because Unity Catalog object names contain no
+    ``.``, so a part like ``b.c`` cannot occur."""
     ids = {
         node_id("a", "b"),
         node_id("a", "b", "c"),

@@ -33,6 +33,10 @@ _SCHEMA_PROBE_LIMIT = 3
 
 @dataclass
 class SampleStats:
+    """Per-run sampling diagnostics: candidate/sampled counts, timings, and the
+    distinct-value cardinality distribution observed across sampled columns.
+    """
+
     candidate_columns: int
     sampled_columns: int
     skipped_columns: int
@@ -52,6 +56,10 @@ class SampleStats:
 
 @dataclass
 class TableCandidate:
+    """A table selected for value sampling, with its STRING/BOOLEAN columns and
+    their neocarta Column ids.
+    """
+
     catalog: str
     schema_name: str
     table_name: str
@@ -59,6 +67,7 @@ class TableCandidate:
     column_ids: list[str]
 
     def fq(self) -> str:
+        """Return the backtick-quoted ``catalog.schema.table`` identifier."""
         return f"`{self.catalog}`.`{self.schema_name}`.`{self.table_name}`"
 
 

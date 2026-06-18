@@ -1,4 +1,4 @@
-.PHONY: help agent create-graph create-graph-no-embeddings musicbrainz-agent create-graph-from-musicbrainz create-graph-from-musicbrainz-no-embeddings clean test-databricks build databricks-wheel-test
+.PHONY: help agent create-graph create-graph-no-embeddings musicbrainz-agent create-graph-from-musicbrainz create-graph-from-musicbrainz-no-embeddings clean
 
 help:
 	@echo "Available commands:"
@@ -19,10 +19,6 @@ help:
 	@echo "  make clean ................... Remove Python cache files and temporary directories"
 	@echo "  make fmt ..................... Format the code with Ruff"
 	@echo "  make lint .................... Lint the code with Ruff"
-	@echo "  .............................."
-	@echo "  make test-databricks ......... Run the Databricks connector unit tests"
-	@echo "  make build ................... Build the neocarta wheel + sdist into dist/"
-	@echo "  make databricks-wheel-test ... Clean-room install the wheel and run smoke tests"
 	@echo "  .............................."
 	@echo "  make refresh-mermaid-data-model-images .... Refresh the data model images"
 	@echo "  make refresh-mermaid-architecture-images .. Refresh the architecture images"
@@ -106,43 +102,6 @@ test-smoke:
 
 test-all:
 	uv run pytest tests/ -v
-
-# --- Databricks connector ---------------------------------------------------
-# The Databricks connector lives under neocarta/connectors/databricks/ and its
-# Spark-agnostic FK inference under neocarta/enrichment/foreign_keys/. Its local
-# (no-cluster) Spark tests run with the `databricks` group, which pulls pyspark
-# via the `databricks-spark` extra.
-test-databricks:
-	uv run --group databricks pytest tests/unit/connectors/databricks tests/unit/enrichment/foreign_keys -v
-
-# Build the neocarta wheel + sdist into dist/. This is the single artifact that
-# carries the Databricks connector; stage the wheel on a UC Volume to run the
-# Spark ingest job on a cluster.
-build:
-	uv build
-
-# Clean-room packaging check: build the wheel, install neocarta[databricks-spark]
-# into a fresh empty virtualenv (NOT the editable source tree), then import the
-# connector and run the smoke suite against the installed wheel. Catches modules
-# missing from the wheel and undeclared dependencies that the editable tree hides
-# — the exact failures a fresh install / cluster would hit. Smoke tests are copied
-# to a temp dir and run from there so the source `neocarta/` package cannot shadow
-# the installed distribution.
-databricks-wheel-test:
-	@set -eu; \
-	rm -rf dist; \
-	uv build; \
-	WHEEL="$$(ls dist/neocarta-*-py3-none-any.whl)"; \
-	WORK="$$(mktemp -d)"; \
-	trap 'rm -rf "$$WORK"' EXIT; \
-	python3 -m venv "$$WORK/venv"; \
-	"$$WORK/venv/bin/pip" install --quiet --upgrade pip; \
-	"$$WORK/venv/bin/pip" install --quiet "neocarta[databricks-spark] @ file://$(CURDIR)/$$WHEEL" pytest; \
-	cp -R tests/smoke "$$WORK/smoke"; \
-	echo ">>> importing connector from installed wheel"; \
-	(cd "$$WORK" && ./venv/bin/python -c "from neocarta.connectors.databricks import DatabricksSparkSchemaConnector; import pyspark; print('import ok; pyspark', pyspark.__version__)"); \
-	echo ">>> running smoke suite against installed wheel"; \
-	(cd "$$WORK" && ./venv/bin/pytest smoke -v)
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

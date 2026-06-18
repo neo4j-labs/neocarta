@@ -15,6 +15,7 @@ Requires the optional Spark dependencies::
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,6 +29,11 @@ _EXTRA_HINT = (
     "Install the optional dependencies with: pip install neocarta[databricks-spark]"
 )
 
+_STAGE_HINT = (
+    "The Databricks connector runs as a single Spark job and does not expose "
+    "separate extract/transform/load stages; call ingest() to run the pipeline."
+)
+
 
 class DatabricksSparkSchemaConnector:
     """Ingest Unity Catalog schema facts into Neo4j via a Spark job.
@@ -36,10 +42,10 @@ class DatabricksSparkSchemaConnector:
     ----------
     settings : SparkIngestSettings, optional
         Ingest configuration. When omitted, settings are loaded from the
-        environment (the ``NEOCARTA_DATABRICKS_*`` variables) at :meth:`run` time.
+        environment (the ``NEOCARTA_DATABRICKS_*`` variables) at :meth:`ingest` time.
     neo4j_uri, neo4j_username, neo4j_password : str, optional
         Neo4j connection details. When all three are supplied they take
-        precedence; otherwise ``run`` falls back to ``NEO4J_*`` process env, and
+        precedence; otherwise ``ingest`` falls back to ``NEO4J_*`` process env, and
         finally to the Databricks secret scope (on-cluster jobs).
 
     Notes:
@@ -58,11 +64,45 @@ class DatabricksSparkSchemaConnector:
         neo4j_username: str | None = None,
         neo4j_password: str | None = None,
     ) -> None:
+        """Store ingest settings and optional explicit Neo4j credentials.
+
+        Both are resolved lazily at run time, so construction never imports
+        Spark or touches the environment. See the class docstring for how the
+        ``settings`` and ``neo4j_*`` arguments are resolved.
+        """
         self._settings = settings
         self._neo4j_creds = (neo4j_uri, neo4j_username, neo4j_password)
 
-    def run(self, spark: SparkSession | None = None) -> RunSummary:
+    def extract(self, *args: object, **kwargs: object) -> None:
+        """Not a separate stage for this connector — see :meth:`ingest`.
+
+        The in-process connectors (BigQuery, CSV, Dataplex) read into an
+        extractor cache, transform it, then load. This connector instead runs a
+        single Spark job that streams catalog metadata straight to Neo4j, so the
+        extract/transform/load stages are not individually addressable. Call
+        :meth:`ingest` to run the whole pipeline.
+        """
+        raise NotImplementedError(_STAGE_HINT)
+
+    def transform(self, *args: object, **kwargs: object) -> None:
+        """Not a separate stage for this connector — see :meth:`ingest`.
+
+        See :meth:`extract` for why the stages are not individually addressable.
+        """
+        raise NotImplementedError(_STAGE_HINT)
+
+    def load(self, *args: object, **kwargs: object) -> None:
+        """Not a separate stage for this connector — see :meth:`ingest`.
+
+        See :meth:`extract` for why the stages are not individually addressable.
+        """
+        raise NotImplementedError(_STAGE_HINT)
+
+    def ingest(self, spark: SparkSession | None = None) -> RunSummary:
         """Run the schema ingest and return the finished ``RunSummary``.
+
+        This is the connector's entrypoint. It runs the Spark job that reads
+        Unity Catalog metadata and writes the schema graph to Neo4j in one pass.
 
         Parameters
         ----------
@@ -87,6 +127,21 @@ class DatabricksSparkSchemaConnector:
                 batch_size=settings.neo4j_batch_size,
             )
         return run_ingest(settings=settings, spark=spark, neo4j=neo4j)
+
+    def run(self, spark: SparkSession | None = None) -> RunSummary:
+        """Run the schema ingest and return the finished ``RunSummary``.
+
+        .. deprecated::
+            Use :meth:`ingest` instead. ``run`` will be removed in a future
+            release.
+        """
+        warnings.warn(
+            "DatabricksSparkSchemaConnector.run() is deprecated; "
+            "use DatabricksSparkSchemaConnector.ingest() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.ingest(spark)
 
     @staticmethod
     def _lazy_imports() -> tuple[object, object, object]:

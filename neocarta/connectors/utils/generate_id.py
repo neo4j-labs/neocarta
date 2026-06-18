@@ -18,8 +18,9 @@ def compose_id(*parts: str) -> str:
     hierarchical id helper here. Use this when the segment arity is dynamic.
 
     Note this normalization is lossy (hyphens collapse to underscores), so it is
-    not suitable where the original identifier must round-trip; the Databricks
-    connector deliberately uses its own lossless id scheme instead.
+    not suitable where the original identifier must round-trip. Connectors that
+    need the verbatim path store it as a separate property; the Databricks
+    connector keeps a lossless ``qualified_name`` alongside this id.
 
     Examples:
     --------

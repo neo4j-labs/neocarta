@@ -3,8 +3,8 @@
 These exercise the pure label-selection logic and the `create_vector_indexes`
 fan-out without a live Neo4j: the shared `create_vector_index` helper is patched
 so the test asserts which labels are indexed, and at which dimension. Only inline
-mode creates vector indexes during the job; external mode defers to the
-`neocarta databricks embed` CLI, so there is no external fan-out to test here.
+mode creates vector indexes during the job; external mode defers to the separate
+external embedding step, so there is no external fan-out to test here.
 """
 
 from __future__ import annotations

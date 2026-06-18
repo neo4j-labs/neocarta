@@ -35,6 +35,12 @@ def split_qualified_name(
     expected_parts: int | None = None,
     label: str = "qualified name",
 ) -> list[str]:
+    """Split a dotted Databricks qualified name into validated parts.
+
+    Each part is checked with :func:`validate_identifier` so the caller can
+    safely quote them with backticks. When ``expected_parts`` is given, the
+    number of dot-separated parts must match exactly.
+    """
     parts = value.split(".")
     if expected_parts is not None and len(parts) != expected_parts:
         raise ValueError(
@@ -46,10 +52,12 @@ def split_qualified_name(
 
 
 def quote_identifier(value: str) -> str:
+    """Validate ``value`` and wrap it in backticks for safe SQL interpolation."""
     return f"`{validate_identifier(value)}`"
 
 
 def quote_qualified_name(value: str, *, expected_parts: int | None = None) -> str:
+    """Validate each part of a dotted name and rejoin it backtick-quoted."""
     return ".".join(
         quote_identifier(part)
         for part in split_qualified_name(value, expected_parts=expected_parts)
@@ -112,10 +120,12 @@ def validate_serving_endpoint_name(value: str, *, label: str = "serving endpoint
 
 
 def uc_volume_parts(value: str) -> list[str]:
+    """Validate a UC Volume subpath and return its slash-separated segments."""
     validate_uc_volume_subpath(value)
     return value.rstrip("/").lstrip("/").split("/")
 
 
 def uc_volume_parent(value: str) -> str:
+    """Return the parent directory of a validated UC Volume subpath."""
     parts = uc_volume_parts(value)
     return "/" + "/".join(parts[:-1])

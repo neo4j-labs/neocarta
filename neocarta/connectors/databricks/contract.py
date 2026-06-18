@@ -5,12 +5,10 @@ Node labels and relationship types are the canonical neocarta enums
 the subset listed in `MANAGED_NODE_LABELS` / `MANAGED_REL_TYPES`. Identifier
 production lives in `ingest.contract_expr`, which holds the byte-identical Python
 (`node_id` / `qualified_name`) and Spark (`node_id_expr` / `qualified_name_expr`)
-builders — no id is built here. The connector deliberately does NOT use the
-shared `neocarta.connectors.utils.generate_id` helpers: their normalization is
-lossy (it folds hyphens and spaces to underscores) and so is not collision-safe
-as a Unity Catalog identity key; see `ingest.contract_expr` for the full
-rationale. `EdgeSource` is connector-specific provenance with no neocarta-wide
-equivalent.
+builders; no id is built here. `node_id` uses the shared
+`neocarta.connectors.utils.generate_id` recipe (`compose_id`), so this connector's
+ids are uniform with the other connectors. `EdgeSource` is connector-specific
+provenance with no neocarta-wide equivalent.
 """
 
 from __future__ import annotations
@@ -38,10 +36,10 @@ if TYPE_CHECKING:
 # a few additive properties; the Pydantic subclasses in expanded.py are the
 # source of truth and NODE_PROPERTIES is derived from them.
 #
-# Every node's `id` (the Neo4j MERGE key) is an md5 hash of its lowercased
-# dotted path, and `qualified_name` carries that readable path as a property.
-# The hash is the collision-safe identity key; the readable path is for humans.
-# See ingest.contract_expr for why the id is hashed rather than the dotted string.
+# Every node's `id` (the Neo4j MERGE key) is the shared `compose_id` of its
+# parts: lowercased, with spaces and hyphens folded to underscore, dot-joined.
+# `qualified_name` carries the lossless readable path as a property. The
+# normalization is lossy; see ingest.contract_expr for details.
 #
 # Node properties beyond core:
 #   Database: qualified_name, contract_version. service is the constant
@@ -166,15 +164,19 @@ REFERENCES_PROPERTIES: tuple[str, ...] = _graph_properties(
 # never embedded (no neocarta path embeds them; they are reached by HAS_VALUE
 # traversal, not vector search), so they have no entry here.
 #
-# The text is composed as `name | type | comment`, matching the shared
-# enrichment embed path (enrichment.embeddings.utils.get_nodes_to_embed), so
-# inline and external embeddings and every other connector embed the identical
-# text. `concat_ws` drops null parts and `nullif(trim(comment), '')` drops blank
-# comments, so a node always embeds on at least its name. Only Column carries a
-# type (`data_type`); the other labels are `name | comment`.
+# The text is the node's description only (`nullif(trim(comment), '')`), matching
+# the shared enrichment embed path (enrichment.embeddings.utils.get_nodes_to_embed):
+# neocarta embeds the description field, so inline and external embeddings and
+# every other connector embed the identical text. `nullif(trim(comment), '')`
+# yields null for a missing or blank comment; inline mode embeds only the nodes
+# whose embedding_text is non-null and writes the rest without an embedding (see
+# run.py:_write_label_nodes), mirroring neocarta's `WHERE description IS NOT NULL`.
+# Database carries no catalog comment, so its embedding_text is always null and
+# Database nodes are never embedded (build_database_nodes sets it directly; the
+# entry here is kept for uniformity).
 EMBEDDING_TEXT_EXPR: dict[NodeLabel, str] = {
-    NodeLabel.TABLE: "concat_ws(' | ', name, nullif(trim(comment), ''))",
-    NodeLabel.COLUMN: "concat_ws(' | ', name, data_type, nullif(trim(comment), ''))",
-    NodeLabel.SCHEMA: "concat_ws(' | ', name, nullif(trim(comment), ''))",
-    NodeLabel.DATABASE: "name",
+    NodeLabel.TABLE: "nullif(trim(comment), '')",
+    NodeLabel.COLUMN: "nullif(trim(comment), '')",
+    NodeLabel.SCHEMA: "nullif(trim(comment), '')",
+    NodeLabel.DATABASE: "nullif(trim(comment), '')",
 }

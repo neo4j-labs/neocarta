@@ -11,9 +11,9 @@ helpers so index names match what the MCP server queries by.
 Only inline mode creates `{label}_vector_index` cosine indexes here, at
 ``settings.embedding_dimension`` and only for labels whose embedding flag is on,
 because only inline writes embeddings during the Spark job. External mode creates
-no vector indexes during ingest; the `neocarta databricks embed` CLI creates each
-index at the dimension it actually embeds, so the index dimension always matches
-the stored vectors.
+no vector indexes during ingest; the separate external embedding step creates
+each index at the dimension it actually embeds, so the index dimension always
+matches the stored vectors.
 """
 
 from __future__ import annotations
@@ -129,7 +129,7 @@ def _vector_index_labels(settings: SparkIngestSettings) -> tuple[NodeLabel, ...]
 
     Restricted to labels whose `include_embeddings_*` flag is on, since only
     those carry an `embedding` property after an inline run. External mode
-    creates no vector indexes during ingest; the `neocarta databricks embed` CLI
+    creates no vector indexes during ingest; the separate external embedding step
     creates each one at the dimension it embeds.
     """
     flags = {
@@ -148,7 +148,7 @@ def create_vector_indexes(driver: Driver, settings: SparkIngestSettings) -> None
     reusing neocarta's shared :func:`neocarta.ingest.indexes.create_vector_index`
     so the index name matches what the MCP server queries by. Only called in
     inline mode (the only mode that writes embeddings during the job); external
-    mode creates no vector indexes here — the `neocarta databricks embed` CLI
+    mode creates no vector indexes here. The separate external embedding step
     creates each index at the dimension it actually embeds. Value is never
     embedded or indexed (see ``_VECTOR_INDEX_LABELS``).
 
