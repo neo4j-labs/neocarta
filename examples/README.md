@@ -46,6 +46,11 @@ top, and run it top to bottom.
 See [neocarta/connectors/databricks/README.md](../neocarta/connectors/databricks/README.md)
 for the embedding modes and the full `NEOCARTA_DATABRICKS_*` settings reference.
 
+#### `databricks/graph_text2sql.py` - Query the Databricks Graph (Notebook)
+Databricks notebook that queries the semantic graph produced by
+`inline_embed_ingest.py`. Import it into a Databricks workspace alongside the
+ingest notebook to explore the resulting graph interactively.
+
 #### `bigquery_query_log_db.py` - Query Log from BigQuery
 Extract query lineage from BigQuery INFORMATION_SCHEMA.
 

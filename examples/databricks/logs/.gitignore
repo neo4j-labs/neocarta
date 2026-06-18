@@ -1,4 +1,0 @@
-# Notification / driver logs written by the example scripts. The directory is
-# tracked so the scripts can write here, but its contents stay out of git.
-*
-!.gitignore

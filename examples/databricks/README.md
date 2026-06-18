@@ -1,88 +1,52 @@
 # Databricks examples
 
-Run the neocarta Databricks connector against Unity Catalog:
+Run the neocarta Databricks connector against Unity Catalog from inside a
+Databricks workspace. Two notebooks drive the workflow:
 
-- **Notebooks** (`inline_embed_ingest.py`, `graph_text2sql.py`): run ingest and
-  queries interactively inside a Databricks notebook, configured in-cell. Best
-  for exploration and one-off runs in the workspace.
+- `inline_embed_ingest.py` — ingest Unity Catalog schema into Neo4j, optionally
+  generating vector embeddings inline in the same Spark job. Configured in-cell.
+- `graph_text2sql.py` — query the resulting graph interactively.
 
-For setup (building the connector wheel, the OpenAI external embedding endpoint,
-embedding modes, and the full `NEOCARTA_DATABRICKS_*` settings reference) see the
-connector README,
+These are Databricks source notebooks: import them into your workspace, fill in
+the values at the top, and run each top to bottom. For setup that lives outside
+the notebooks (building the connector wheel, registering the OpenAI external
+embedding endpoint, embedding modes, and the full `NEOCARTA_DATABRICKS_*`
+settings reference) see the connector README,
 [`neocarta/connectors/databricks/README.md`](../../neocarta/connectors/databricks/README.md).
 
-## Notebooks
+## Steps
 
-- `inline_embed_ingest.py` — ingest plus inline embeddings in one cluster job,
-  configured by constructing the settings directly in the notebook.
-- `graph_text2sql.py` — query the resulting graph.
+### 1. Set up the sample dataset
 
-Embeddings can be generated inline as part of the ingest notebook, or externally
+The connector ingests an existing Unity Catalog, so you need a catalog to point
+it at. If you do not already have one, stage the sample finance dataset:
+
+1. Open the
+   [`00_setup_data.ipynb`](https://github.com/neo4j-partners/graph-on-databricks/blob/main/finance-genie/workshop/00_setup_data.ipynb)
+   notebook from the `graph-on-databricks` repo in your Databricks workspace.
+2. Run it top to bottom. It creates the `graph-on-databricks` catalog and
+   `graph-enriched-schema` schema, populated with five fraud-detection tables:
+   `accounts`, `merchants`, `transactions`, `account_links`, and
+   `account_labels`, complete with column comments and foreign-key constraints.
+
+Skip this step if you are pointing the connector at your own catalog.
+
+### 2. Ingest the schema into Neo4j
+
+1. Import `inline_embed_ingest.py` into your Databricks workspace and attach it
+   to a classic cluster (the Spark ingest writes through the Neo4j Spark
+   Connector, a JVM library that is unsupported on serverless).
+2. Set `NEOCARTA_DATABRICKS_CATALOG` to the catalog from step 1 (for example
+   `graph-on-databricks`) and fill in the remaining values at the top of the
+   notebook.
+3. Run the notebook top to bottom to write the schema graph into Neo4j.
+
+Embeddings can be generated inline as part of this notebook, or externally
 afterward with neocarta. Both are neocarta features; see the connector README
 ([Embedding modes](../../neocarta/connectors/databricks/README.md#embedding-modes))
-for details.
+for which mode to pick and how to configure it.
 
-## Compare retrieval strategies locally (`compare_retrievers.py`)
+### 3. Query the graph
 
-A `uv` script that runs one query through every retrieval strategy the neocarta
-MCP server exposes and prints the ranked tables each returns, plus a comparison
-matrix. It covers vector, full-text, hybrid, and business-term hybrid search at
-both the table and column level. Use it to sanity-check a graph after ingest and
-to see how the strategies differ on the same question.
-
-The script reuses the exact Cypher the MCP server runs (`neocarta._mcp.cypher`)
-and the same embedder (`LiteLLMEmbeddingsConnector`), so it is a faithful local
-test of production retrieval. It runs against the Neo4j instance in your `.env`
-and is read-only: it only performs vector and full-text index lookups.
-
-### Prerequisites
-
-- A populated neocarta graph in the Neo4j instance named in `.env`.
-- The search indexes the strategies query. Vector indexes are created during
-  ingest. The full-text indexes (`schema_full_text_index`, `table_full_text_index`,
-  `column_full_text_index`) are created by the ingest pipeline's bootstrap step,
-  so a graph ingested before that step existed needs a rerun. Strategies whose
-  index is missing are skipped with a printed reason rather than failing the run.
-- An `EMBEDDING_MODEL` that matches the model and dimension used at ingest, for
-  the vector and hybrid strategies to be meaningful. A Databricks graph embedded
-  via `ai_query('openai-text-embedding-3-small', ...)` lines up with the LiteLLM
-  model `text-embedding-3-small`. Full-text search uses no embeddings and is
-  unaffected by this.
-
-### Environment variables
-
-Read from `.env` (or the process environment):
-
-- `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`
-- `NEO4J_DATABASE` (optional, defaults to `neo4j`)
-- `EMBEDDING_MODEL` (optional, defaults to `text-embedding-3-small`)
-- Provider credentials for that model, for example `OPENAI_API_KEY`
-
-### Run it
-
-Run every strategy for one question:
-
-```bash
-uv run examples/databricks/compare_retrievers.py \
-  --query "Which account types have the most fraud-labeled accounts?"
-```
-
-Run a subset of strategies with wider recall and more rows printed:
-
-```bash
-uv run examples/databricks/compare_retrievers.py \
-  --query "fraud labeled accounts" \
-  --strategies tbl-vec tbl-ft tbl-hyb \
-  --search-top-k 20 --max-tables 10 --top 10
-```
-
-Options:
-
-- `--strategies` selects which strategies to run. Defaults to all. Choices are
-  `tbl-vec`, `tbl-ft`, `tbl-hyb`, `tbl-bt`, `sch-tbl-vec`, `col-vec`, `col-ft`,
-  `col-hyb`, `col-bt`.
-- `--search-top-k` sets how many candidates each search branch returns before
-  ranking (default 10).
-- `--max-tables` caps the tables kept per strategy (default 5).
-- `--top` sets how many ranked rows to print per strategy and in the comparison
-  matrix (default 5).
+1. Import `graph_text2sql.py` into the same workspace.
+2. Run it to query the graph produced in step 2.
