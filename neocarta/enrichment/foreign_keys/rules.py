@@ -1,9 +1,7 @@
 """Pure-Python foreign-key inference rule layer (Spark-free).
 
 These heuristics are ported verbatim from the dbxcarta Spark connector's rule
-layer (``fk/common.py`` + ``fk/metadata.py``). The Spark *evaluation* was
-discarded in the migration; the rules live here and are driven by an in-process
-candidate loop in :mod:`neocarta.enrichment.foreign_keys.infer`.
+layer (``fk/common.py`` + ``fk/metadata.py``).
 
 The rules: a column is a *target* candidate when it looks like a key (declared
 primary key, or a name heuristic — ``id`` / sole ``{table}_id``). A source
