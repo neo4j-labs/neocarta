@@ -4,8 +4,12 @@
 ## Upcoming
 
 ### Fixed
+<<<<<<< HEAD
 - `write_embeddings_to_graph` now logs the actual number of embeddings written based on input row count, instead of `summary.counters.properties_set`, which is always 0 because `db.create.setNodeVectorProperty` is a procedure call and Neo4j query summary counters do not track procedure-call writes. (#216)
 - Connector skills now document search-entry-point index requirements and embedding label obligations. Any node label used as an MCP search entry point must have a full-text index created at load time and must be included in the CLI `--embeddings` label set. Override hazard for `Neo4jRDBMSLoader` subclasses is now explicit in the contract. (#211)
+=======
+- MCP server no longer emits duplicate FastMCP startup messages. `FastMCP` was initialized with `log_level="DEBUG"` which caused its internal logger to flood the CLI output alongside neocarta's own logger. Changed to `log_level="WARNING"` to suppress FastMCP internals while preserving neocarta's intentional log output. (#169)
+>>>>>>> 1cc860d (fix: suppress duplicate FastMCP startup messages in MCP server)
 
 ### Changed
 

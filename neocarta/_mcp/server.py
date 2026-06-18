@@ -135,7 +135,7 @@ async def create_mcp_server(
 This is an MCP server that facilitates context retrieval from a Neo4j semantic layer.
 The retrieved context may be used for query generation, query routing or data discovery.
 """
-    server = FastMCP(name=name, instructions=instructions, log_level="DEBUG")
+    server = FastMCP(name=name, instructions=instructions, log_level="WARNING")
 
     await _validate_graph_version(neo4j_driver, neo4j_database)
 
