@@ -94,6 +94,14 @@ Every verb body runs the same spine (see `csv.py:csv_ingest`):
 9. Optional embeddings: `_build_embedder(settings, driver)` then
    `_run_embeddings(embedder, node_labels)` (the latter normalises provider
    failures into a structured `upstream_error`).
+
+   **Search entry point requirement:** `node_labels` must include **all**
+   search-entry-point node labels the connector produces — not just the shared
+   `DEFAULT_SCHEMA_NODE_LABELS`. If your connector adds nodes beyond
+   Database/Schema/Table/Column that act as search entry points (e.g. `Metric`,
+   `BusinessTerm`), the embedding label set must be connector-specific and
+   include them. Without the embedding run there is no vector index, so the
+   vector/hybrid tiers for that label never register in the MCP server.
 10. Success: build `{"<source>_<verb>": {..., "status": "succeeded"}}` and emit
     the same way as step 5.
 
