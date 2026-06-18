@@ -257,11 +257,15 @@ def build_has_column_rel(columns_df: DataFrame) -> DataFrame:
 
 
 def references_schema() -> StructType:
-    """The canonical REFERENCES 5-col schema — single source of truth.
+    """The canonical REFERENCES 5-col schema for the declared-FK path.
 
-    Both the bounded declared path (`build_references_rel`, list[FKEdge] ->
-    DataFrame) and the catalog-scale Spark-native inference path
-    (`to_references_rel`, DataFrame -> DataFrame) conform to exactly this.
+    `build_references_rel` wraps declared `FKEdge`s in this shape. The
+    `confidence` and `source` columns are constant here (`1.0` / `"declared"`),
+    but they are kept so the connector's declared edges carry the same property
+    shape as the heuristic edges written later by
+    `neocarta.enrichment.foreign_keys` (`confidence` < 1.0 /
+    `source="inferred_metadata"`); a consumer can then filter or weight both
+    kinds of REFERENCES edge uniformly.
     """
     from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
@@ -276,29 +280,14 @@ def references_schema() -> StructType:
     )
 
 
-def to_references_rel(df: DataFrame) -> DataFrame:
-    """Project a Spark-native inference frame onto `references_schema`.
-
-    DataFrame -> DataFrame, no driver collect. Casts each column to the
-    canonical type so byte-compatibility with the declared path is enforced
-    by the schema, not by coincidental conformance of the upstream
-    expressions. The input must already carry the five named columns.
-    """
-    from pyspark.sql.functions import col
-
-    fields = references_schema().fields
-    return df.select(*[col(f.name).cast(f.dataType).alias(f.name) for f in fields])
-
-
 def build_references_rel(
     spark: SparkSession,
     edges: list[FKEdge],
 ) -> DataFrame:
-    """Wrap FKEdge dataclasses in the canonical REFERENCES 5-col schema.
+    """Wrap declared `FKEdge` dataclasses in the canonical REFERENCES schema.
 
-    Source-agnostic: accepts edges with any EdgeSource tag (DECLARED,
-    INFERRED_METADATA). The enum `.value` is serialized at this
-    tuple boundary — no magic strings downstream.
+    The `EdgeSource` enum `.value` is serialized at this tuple boundary — no
+    magic strings downstream.
     """
     tuples = [
         (e.source_column_id, e.target_column_id, e.confidence, e.source.value, e.criteria)

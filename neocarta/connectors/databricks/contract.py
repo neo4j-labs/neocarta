@@ -95,14 +95,17 @@ MANAGED_REL_TYPES: tuple[RelType, ...] = (
 
 
 class EdgeSource(str, Enum):
-    """Provenance tag on REFERENCES edges. DECLARED is the Unity Catalog
-    declared-FK source; INFERRED_METADATA is name/PK heuristic inference.
+    """Provenance tag on REFERENCES edges written by the connector.
+
+    The connector emits only declared Unity Catalog foreign keys, so DECLARED
+    is the only value it produces. Heuristic inference lives in
+    `neocarta.enrichment.foreign_keys`, which tags its own edges
+    `source="inferred_metadata"` through a separate write path.
 
     Connector-specific: neocarta has no repo-wide edge-provenance enum.
     """
 
     DECLARED = "declared"
-    INFERRED_METADATA = "inferred_metadata"
 
 
 # Map each managed label to the Pydantic model that defines its shape. The
