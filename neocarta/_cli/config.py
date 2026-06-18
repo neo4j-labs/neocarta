@@ -69,6 +69,11 @@ ENV_VARS: dict[str, str] = {
         "product SchemaCrawler reports (for `jdbc schema`)."
     ),
     "JDBC_TIMEOUT": "Max seconds for the SchemaCrawler subprocess (default: 120; for `jdbc schema`).",
+    "DATABRICKS_HOST": (
+        "Databricks workspace URL, e.g. https://dbc-xxxx.cloud.databricks.com "
+        "(for `databricks glossary`)."
+    ),
+    "DATABRICKS_TOKEN": "Databricks personal access token (secret; for `databricks glossary`).",
 }
 
 
@@ -130,6 +135,10 @@ class CLISettings(BaseSettings):
     jdbc_platform: str | None = Field(default=None, validation_alias="JDBC_PLATFORM")
     jdbc_service: str | None = Field(default=None, validation_alias="JDBC_SERVICE")
     jdbc_timeout: int = Field(default=120, validation_alias="JDBC_TIMEOUT")
+
+    # Databricks (governed-tags glossary)
+    databricks_host: str | None = Field(default=None, validation_alias="DATABRICKS_HOST")
+    databricks_token: SecretStr | None = Field(default=None, validation_alias="DATABRICKS_TOKEN")
 
 
 def load_settings() -> CLISettings:

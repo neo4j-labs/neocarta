@@ -57,6 +57,14 @@ cli = [
     "rich>=13.0.0",
     "pydantic-settings>=2.12.0",
 ]
+# Databricks Unity Catalog governed-tags glossary connector. Reads tag-policy
+# definitions via the Databricks SDK (no SQL warehouse, no pyspark). A future
+# pyspark-based Databricks schema connector will ship in a separate extra.
+# 0.118.0 is the verified floor: it ships WorkspaceClient.tag_policies
+# (the governed-tags / tag-policies API the glossary connector reads).
+databricks = [
+    "databricks-sdk>=0.118.0",
+]
 
 [project.scripts]
 neocarta = "neocarta._cli:main"

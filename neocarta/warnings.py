@@ -42,3 +42,23 @@ class UnsupportedOsiVersionWarning(NeocartaWarning):
 
         warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
     """
+
+
+class DatabricksGlossaryWarning(NeocartaWarning):
+    """
+    Emitted when the Databricks glossary connector falls back to a degraded mode.
+
+    Currently raised when the connector cannot read the workspace's metastore id
+    (e.g. no metastore assignment, or insufficient permissions) and therefore
+    derives the synthesized ``Glossary`` node's id from the workspace host URL
+    instead. Governed tags are account-level, so the host-derived id is
+    workspace- rather than metastore-scoped; pass an explicit ``glossary_id`` to
+    the connector to control it.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import DatabricksGlossaryWarning
+
+        warnings.filterwarnings("ignore", category=DatabricksGlossaryWarning)
+    """
