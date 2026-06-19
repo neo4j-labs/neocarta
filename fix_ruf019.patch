@@ -1,0 +1,15 @@
+diff --git a/neocarta/enrichment/descriptions/litellm_description.py b/neocarta/enrichment/descriptions/litellm_description.py
+--- a/neocarta/enrichment/descriptions/litellm_description.py
++++ b/neocarta/enrichment/descriptions/litellm_description.py
+@@ -38,12 +38,12 @@
+-    if "column_names" in context and context["column_names"]:
++    if context.get("column_names"):
+         lines.append(f"Columns: {', '.join(context['column_names'])}")
+
+-    if "sibling_column_names" in context and context["sibling_column_names"]:
++    if context.get("sibling_column_names"):
+         lines.append(f"Sibling columns: {', '.join(context['sibling_column_names'])}")
+
+-    if "example_values" in context and context["example_values"]:
++    if context.get("example_values"):
+         lines.append(f"Example values: {', '.join(str(v) for v in context['example_values'])}")

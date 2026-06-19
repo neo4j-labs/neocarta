@@ -32,21 +32,21 @@ def _build_context_prompt(context: dict[str, Any]) -> str:
 
     lines = [f"Node type: {node_label}", f"Name: {name}"]
 
-    if "database_name" in context:
+    if context.get("database_name"):
         lines.append(f"Parent database: {context.get('database_name') or '(unknown)'}")
-    if "table_names" in context and context["table_names"]:
+    if context.get("table_names"):
         lines.append(f"Contains tables: {', '.join(context['table_names'])}")
-    if "schema_name" in context:
+    if context.get("schema_name"):
         lines.append(f"Parent schema: {context.get('schema_name') or '(unknown)'}")
-    if "column_names" in context and context["column_names"]:
+    if context.get("column_names"):
         lines.append(f"Columns: {', '.join(context['column_names'])}")
-    if "table_name" in context:
+    if context.get("table_name"):
         lines.append(f"Parent table: {context.get('table_name') or '(unknown)'}")
-    if "sibling_column_names" in context and context["sibling_column_names"]:
+    if context.get("sibling_column_names"):
         lines.append(f"Sibling columns: {', '.join(context['sibling_column_names'])}")
-    if "column_type" in context and context.get("column_type"):
+    if context.get("column_type"):
         lines.append(f"Data type: {context['column_type']}")
-    if "example_values" in context and context["example_values"]:
+    if context.get("example_values"):
         lines.append(f"Example values: {', '.join(str(v) for v in context['example_values'])}")
 
     return "\n".join(lines)
