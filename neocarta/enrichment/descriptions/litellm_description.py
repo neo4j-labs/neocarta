@@ -34,9 +34,20 @@ def _build_context_prompt(context: dict[str, Any]) -> str:
 
     if context.get("database_name"):
         lines.append(f"Parent database: {context.get('database_name') or '(unknown)'}")
-    table_names = context.get("table_names")
-    if table_names:
-        lines.append(f"Contains tables: {", ".join(map(str, table_names)) if isinstance(table_names, list) else table_names})"
+    if context.get("table_names"):
+        lines.append(f"Contains tables: {', '.join(context['table_names'])}")
+    if context.get("schema_name"):
+        lines.append(f"Parent schema: {context.get('schema_name') or '(unknown)'}")
+    if context.get("column_names"):
+        lines.append(f"Columns: {', '.join(context['column_names'])}")
+    if context.get("table_name"):
+        lines.append(f"Parent table: {context.get('table_name') or '(unknown)'}")
+    if context.get("sibling_column_names"):
+        lines.append(f"Sibling columns: {', '.join(context['sibling_column_names'])}")
+    if context.get("column_type"):
+        lines.append(f"Data type: {context['column_type']}")
+    if context.get("example_values"):
+        lines.append(f"Example values: {', '.join(str(v) for v in context['example_values'])}")
 
     return "\n".join(lines)
 
