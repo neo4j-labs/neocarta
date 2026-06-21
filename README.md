@@ -75,7 +75,7 @@ See the [Neocarta CLI](#neocarta-cli) section for the full command set.
 ```bash
 pip install "neocarta[mcp]"
 # reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD from the environment or a .env file
-neocarta-mcp
+neocarta-mcp           # or, from the unified CLI: neocarta mcp serve
 ```
 
 The server gives the agent retrieval tools — `list_schemas`, `list_tables_by_schema`, and full-text, vector, or hybrid search over tables, columns, and business terms — each returning a table with its columns, types, example values, and **foreign-key references**.
@@ -873,7 +873,7 @@ See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-v
 
 ## Neocarta MCP
 
-The Neocarta MCP server is available via the optional `[mcp]` add-on.
+The Neocarta MCP server is available via the optional `[mcp]` add-on. Start it with the standalone `neocarta-mcp` console script, or from the unified CLI with `neocarta mcp serve` (which requires both the `cli` and `mcp` extras). Both serve over stdio and read the same `NEO4J_*` / `EMBEDDING_*` environment configuration.
 
 ### Overview
 
