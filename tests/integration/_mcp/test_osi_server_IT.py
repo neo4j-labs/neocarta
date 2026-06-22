@@ -29,8 +29,17 @@ def test_osi_tools_registered(neo4j_connection, osi_loaded_graph):
         "get_metric_expression",
         "get_aspects",
     }.issubset(tools)
-    # Metric label has only a vector index loaded → the vector-tier metric tool registers.
-    assert "get_context_by_metric_vector_search" in tools
+    # The OSI load creates Metric + BusinessTerm full-text indexes and the fixture adds a
+    # Metric vector index; with BusinessTerm nodes present the metric tool registers at the
+    # top business-term-bridged tier (and the lower metric tiers do not).
+    assert "get_context_by_metric_business_term_hybrid_search" in tools
+    assert tools.isdisjoint(
+        {
+            "get_context_by_metric_vector_search",
+            "get_context_by_metric_full_text_search",
+            "get_context_by_metric_hybrid_search",
+        }
+    )
 
 
 def test_list_domains_reports_counts(neo4j_connection, osi_loaded_graph):
@@ -94,12 +103,12 @@ def test_get_domain_context(neo4j_connection, osi_loaded_graph):
     assert hire_date["is_time_dimension"] is True
 
 
-def test_get_context_by_metric_vector_search(neo4j_connection, osi_loaded_graph):
-    """Metric vector search returns metrics with their domain, expressions, and synonyms."""
+def test_get_context_by_metric_search(neo4j_connection, osi_loaded_graph):
+    """Metric search returns metrics with their domain, expressions, and synonyms."""
     data = asyncio.run(
         _call_tool(
             neo4j_connection,
-            "get_context_by_metric_vector_search",
+            "get_context_by_metric_business_term_hybrid_search",
             {"text_content": "annual recurring revenue", "max_metrics": 20},
         )
     )
@@ -117,12 +126,12 @@ def test_get_context_by_metric_vector_search(neo4j_connection, osi_loaded_graph)
     assert "ARR" in arr["synonyms"]
 
 
-def test_get_context_by_metric_vector_search_domain_filter(neo4j_connection, osi_loaded_graph):
+def test_get_context_by_metric_search_domain_filter(neo4j_connection, osi_loaded_graph):
     """A non-matching domain filter on metric search yields no results."""
     data = asyncio.run(
         _call_tool(
             neo4j_connection,
-            "get_context_by_metric_vector_search",
+            "get_context_by_metric_business_term_hybrid_search",
             {"text_content": "revenue", "domain_name": "does_not_exist"},
         )
     )
@@ -184,11 +193,11 @@ def test_get_aspects_for_domain(neo4j_connection, osi_loaded_graph):
 
 
 def test_table_search_surfaces_osi_aspects_and_expressions(neo4j_connection, osi_loaded_graph):
-    """The existing table vector search returns OSI column expressions and table aspects."""
+    """The existing table search returns OSI column expressions and table aspects."""
     data = asyncio.run(
         _call_tool(
             neo4j_connection,
-            "get_context_by_table_vector_search",
+            "get_context_by_table_business_term_hybrid_search",
             {"text_content": "employees", "max_tables": 40},
         )
     )

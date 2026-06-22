@@ -164,11 +164,13 @@ def loaded_graph(setup, sample_csv_dir):
 def osi_loaded_graph(setup):
     """Load the sample OSI semantic model and write mock metric embeddings once per module.
 
-    Ingests ``datasets/osi/acme_semantic_model.yaml`` via the OSI connector, then writes
-    mock embeddings (and creates the vector indexes) for the Metric, Table, and Column
-    labels so the metric vector-search tool registers and the existing table/column
-    vector-search tools surface the OSI expression/aspect enrichment. The fixture owns the
-    Neo4j driver and closes it after setup, including setup failures.
+    Ingests ``datasets/osi/acme_semantic_model.yaml`` via the OSI connector — which creates
+    the Domain/Table/Column/Metric/BusinessTerm full-text indexes — then writes mock
+    embeddings (creating the vector indexes) for the Metric, Table, and Column labels. With
+    full-text + vector indexes and the synonyms-derived BusinessTerm nodes present, the
+    metric/table/column search tools register at the top business-term-bridged hybrid tier,
+    and the table/column hits surface the OSI expression/aspect enrichment. The fixture owns
+    the Neo4j driver and closes it after setup, including setup failures.
     """
     sync_driver = GraphDatabase.driver(
         setup.get_connection_url(),
