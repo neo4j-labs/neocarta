@@ -282,22 +282,22 @@ QUERY_LOG_FILE=./query_logs.json neocarta query-log ingest --dry-run --json
 
 ---
 
-### `neocarta mcp <tool>`
+### `neocarta tool <tool>`
 
 Mirrors the [Neocarta MCP server](../_mcp/README.md) tools as read-only CLI commands, one per tool, with the **same names, arguments, and documentation**. Use these to query the semantic graph from a shell or a non-MCP agent without running the server. They reuse the server's Cypher, result models, and embedder, but run synchronously against the CLI's Neo4j driver — so only the `[cli]` install is needed (no `fastmcp` / `[mcp]` extra).
 
 Catalog tools (always available — schema only):
 
-- `neocarta mcp list-schemas`
-- `neocarta mcp list-tables-by-schema --schema-name <schema>`
-- `neocarta mcp get-full-metadata-schema` *(large payload — debugging / small graphs only)*
+- `neocarta tool list-schemas`
+- `neocarta tool list-tables-by-schema --schema-name <schema>`
+- `neocarta tool get-full-metadata-schema` *(large payload — debugging / small graphs only)*
 
 Search tools (need the matching index, built by an ingest with `--embeddings`):
 
-- `neocarta mcp get-context-by-table-vector-search` / `...-column-vector-search` / `...-schema-and-table-vector-search`
-- `neocarta mcp get-context-by-table-full-text-search` / `...-column-full-text-search`
-- `neocarta mcp get-context-by-table-hybrid-search` / `...-column-hybrid-search`
-- `neocarta mcp get-context-by-table-business-term-hybrid-search` / `...-column-business-term-hybrid-search`
+- `neocarta tool get-context-by-table-vector-search` / `...-column-vector-search` / `...-schema-and-table-vector-search`
+- `neocarta tool get-context-by-table-full-text-search` / `...-column-full-text-search`
+- `neocarta tool get-context-by-table-hybrid-search` / `...-column-hybrid-search`
+- `neocarta tool get-context-by-table-business-term-hybrid-search` / `...-column-business-term-hybrid-search`
 
 - **Flags:**
   - `--text-content TEXT` — the query string (search tools; required). Mirrors the tool's `text_content`.
@@ -306,17 +306,17 @@ Search tools (need the matching index, built by an ingest with `--embeddings`):
   - `--schema-name TEXT` — the schema to list tables for (`list-tables-by-schema`; required).
   - `--json` — emit JSON on stdout.
 - **Config:** `NEO4J_*` for every command. The embedding-backed search tools (vector / hybrid / business-term) additionally read `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` and need an embedding-provider key (e.g. `OPENAI_API_KEY`); set the model to match what the graph was embedded with so query and stored vectors agree. Full-text and catalog tools need no provider credentials.
-- **Output:** a single top-level key `mcp_<tool>` (underscored), e.g. `{"mcp_get_context_by_table_vector_search": {"tool": ..., "text_content": ..., "max_tables": ..., "search_top_k": ..., "count": N, "results": [...]}}`. `results` is the same `TableContext` shape (table + matched columns + types + example values + foreign-key references + scores) the MCP server returns; `list-schemas` / `list-tables-by-schema` return their raw records, while `get-full-metadata-schema` returns the `TableContext` shape (mirroring the server's `get_full_metadata_schema`). For `list-tables-by-schema`, `count` is the number of tables (not the single aggregated row).
+- **Output:** a single top-level key `tool_<tool>` (underscored), e.g. `{"tool_get_context_by_table_vector_search": {"tool": ..., "text_content": ..., "max_tables": ..., "search_top_k": ..., "count": N, "results": [...]}}`. `results` is the same `TableContext` shape (table + matched columns + types + example values + foreign-key references + scores) the MCP server returns; `list-schemas` / `list-tables-by-schema` return their raw records, while `get-full-metadata-schema` returns the `TableContext` shape (mirroring the server's `get_full_metadata_schema`). For `list-tables-by-schema`, `count` is the number of tables (not the single aggregated row).
 - **Exit codes:** missing required input → `2` (usage error); a graph missing the required vector/full-text index → `3` (not found, with a suggestion to ingest with `--embeddings`); a failed query embedding (bad/missing provider key or model) → `8` (upstream error).
 - **Use when:** scripting metadata retrieval, debugging what the MCP server would return, or giving a non-MCP agent the same retrieval surface.
 
 > Unlike the MCP server — which probes the graph and registers a single best search tool per label — the CLI exposes **all** tools statically (so `agent-context` always lists them); a tool whose index is absent simply exits `3` at call time.
 
 ```bash
-neocarta mcp list-schemas --json
-neocarta mcp list-tables-by-schema --schema-name sales --json
-neocarta mcp get-context-by-table-vector-search --text-content "customer orders" --max-tables 5 --json
-neocarta mcp get-context-by-column-full-text-search --text-content "customer_id" --json
+neocarta tool list-schemas --json
+neocarta tool list-tables-by-schema --schema-name sales --json
+neocarta tool get-context-by-table-vector-search --text-content "customer orders" --max-tables 5 --json
+neocarta tool get-context-by-column-full-text-search --text-content "customer_id" --json
 ```
 
 ---

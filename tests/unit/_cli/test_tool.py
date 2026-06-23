@@ -1,4 +1,4 @@
-"""Unit tests for ``neocarta mcp <tool>`` — the MCP tools mirrored on the CLI.
+"""Unit tests for ``neocarta tool <tool>`` — the MCP tools mirrored on the CLI.
 
 These cover CLI plumbing only (the live Cypher/Neo4j behaviour is exercised by
 the MCP integration suite): the command tree and --help shape, the mirrored
@@ -17,7 +17,7 @@ from neo4j.exceptions import AuthError as Neo4jAuthError
 from neo4j.exceptions import ClientError
 
 from neocarta._cli import cli
-from neocarta._cli.commands.mcp import _emit
+from neocarta._cli.commands.tool import _emit
 from neocarta._cli.errors import EXIT_CODES
 from neocarta.errors import (
     AuthError,
@@ -57,13 +57,13 @@ _TABLE_ROW = {
 
 @pytest.fixture
 def _cli_env(monkeypatch):
-    """Populate the Neo4j env vars every mcp command needs to start."""
+    """Populate the Neo4j env vars every tool command needs to start."""
     monkeypatch.setenv("NEO4J_URI", "bolt://localhost:7687")
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "password")
 
 
-def _mock_driver(monkeypatch_target="neocarta._cli.commands.mcp._neo4j_driver"):
+def _mock_driver(monkeypatch_target="neocarta._cli.commands.tool._neo4j_driver"):
     """Return a ``patch`` for the sync driver context manager yielding a MagicMock driver."""
     return patch(monkeypatch_target)
 
@@ -80,14 +80,14 @@ def _bind(mock_driver_ctx):
 # command tree / --help
 # --------------------------------------------------------------------------- #
 def test_group_help_lists_every_tool_command():
-    result = CliRunner().invoke(cli, ["mcp", "--help"])
+    result = CliRunner().invoke(cli, ["tool", "--help"])
     assert result.exit_code == 0
     for name in _TOOL_COMMANDS:
-        assert name in result.output, f"`mcp --help` should list {name}"
+        assert name in result.output, f"`tool --help` should list {name}"
 
 
 def test_search_command_help_documents_mirrored_args_and_docstring():
-    result = CliRunner().invoke(cli, ["mcp", "get-context-by-table-vector-search", "--help"])
+    result = CliRunner().invoke(cli, ["tool", "get-context-by-table-vector-search", "--help"])
     assert result.exit_code == 0
     for token in ("--text-content", "--max-tables", "--search-top-k"):
         assert token in result.output, f"--help should document {token}"
@@ -96,7 +96,7 @@ def test_search_command_help_documents_mirrored_args_and_docstring():
 
 
 def test_list_tables_help_documents_schema_name_and_omits_search_args():
-    result = CliRunner().invoke(cli, ["mcp", "list-tables-by-schema", "--help"])
+    result = CliRunner().invoke(cli, ["tool", "list-tables-by-schema", "--help"])
     assert result.exit_code == 0
     assert "--schema-name" in result.output
     assert "--max-tables" not in result.output
@@ -104,7 +104,7 @@ def test_list_tables_help_documents_schema_name_and_omits_search_args():
 
 
 def test_list_schemas_help_has_no_search_args():
-    result = CliRunner().invoke(cli, ["mcp", "list-schemas", "--help"])
+    result = CliRunner().invoke(cli, ["tool", "list-schemas", "--help"])
     assert result.exit_code == 0
     assert "--text-content" not in result.output
     assert "--max-tables" not in result.output
@@ -118,7 +118,7 @@ def test_missing_neo4j_settings_fails_with_usage_error(monkeypatch):
     monkeypatch.setattr("neocarta._cli.config.load_dotenv", lambda *_a, **_kw: None)
     for key in ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"):
         monkeypatch.delenv(key, raising=False)
-    result = CliRunner().invoke(cli, ["--json", "mcp", "list-schemas"])
+    result = CliRunner().invoke(cli, ["--json", "tool", "list-schemas"])
     assert result.exit_code == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert payload["error"]["code"] == "usage_error"
@@ -127,7 +127,7 @@ def test_missing_neo4j_settings_fails_with_usage_error(monkeypatch):
 
 def test_search_missing_text_content_fails_with_usage_error():
     # --text-content is required *before* any settings/Neo4j work.
-    result = CliRunner().invoke(cli, ["--json", "mcp", "get-context-by-table-vector-search"])
+    result = CliRunner().invoke(cli, ["--json", "tool", "get-context-by-table-vector-search"])
     assert result.exit_code == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert payload["error"]["code"] == "usage_error"
@@ -136,7 +136,7 @@ def test_search_missing_text_content_fails_with_usage_error():
 
 @pytest.mark.usefixtures("_cli_env")
 def test_list_tables_missing_schema_name_fails_with_usage_error():
-    result = CliRunner().invoke(cli, ["--json", "mcp", "list-tables-by-schema"])
+    result = CliRunner().invoke(cli, ["--json", "tool", "list-tables-by-schema"])
     assert result.exit_code == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert payload["error"]["code"] == "usage_error"
@@ -155,10 +155,10 @@ def test_list_schemas_success_envelope():
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = rows
-        result = CliRunner().invoke(cli, ["--json", "mcp", "list-schemas"])
+        result = CliRunner().invoke(cli, ["--json", "tool", "list-schemas"])
     assert result.exit_code == 0, result.output
     out = result.output
-    body = json.loads(out[out.index("{") :])["mcp_list_schemas"]
+    body = json.loads(out[out.index("{") :])["tool_list_schemas"]
     assert body["tool"] == "list_schemas"
     assert body["count"] == 2
     assert body["results"] == rows
@@ -171,11 +171,11 @@ def test_list_tables_by_schema_success_echoes_schema_name():
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = rows
         result = CliRunner().invoke(
-            cli, ["--json", "mcp", "list-tables-by-schema", "--schema-name", "sales"]
+            cli, ["--json", "tool", "list-tables-by-schema", "--schema-name", "sales"]
         )
     assert result.exit_code == 0, result.output
     out = result.output
-    body = json.loads(out[out.index("{") :])["mcp_list_tables_by_schema"]
+    body = json.loads(out[out.index("{") :])["tool_list_tables_by_schema"]
     assert body["schema_name"] == "sales"
     assert body["results"] == rows
     # count reflects the number of TABLES, not the single aggregated collect() row.
@@ -188,7 +188,7 @@ def test_list_tables_by_schema_success_echoes_schema_name():
 def test_table_vector_search_success_envelope_and_sync_embed():
     with (
         _mock_driver() as mock_driver_ctx,
-        patch("neocarta._cli.commands.mcp._build_embedder") as mock_build,
+        patch("neocarta._cli.commands.tool._build_embedder") as mock_build,
     ):
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = [_TABLE_ROW]
@@ -198,12 +198,12 @@ def test_table_vector_search_success_envelope_and_sync_embed():
 
         result = CliRunner().invoke(
             cli,
-            ["--json", "mcp", "get-context-by-table-vector-search", "--text-content", "orders"],
+            ["--json", "tool", "get-context-by-table-vector-search", "--text-content", "orders"],
         )
 
     assert result.exit_code == 0, result.output
     out = result.output
-    body = json.loads(out[out.index("{") :])["mcp_get_context_by_table_vector_search"]
+    body = json.loads(out[out.index("{") :])["tool_get_context_by_table_vector_search"]
     assert body["tool"] == "get_context_by_table_vector_search"
     assert body["text_content"] == "orders"
     assert body["count"] == 1
@@ -234,7 +234,7 @@ def test_search_default_arg_matrix_is_mirrored(command, expected_max_tables, exp
     """Each command must forward the exact per-tool max_tables / search_top_k defaults."""
     with (
         _mock_driver() as mock_driver_ctx,
-        patch("neocarta._cli.commands.mcp._build_embedder") as mock_build,
+        patch("neocarta._cli.commands.tool._build_embedder") as mock_build,
     ):
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = []
@@ -242,7 +242,7 @@ def test_search_default_arg_matrix_is_mirrored(command, expected_max_tables, exp
         embedder._create_embedding_sync.return_value = [0.1]
         mock_build.return_value = embedder
 
-        result = CliRunner().invoke(cli, ["mcp", command, "--text-content", "x"])
+        result = CliRunner().invoke(cli, ["tool", command, "--text-content", "x"])
 
     assert result.exit_code == 0, result.output
     params = driver.execute_query.call_args.kwargs["parameters_"]
@@ -254,13 +254,13 @@ def test_search_default_arg_matrix_is_mirrored(command, expected_max_tables, exp
 def test_full_text_search_sanitises_lucene_and_skips_embedding():
     with (
         _mock_driver() as mock_driver_ctx,
-        patch("neocarta._cli.commands.mcp._build_embedder") as mock_build,
+        patch("neocarta._cli.commands.tool._build_embedder") as mock_build,
     ):
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = []
         result = CliRunner().invoke(
             cli,
-            ["mcp", "get-context-by-table-full-text-search", "--text-content", "a:b* (c)"],
+            ["tool", "get-context-by-table-full-text-search", "--text-content", "a:b* (c)"],
         )
     assert result.exit_code == 0, result.output
     params = driver.execute_query.call_args.kwargs["parameters_"]
@@ -278,14 +278,14 @@ def test_full_text_search_sanitises_lucene_and_skips_embedding():
 def test_embedding_failure_maps_to_upstream_error():
     with (
         _mock_driver() as mock_driver_ctx,
-        patch("neocarta._cli.commands.mcp._build_embedder") as mock_build,
+        patch("neocarta._cli.commands.tool._build_embedder") as mock_build,
     ):
         _bind(mock_driver_ctx)
         embedder = MagicMock()
         embedder._create_embedding_sync.return_value = None  # provider failure is swallowed to None
         mock_build.return_value = embedder
         result = CliRunner().invoke(
-            cli, ["mcp", "get-context-by-table-vector-search", "--text-content", "orders"]
+            cli, ["tool", "get-context-by-table-vector-search", "--text-content", "orders"]
         )
     assert result.exit_code == EXIT_CODES["upstream_error"]["code"]
 
@@ -298,7 +298,7 @@ def test_missing_search_index_maps_to_not_found():
             "There is no such fulltext schema index: table_full_text_index"
         )
         result = CliRunner().invoke(
-            cli, ["mcp", "get-context-by-table-full-text-search", "--text-content", "orders"]
+            cli, ["tool", "get-context-by-table-full-text-search", "--text-content", "orders"]
         )
     assert result.exit_code == EXIT_CODES["not_found"]["code"], result.output
 
@@ -318,7 +318,7 @@ def test_library_errors_route_to_exit_codes(error: NeocartaError, expected_exit_
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.side_effect = error
-        result = CliRunner().invoke(cli, ["mcp", "list-schemas"])
+        result = CliRunner().invoke(cli, ["tool", "list-schemas"])
     assert result.exit_code == expected_exit_code, (
         f"{type(error).__name__} should exit {expected_exit_code}, got {result.exit_code}."
     )
@@ -327,14 +327,14 @@ def test_library_errors_route_to_exit_codes(error: NeocartaError, expected_exit_
 # --------------------------------------------------------------------------- #
 # agent-context introspection
 # --------------------------------------------------------------------------- #
-def test_agent_context_enumerates_mcp_tools():
+def test_agent_context_enumerates_tool_commands():
     result = CliRunner().invoke(cli, ["agent-context"])
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert "mcp" in payload["commands"]
-    subcommands = payload["commands"]["mcp"]["subcommands"]
+    assert "tool" in payload["commands"]
+    subcommands = payload["commands"]["tool"]["subcommands"]
     for name in _TOOL_COMMANDS:
-        assert name in subcommands, f"agent-context should enumerate mcp {name}"
+        assert name in subcommands, f"agent-context should enumerate tool {name}"
     # A search command advertises its mirrored text arg and the table-vector defaults. Like the
     # connector commands, --text-content is validated via require() (not Click `required=True`)
     # so the missing-value case yields the structured usage_error envelope.
@@ -368,14 +368,14 @@ def test_search_embed_and_lucene_wiring_per_command(command, embed, lucene):
     """queryEmbedding is present iff the tier embeds; queryText iff it uses full-text."""
     with (
         _mock_driver() as mock_driver_ctx,
-        patch("neocarta._cli.commands.mcp._build_embedder") as mock_build,
+        patch("neocarta._cli.commands.tool._build_embedder") as mock_build,
     ):
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = []
         embedder = MagicMock()
         embedder._create_embedding_sync.return_value = [0.1]
         mock_build.return_value = embedder
-        result = CliRunner().invoke(cli, ["mcp", command, "--text-content", "orders"])
+        result = CliRunner().invoke(cli, ["tool", command, "--text-content", "orders"])
 
     assert result.exit_code == 0, result.output
     params = driver.execute_query.call_args.kwargs["parameters_"]
@@ -392,7 +392,7 @@ def test_read_query_uses_read_routing_and_configured_database(monkeypatch):
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = []
-        result = CliRunner().invoke(cli, ["mcp", "list-schemas"])
+        result = CliRunner().invoke(cli, ["tool", "list-schemas"])
     assert result.exit_code == 0, result.output
     kwargs = driver.execute_query.call_args.kwargs
     assert kwargs["routing_"] is RoutingControl.READ
@@ -428,10 +428,10 @@ def test_get_full_metadata_schema_validates_table_contexts():
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.return_value = [_TABLE_ROW, _RICH_TABLE_ROW]
-        result = CliRunner().invoke(cli, ["--json", "mcp", "get-full-metadata-schema"])
+        result = CliRunner().invoke(cli, ["--json", "tool", "get-full-metadata-schema"])
     assert result.exit_code == 0, result.output
     out = result.output
-    body = json.loads(out[out.index("{") :])["mcp_get_full_metadata_schema"]
+    body = json.loads(out[out.index("{") :])["tool_get_full_metadata_schema"]
     assert body["tool"] == "get_full_metadata_schema"
     assert body["count"] == 2
     # Nested ColumnContext is serialised through the model.
@@ -445,7 +445,7 @@ def test_malformed_graph_row_maps_to_upstream_error():
         driver = _bind(mock_driver_ctx)
         # Missing required database_name / schema_name / columns.
         driver.execute_query.return_value = [{"result": {"table_name": "x"}}]
-        result = CliRunner().invoke(cli, ["mcp", "get-full-metadata-schema"])
+        result = CliRunner().invoke(cli, ["tool", "get-full-metadata-schema"])
     assert result.exit_code == EXIT_CODES["upstream_error"]["code"], result.output
 
 
@@ -457,7 +457,7 @@ def test_raw_neo4j_auth_error_maps_to_auth_error():
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.side_effect = Neo4jAuthError("authentication failure")
-        result = CliRunner().invoke(cli, ["mcp", "list-schemas"])
+        result = CliRunner().invoke(cli, ["tool", "list-schemas"])
     assert result.exit_code == EXIT_CODES["auth_error"]["code"], result.output
 
 
@@ -466,7 +466,7 @@ def test_generic_client_error_maps_to_upstream_error():
     with _mock_driver() as mock_driver_ctx:
         driver = _bind(mock_driver_ctx)
         driver.execute_query.side_effect = ClientError("some unrelated client error")
-        result = CliRunner().invoke(cli, ["mcp", "list-schemas"])
+        result = CliRunner().invoke(cli, ["tool", "list-schemas"])
     assert result.exit_code == EXIT_CODES["upstream_error"]["code"], result.output
 
 
@@ -477,7 +477,7 @@ def test_full_text_query_reduced_to_empty_is_usage_error():
         _bind(mock_driver_ctx)
         result = CliRunner().invoke(
             cli,
-            ["--json", "mcp", "get-context-by-table-full-text-search", "--text-content", ":*()~"],
+            ["--json", "tool", "get-context-by-table-full-text-search", "--text-content", ":*()~"],
         )
     assert result.exit_code == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
@@ -488,12 +488,12 @@ def test_full_text_query_reduced_to_empty_is_usage_error():
 # output path + cypher-builder resolution
 # --------------------------------------------------------------------------- #
 def test_emit_human_path_prints_envelope():
-    """When not in JSON mode, _emit renders the mcp_<tool> envelope via Rich stdout."""
+    """When not in JSON mode, _emit renders the tool_<tool> envelope via Rich stdout."""
     stdout = MagicMock()
     ctx = SimpleNamespace(obj={"as_json": False, "stdout": stdout})
     body = {"tool": "list_schemas", "count": 0, "results": []}
     _emit(ctx, tool="list_schemas", json_flag=False, body=body)
-    stdout.print.assert_called_once_with({"mcp_list_schemas": body})
+    stdout.print.assert_called_once_with({"tool_list_schemas": body})
 
 
 def test_every_command_resolves_a_cypher_builder():

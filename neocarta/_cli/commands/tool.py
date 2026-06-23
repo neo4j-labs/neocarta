@@ -1,11 +1,12 @@
-"""``neocarta mcp ...`` commands — the MCP server tools, mirrored on the CLI.
+"""``neocarta tool ...`` commands — the MCP server tools, mirrored on the CLI.
 
 Each subcommand mirrors one tool exposed by the Neocarta MCP server
 (:mod:`neocarta._mcp.tools`) by name, arguments, and documentation, and runs
 the *same* Cypher against the *same* Neo4j semantic graph the server would. The
 command names are the kebab-cased tool names (e.g. the ``list_schemas`` tool is
-``neocarta mcp list-schemas``), so an agent that knows the MCP surface already
-knows the CLI surface.
+``neocarta tool list-schemas``), so an agent that knows the MCP surface already
+knows the CLI surface. The group is named ``tool`` rather than ``mcp`` because
+no MCP server is involved — these run directly against the CLI's Neo4j driver.
 
 Unlike the MCP server — which builds an async FastMCP server and registers one
 search tool per label based on the indexes present — these commands run
@@ -44,11 +45,12 @@ if TYPE_CHECKING:
 
 
 @click.group()
-def mcp() -> None:
-    """Run Neocarta MCP server tools directly from the CLI.
+def tool() -> None:
+    """Query the Neo4j semantic graph with the MCP server's tools, from the CLI.
 
     Each subcommand mirrors one tool of the `neocarta-mcp` server by name,
-    arguments, and documentation, querying the same Neo4j semantic graph. The
+    arguments, and documentation, querying the same Neo4j semantic graph — but
+    runs directly against the CLI's Neo4j driver, with no MCP server involved. The
     catalog tools (list-schemas, list-tables-by-schema, get-full-metadata-schema)
     work from schema alone; the search tools require the matching vector /
     full-text indexes (built by an ingest with --embeddings) and, where they
@@ -204,8 +206,8 @@ def _embed_query(settings: CLISettings, driver: Driver, text_content: str) -> li
 
 
 def _emit(ctx: click.Context, *, tool: str, json_flag: bool, body: dict[str, Any]) -> None:
-    """Emit the result under the ``mcp_<tool>`` envelope key (JSON or Rich)."""
-    payload = {f"mcp_{tool}": body}
+    """Emit the result under the ``tool_<tool>`` envelope key (JSON or Rich)."""
+    payload = {f"tool_{tool}": body}
     if ctx.obj["as_json"] or json_flag:
         emit_json(payload)
     else:
@@ -269,7 +271,7 @@ def _run_search(
                     suggestion="Provide alphanumeric search terms in --text-content.",
                 )
             params["queryText"] = query_text
-        with cli_status(stderr, f"Running MCP tool {tool}..."):
+        with cli_status(stderr, f"Running tool {tool}..."):
             rows = _read_query(driver, settings, _cypher(tool), params)
     body = {
         "tool": tool,
@@ -300,7 +302,7 @@ def _run_catalog(
     """
     settings = load_settings()
     stderr = ctx.obj["stderr"]
-    with _read_driver(settings) as driver, cli_status(stderr, f"Running MCP tool {tool}..."):
+    with _read_driver(settings) as driver, cli_status(stderr, f"Running tool {tool}..."):
         rows = _read_query(driver, settings, _cypher(tool), params or {})
     results = _table_contexts(rows) if as_table_context else rows
     count = sum(len(row.get(count_field) or []) for row in rows) if count_field else len(results)
@@ -311,7 +313,7 @@ def _run_catalog(
 # --------------------------------------------------------------------------- #
 # Catalog tools (always available)
 # --------------------------------------------------------------------------- #
-@mcp.command("list-schemas")
+@tool.command("list-schemas")
 @_json_option
 @click.pass_context
 def list_schemas(ctx: click.Context, *, json_flag: bool) -> None:
@@ -324,11 +326,11 @@ def list_schemas(ctx: click.Context, *, json_flag: bool) -> None:
     _run_catalog(ctx, tool="list_schemas", json_flag=json_flag)
 
 
-@mcp.command("list-tables-by-schema")
+@tool.command("list-tables-by-schema")
 @click.option(
     "--schema-name",
     default=None,
-    help="The name of the schema to list tables for. Use `neocarta mcp list-schemas` to get "
+    help="The name of the schema to list tables for. Use `neocarta tool list-schemas` to get "
     "valid schema names.",
 )
 @_json_option
@@ -356,7 +358,7 @@ def list_tables_by_schema(ctx: click.Context, *, schema_name: str | None, json_f
     )
 
 
-@mcp.command("get-full-metadata-schema")
+@tool.command("get-full-metadata-schema")
 @_json_option
 @click.pass_context
 def get_full_metadata_schema(ctx: click.Context, *, json_flag: bool) -> None:
@@ -373,7 +375,7 @@ def get_full_metadata_schema(ctx: click.Context, *, json_flag: bool) -> None:
 # --------------------------------------------------------------------------- #
 # Vector search tools
 # --------------------------------------------------------------------------- #
-@mcp.command("get-context-by-column-vector-search")
+@tool.command("get-context-by-column-vector-search")
 @_search_options(
     text_help="Natural-language description or query to search for semantically similar columns.",
     max_tables_default=5,
@@ -426,7 +428,7 @@ def get_context_by_column_vector_search(
     )
 
 
-@mcp.command("get-context-by-table-vector-search")
+@tool.command("get-context-by-table-vector-search")
 @_search_options(
     text_help="Natural-language description or query to search for semantically similar tables.",
     max_tables_default=10,
@@ -477,7 +479,7 @@ def get_context_by_table_vector_search(
     )
 
 
-@mcp.command("get-context-by-schema-and-table-vector-search")
+@tool.command("get-context-by-schema-and-table-vector-search")
 @_search_options(
     text_help="Natural-language description or query to search for semantically similar schemas "
     "and tables.",
@@ -536,7 +538,7 @@ def get_context_by_schema_and_table_vector_search(
 # --------------------------------------------------------------------------- #
 # Full-text search tools
 # --------------------------------------------------------------------------- #
-@mcp.command("get-context-by-table-full-text-search")
+@tool.command("get-context-by-table-full-text-search")
 @_search_options(
     text_help="The full-text search expression. Supports Lucene query syntax.",
     max_tables_default=10,
@@ -588,7 +590,7 @@ def get_context_by_table_full_text_search(
     )
 
 
-@mcp.command("get-context-by-column-full-text-search")
+@tool.command("get-context-by-column-full-text-search")
 @_search_options(
     text_help="The full-text search expression. Supports Lucene query syntax.",
     max_tables_default=5,
@@ -643,7 +645,7 @@ def get_context_by_column_full_text_search(
 # --------------------------------------------------------------------------- #
 # Hybrid search tools (vector + full-text)
 # --------------------------------------------------------------------------- #
-@mcp.command("get-context-by-table-hybrid-search")
+@tool.command("get-context-by-table-hybrid-search")
 @_search_options(
     text_help="Natural-language and/or keyword query. The same string is used for both the "
     "embedding lookup and the full-text search.",
@@ -697,7 +699,7 @@ def get_context_by_table_hybrid_search(
     )
 
 
-@mcp.command("get-context-by-column-hybrid-search")
+@tool.command("get-context-by-column-hybrid-search")
 @_search_options(
     text_help="Natural-language and/or keyword query. The same string is used for both the "
     "embedding lookup and the full-text search.",
@@ -756,7 +758,7 @@ def get_context_by_column_hybrid_search(
 # --------------------------------------------------------------------------- #
 # Business-term-bridged hybrid search tools
 # --------------------------------------------------------------------------- #
-@mcp.command("get-context-by-table-business-term-hybrid-search")
+@tool.command("get-context-by-table-business-term-hybrid-search")
 @_search_options(
     text_help="Natural-language and/or business-term query. The same string is used for the "
     "embedding lookup and both full-text branches.",
@@ -818,7 +820,7 @@ def get_context_by_table_business_term_hybrid_search(
     )
 
 
-@mcp.command("get-context-by-column-business-term-hybrid-search")
+@tool.command("get-context-by-column-business-term-hybrid-search")
 @_search_options(
     text_help="Natural-language and/or business-term query. The same string is used for the "
     "embedding lookup and both full-text branches.",

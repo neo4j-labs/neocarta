@@ -846,20 +846,20 @@ Today the CLI ships these connector commands:
 | `neocarta osi export` | `OsiConnector` — export an OSI semantic model from Neo4j back to an OSI YAML file |
 | `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
 
-Plus the [MCP server](#neocarta-mcp) tools, mirrored under `neocarta mcp <tool>` so the graph can be queried straight from the shell or a non-MCP agent (read-only; need only the `[cli]` install):
+Plus the [MCP server](#neocarta-mcp) tools, mirrored under `neocarta tool <tool>` so the graph can be queried straight from the shell or a non-MCP agent (read-only; need only the `[cli]` install):
 
 | Command | Mirrors MCP tool |
 |---|---|
-| `neocarta mcp list-schemas` | `list_schemas` — list every schema and its database |
-| `neocarta mcp list-tables-by-schema --schema-name S` | `list_tables_by_schema` — list the tables in schema `S` |
-| `neocarta mcp get-full-metadata-schema` | `get_full_metadata_schema` — dump full table/column metadata (large) |
-| `neocarta mcp get-context-by-{table,column}-vector-search --text-content "..."` | semantic (embedding) search over table/column descriptions |
-| `neocarta mcp get-context-by-schema-and-table-vector-search --text-content "..."` | semantic search across schema + table embeddings |
-| `neocarta mcp get-context-by-{table,column}-full-text-search --text-content "..."` | full-text search over table/column name + description |
-| `neocarta mcp get-context-by-{table,column}-hybrid-search --text-content "..."` | hybrid vector + full-text search |
-| `neocarta mcp get-context-by-{table,column}-business-term-hybrid-search --text-content "..."` | hybrid search bridged through `:BusinessTerm` tags |
+| `neocarta tool list-schemas` | `list_schemas` — list every schema and its database |
+| `neocarta tool list-tables-by-schema --schema-name S` | `list_tables_by_schema` — list the tables in schema `S` |
+| `neocarta tool get-full-metadata-schema` | `get_full_metadata_schema` — dump full table/column metadata (large) |
+| `neocarta tool get-context-by-{table,column}-vector-search --text-content "..."` | semantic (embedding) search over table/column descriptions |
+| `neocarta tool get-context-by-schema-and-table-vector-search --text-content "..."` | semantic search across schema + table embeddings |
+| `neocarta tool get-context-by-{table,column}-full-text-search --text-content "..."` | full-text search over table/column name + description |
+| `neocarta tool get-context-by-{table,column}-hybrid-search --text-content "..."` | hybrid vector + full-text search |
+| `neocarta tool get-context-by-{table,column}-business-term-hybrid-search --text-content "..."` | hybrid search bridged through `:BusinessTerm` tags |
 
-Each `neocarta mcp` command mirrors its tool's name, `--text-content` / `--max-tables` / `--search-top-k` arguments (and per-tool defaults), and help text. The catalog commands work from schema alone; the search commands need the matching vector/full-text indexes (build them with an ingest `--embeddings`) and, where they embed the query, an embedding-provider key (e.g. `OPENAI_API_KEY`). A search command run against a graph missing the required index exits `3` (`not_found`).
+Each `neocarta tool` command mirrors its tool's name, `--text-content` / `--max-tables` / `--search-top-k` arguments (and per-tool defaults), and help text. The catalog commands work from schema alone; the search commands need the matching vector/full-text indexes (build them with an ingest `--embeddings`) and, where they embed the query, an embedding-provider key (e.g. `OPENAI_API_KEY`). A search command run against a graph missing the required index exits `3` (`not_found`).
 
 Plus one introspection verb:
 
@@ -882,8 +882,8 @@ neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yam
 neocarta query-log ingest --query-log-file ./query_logs.json
 
 # Query the graph with the mirrored MCP tools (read-only):
-neocarta mcp list-schemas --json
-neocarta mcp get-context-by-table-vector-search --text-content "customer orders" --max-tables 5 --json
+neocarta tool list-schemas --json
+neocarta tool get-context-by-table-vector-search --text-content "customer orders" --max-tables 5 --json
 ```
 
 See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
@@ -911,7 +911,7 @@ This is a metadata retrieval MCP server that provides tools to query the Neo4j s
 
 The MCP server probes the target database at startup and registers, per label (Table, Column), the highest-priority retrieval tool whose indexes are present: business-term-bridged hybrid > hybrid > vector or full-text alone. Schema-level vector retrieval and catalog tools are registered independently.
 
-Every one of these tools is also reachable from the [CLI](#neocarta-cli) as `neocarta mcp <tool>` (e.g. `neocarta mcp get-context-by-table-vector-search --text-content "..."`) — same names, arguments, and documentation — for shell use or non-MCP agents, without running the server or installing the `[mcp]` extra.
+Every one of these tools is also reachable from the [CLI](#neocarta-cli) as `neocarta tool <tool>` (e.g. `neocarta tool get-context-by-table-vector-search --text-content "..."`) — same names, arguments, and documentation — for shell use or non-MCP agents, without running the server or installing the `[mcp]` extra.
 
 See the [MCP server README](neocarta/_mcp/README.md) for full server documentation.
 
