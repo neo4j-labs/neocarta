@@ -18,10 +18,12 @@ from ..errors import cli_error_from
 from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
+    _apply_neo4j_overrides,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
     _run_embeddings,
+    neo4j_options,
 )
 
 
@@ -127,6 +129,7 @@ def jdbc() -> None:
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def jdbc_schema(
     ctx: click.Context,
@@ -147,6 +150,9 @@ def jdbc_schema(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Ingest JDBC schema metadata into the Neo4j semantic graph.
 
@@ -163,6 +169,12 @@ def jdbc_schema(
     the host; see neocarta/connectors/jdbc/README.md.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     jdbc_url = require("--jdbc-url", resolve(jdbc_url, settings.jdbc_url), env_var="JDBC_URL")
     jdbc_driver = require(
         "--jdbc-driver", resolve(jdbc_driver, settings.jdbc_driver), env_var="JDBC_DRIVER"

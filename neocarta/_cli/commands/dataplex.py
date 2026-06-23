@@ -24,7 +24,14 @@ from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import cli_error_from
 from ..output import cli_status, emit_json
-from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _run_embeddings
+from ._common import (
+    _apply_neo4j_overrides,
+    _build_embedder,
+    _neo4j_driver,
+    _require_neo4j_settings,
+    _run_embeddings,
+    neo4j_options,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -157,6 +164,7 @@ def _run_ingest(
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def dataplex_schema(
     ctx: click.Context,
@@ -171,6 +179,9 @@ def dataplex_schema(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Ingest Dataplex BigQuery schema metadata into the Neo4j semantic graph.
 
@@ -183,6 +194,12 @@ def dataplex_schema(
     BIGQUERY_DATASET_ID env vars.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     project_id = require(
         "--project-id", resolve(project_id, settings.gcp_project_id), env_var="GCP_PROJECT_ID"
     )
@@ -297,6 +314,7 @@ def dataplex_schema(
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def dataplex_glossary(
     ctx: click.Context,
@@ -311,6 +329,9 @@ def dataplex_glossary(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Ingest the Dataplex business glossary into the Neo4j semantic graph.
 
@@ -325,6 +346,12 @@ def dataplex_glossary(
     DATAPLEX_LOCATION env vars.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     project_id = require(
         "--project-id", resolve(project_id, settings.gcp_project_id), env_var="GCP_PROJECT_ID"
     )
