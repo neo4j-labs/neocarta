@@ -15,6 +15,8 @@ def test_transform_to_database_nodes(
     assert bigquery_transformer.database_nodes[0].id == "test_project_id"
     assert bigquery_transformer.database_nodes[0].name == "test-project-id"
     assert bigquery_transformer.database_nodes[0].description is None
+    assert bigquery_transformer.database_nodes[0].platform == "GCP"
+    assert bigquery_transformer.database_nodes[0].service == "BIGQUERY"
 
 
 def test_transform_to_schema_nodes(
