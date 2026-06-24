@@ -223,6 +223,91 @@ def generate_business_term_id(glossary: str, category: str, term: str) -> str:
     return f"{_normalize(glossary)}.{_normalize(category)}.{_normalize(term)}"
 
 
+def generate_governance_tag_key_id(source: str, key: str) -> str:
+    """
+    Generate a GovernanceTagKey id, namespaced by source.
+
+    Tag keys collide across vendors and accounts (a Databricks ``environment`` tag
+    is unrelated to a Snowflake ``environment`` tag), so the id is scoped by a
+    source identifier — typically the metastore / account id, like the Glossary
+    id is scoped by its metastore.
+
+    Parameters
+    ----------
+    source : str
+        The source namespace (e.g. metastore or account id).
+    key : str
+        The governance tag key.
+
+    Returns:
+    -------
+    str
+        The governance tag key id in format: {source}.{key}
+
+    Examples:
+    --------
+    >>> generate_governance_tag_key_id("aws:us-west-2:abc-123", "sensitivity")
+    'aws:us_west_2:abc_123.sensitivity'
+    """
+    return f"{_normalize(source)}.{_normalize(key)}"
+
+
+def generate_governance_tag_value_id(source: str, key: str, value: str) -> str:
+    """
+    Generate a GovernanceTagValue id, namespaced by source and key.
+
+    Parameters
+    ----------
+    source : str
+        The source namespace (e.g. metastore or account id).
+    key : str
+        The governance tag key.
+    value : str
+        The allowed value.
+
+    Returns:
+    -------
+    str
+        The governance tag value id in format: {source}.{key}.{value}
+
+    Examples:
+    --------
+    >>> generate_governance_tag_value_id("aws:us-west-2:abc-123", "sensitivity", "pii")
+    'aws:us_west_2:abc_123.sensitivity.pii'
+    """
+    return f"{_normalize(source)}.{_normalize(key)}.{_normalize(value)}"
+
+
+def generate_governance_tag_instance_id(source_id: str, key: str, value: str) -> str:
+    """
+    Generate a GovernanceTag (assignment) id.
+
+    Governance tags are modelled per assignment — one node per tagged object — so
+    the id is scoped by the tagged object's id, making each assignment a distinct
+    node even when many objects share the same (key, value).
+
+    Parameters
+    ----------
+    source_id : str
+        The id of the tagged object (column / table / schema id).
+    key : str
+        The applied tag key.
+    value : str
+        The applied tag value.
+
+    Returns:
+    -------
+    str
+        The governance tag assignment id in format: {source_id}.{key}.{value}
+
+    Examples:
+    --------
+    >>> generate_governance_tag_instance_id("proj.sales.orders.email", "sensitivity", "pii")
+    'proj.sales.orders.email.sensitivity.pii'
+    """
+    return f"{source_id}.{_normalize(key)}.{_normalize(value)}"
+
+
 def create_query_id(query: str) -> str:
     """Create a query ID from a query string."""
     return hashlib.sha256(query.encode()).hexdigest()
