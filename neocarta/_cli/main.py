@@ -15,6 +15,7 @@ from .commands.bigquery import bigquery
 from .commands.csv import csv
 from .commands.dataplex import dataplex
 from .commands.jdbc import jdbc
+from .commands.mcp import mcp
 from .commands.osi import osi
 from .commands.query_log import query_log
 from .commands.tool import tool
@@ -90,6 +91,7 @@ cli.add_command(bigquery)
 cli.add_command(csv)
 cli.add_command(dataplex)
 cli.add_command(jdbc)
+cli.add_command(mcp)
 cli.add_command(osi)
 cli.add_command(query_log)
 cli.add_command(tool)
