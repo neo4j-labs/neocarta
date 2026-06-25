@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from ...._logging import log_stage
-from ....errors import AuthError, ConnectorError, NeocartaError
+from ....errors import AuthError, ConnectorError, NeocartaError, StateError
 from ....warnings import DatabricksTagsWarning
 from .models import TagPolicyValueInfo
 
@@ -155,7 +155,18 @@ class DatabricksTagsExtractor:
             One row per (tag_key, allowed value); a value-less tag yields one row
             with ``value_name=None``. Cached on the instance and projected via
             :attr:`tag_key_info` / :attr:`tag_value_info`.
+
+        Raises:
+        ------
+        StateError
+            If called before the id namespace is resolved (i.e. directly rather
+            than via :meth:`extract`), which would namespace ids on ``None``.
         """
+        if self._source is None:
+            raise StateError(
+                "extract_tag_policies() called before the id namespace was resolved.",
+                suggestion="Call extract() (which resolves the source) instead.",
+            )
         records: list[TagPolicyValueInfo] = []
         try:
             for policy in self.workspace_client.tag_policies.list_tag_policies():

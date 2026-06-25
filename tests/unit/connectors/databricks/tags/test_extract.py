@@ -8,7 +8,7 @@ from neocarta.connectors.databricks.tags.extract import (
     DEFAULT_SYSTEM_PREFIXES,
     DatabricksTagsExtractor,
 )
-from neocarta.errors import AuthError, ConnectorError
+from neocarta.errors import AuthError, ConnectorError, StateError
 from neocarta.warnings import DatabricksTagsWarning
 
 from .conftest import METASTORE_ID, _tag_policy
@@ -59,6 +59,13 @@ def test_empty_projections_before_extract(extractor):
     assert extractor.tag_key_info.empty
     assert extractor.tag_value_info.empty
     assert extractor.source is None
+
+
+def test_extract_tag_policies_before_resolve_raises_state_error(extractor):
+    """Calling the stage directly (skipping extract()'s source resolution) fails fast
+    rather than namespacing ids on None."""
+    with pytest.raises(StateError):
+        extractor.extract_tag_policies()
 
 
 def test_explicit_source_override(mock_workspace_client):

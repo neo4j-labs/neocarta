@@ -28,7 +28,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from .._validators import coerce_str, coerce_str_or_none
+from .._validators import coerce_str_or_none
 
 
 class GovernanceTagKey(BaseModel):
@@ -84,10 +84,11 @@ class GovernanceTag(BaseModel):
     key: str = Field(..., description="The applied tag key")
     value: str = Field(..., description="The applied tag value")
 
-    # key/value are denormalised lookup keys fed from a source row (the planned
-    # instance-layer producer reads information_schema.*_tags via pandas), so
-    # NaN-like cells are cast to "" rather than raising — mirroring instance.Value.
-    _cast = field_validator("key", "value", mode="before")(coerce_str)
+    # key/value are required and intentionally NOT coerced: the id is built from the
+    # same (key, value), so coercing a missing cell to "" here would diverge from the
+    # id (which would hash the raw "none"/"nan"). The instance-layer producer must
+    # supply clean values (or drop rows with missing tag parts) before constructing
+    # the node — keeping model and id in sync through one upstream normalization path.
 
 
 class HasValueOption(BaseModel):
