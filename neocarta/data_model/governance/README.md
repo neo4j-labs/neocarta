@@ -31,12 +31,12 @@ Nodes
       tagged object), with `key`/`value` denormalised for single-hop lookups
 
 Relationships
-* [`(:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue)`](./models.py#L88)
+* [`(:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue)`](./models.py#L93)
     * Declares an allowed value of a governed tag key
-* [`(:GovernanceTag)-[:HAS_DEFINITION]->(:GovernanceTagValue)`](./models.py#L102)
+* [`(:GovernanceTag)-[:HAS_DEFINITION]->(:GovernanceTagValue)`](./models.py#L107)
     * Links an applied tag to the value definition it satisfies; present only
       when the value is governed, so a missing link marks a free-form value
-* [`(:Column|:Table|:Schema)-[:TAGGED_WITH]->(:GovernanceTag)`](./models.py#L119)
+* [`(:Column|:Table|:Schema)-[:TAGGED_WITH]->(:GovernanceTag)`](./models.py#L124)
     * Records that an entity carries a governance tag, via the `source_label`
       discriminator. Shares the `TAGGED_WITH` type with the glossary's
       `…->(:BusinessTerm)` edge but targets a different node label
