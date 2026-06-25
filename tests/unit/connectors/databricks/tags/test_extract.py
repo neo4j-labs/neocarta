@@ -163,3 +163,15 @@ def test_empty_system_prefixes_disables_filtering(mock_workspace_client):
     extractor = DatabricksTagsExtractor(mock_workspace_client, system_prefixes=())
     extractor.extract()
     assert len(set(extractor.tag_key_info["tag_key"])) == 5
+
+
+def test_none_or_empty_tag_key_is_skipped_not_an_error(mock_workspace_client):
+    """A malformed policy (no key) is skipped, not reported as a listing failure."""
+    mock_workspace_client.tag_policies.list_tag_policies.return_value = [
+        _tag_policy(None, "no key", "tp-none", ["x"]),
+        _tag_policy("", "empty key", "tp-empty", ["y"]),
+        _tag_policy("department", "ok", "tp-dep", ["finance"]),
+    ]
+    extractor = DatabricksTagsExtractor(mock_workspace_client)
+    extractor.extract()  # must not raise
+    assert set(extractor.tag_key_info["tag_key"]) == {"department"}

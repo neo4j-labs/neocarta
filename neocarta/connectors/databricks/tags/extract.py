@@ -149,6 +149,10 @@ class DatabricksTagsExtractor:
         try:
             for policy in self.workspace_client.tag_policies.list_tag_policies():
                 tag_key = policy.tag_key
+                if not tag_key:
+                    # A policy with no key is malformed and cannot be modelled; skip it
+                    # rather than let ``.startswith`` raise and masquerade as a listing failure.
+                    continue
                 if not include_system_tags and self._is_system_tag(tag_key):
                     continue
                 description = policy.description or None

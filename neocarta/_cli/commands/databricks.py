@@ -11,12 +11,14 @@ One verb is exposed:
 
 from __future__ import annotations
 
+import importlib.util
+
 import click
 
 from ...enums import NodeLabel
 from ...errors import NeocartaError
 from ..config import load_settings, require, require_secret, resolve
-from ..errors import cli_error_from
+from ..errors import CLIError, cli_error_from
 from ..output import cli_status, emit_json
 from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _run_embeddings
 
@@ -25,6 +27,24 @@ from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _r
 # as a literal here so the CLI does not import the connector (and its heavy deps)
 # at module load just to render --help.
 _DEFAULT_SYSTEM_PREFIXES = "system.,class.,ai.,sap."
+
+# Import name the optional ``databricks`` extra provides (the Databricks SDK).
+# Reaching this command already implies the ``cli`` extra is installed.
+_DATABRICKS_IMPORT = "databricks.sdk"
+
+
+def _databricks_extra_installed() -> bool:
+    """Return True if the ``databricks`` extra's SDK is importable.
+
+    Uses :func:`importlib.util.find_spec` (no real import / side effects), so the
+    check can run on the --dry-run path too. The dotted name imports only the
+    parent ``databricks`` namespace package; a missing parent raises
+    ``ModuleNotFoundError`` and is treated as not-installed.
+    """
+    try:
+        return importlib.util.find_spec(_DATABRICKS_IMPORT) is not None
+    except ModuleNotFoundError:
+        return False
 
 
 @click.group()
@@ -121,12 +141,15 @@ def databricks_tags(
     GovernanceTagKey description embeddings are generated via LiteLLM and written
     back. Pass --dry-run to print the planned ingestion without touching Neo4j or
     Databricks. The workspace URL comes from --host or DATABRICKS_HOST; the access
-    token is read only from DATABRICKS_TOKEN (secret), never a flag.
+    token is read only from DATABRICKS_TOKEN (secret), never a flag. Requires the
+    ``databricks`` extra (``pip install 'neocarta[databricks]'``); a clear error
+    is shown if it is missing.
     """
     settings = load_settings()
     host = require("--host", resolve(host, settings.databricks_host), env_var="DATABRICKS_HOST")
-    # Parse the comma-separated prefixes into a tuple; an empty string disables filtering.
-    prefixes = tuple(p.strip() for p in system_prefixes.split(",") if p.strip())
+    # Parse the comma-separated prefixes into a de-duplicated, order-preserving tuple;
+    # an empty/blank string disables filtering (-> empty tuple).
+    prefixes = tuple(dict.fromkeys(p.strip() for p in system_prefixes.split(",") if p.strip()))
     if embedding_model is not None:
         settings.embedding_model = embedding_model
     if embedding_dimensions is not None:
@@ -153,6 +176,8 @@ def databricks_tags(
                 "embedding_dimensions": settings.embedding_dimensions if embeddings else None,
                 "embedding_batch_size": settings.embedding_batch_size if embeddings else None,
                 "node_labels": [label.value for label in node_labels] if embeddings else None,
+                # find_spec only — does not import the SDK or the connector.
+                "databricks_extra_installed": _databricks_extra_installed(),
             }
         }
         if as_json:
@@ -160,6 +185,19 @@ def databricks_tags(
         else:
             stdout.print(payload)
         return
+
+    # Verify the `databricks` extra before requiring credentials, so a missing
+    # install is a clean, actionable usage_error rather than a raw ImportError
+    # traceback when the SDK is imported below. Mirrors `neocarta mcp serve`.
+    if not _databricks_extra_installed():
+        raise CLIError(
+            "usage_error",
+            "The Databricks connector extra is not installed.",
+            suggestion=(
+                "Install it with: pip install 'neocarta[databricks]' "
+                "(or 'neocarta[cli,databricks]' for the CLI and connector together)."
+            ),
+        )
 
     _require_neo4j_settings(settings)
     token = require_secret(

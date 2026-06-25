@@ -289,7 +289,11 @@ def generate_governance_tag_instance_id(source_id: str, key: str, value: str) ->
     Parameters
     ----------
     source_id : str
-        The id of the tagged object (column / table / schema id).
+        The id of the tagged object (column / table / schema id). This MUST
+        already be a ``generate_*_id`` output — it is intentionally **not**
+        re-normalized here (it is already normalized and may legitimately contain
+        dotted segments), unlike the ``source`` segment of
+        :func:`generate_governance_tag_key_id` / :func:`generate_governance_tag_value_id`.
     key : str
         The applied tag key.
     value : str

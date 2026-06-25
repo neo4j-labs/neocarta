@@ -58,6 +58,14 @@ def test_governance_tag_instance_carries_key_and_value():
     assert tag.value == "pii"
 
 
+@pytest.mark.parametrize("missing", [None, np.nan])
+def test_governance_tag_nan_or_none_key_value_coerced_to_empty_str(missing):
+    """key/value are fed from a (pandas) source row, so NaN/None coerce to "" — not a crash."""
+    tag = GovernanceTag(id="x", key=missing, value=missing)
+    assert tag.key == ""
+    assert tag.value == ""
+
+
 def test_has_value_option_links_key_to_value():
     rel = HasValueOption(
         governance_tag_key_id="src.sensitivity",

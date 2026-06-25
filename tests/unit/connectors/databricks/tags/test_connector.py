@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from neocarta.connectors.databricks import DatabricksTagsConnector
-from neocarta.errors import ConfigError
+from neocarta.errors import ConfigError, ConnectorError, StateError
 
 from .conftest import _tag_policy
 
@@ -82,3 +82,37 @@ def test_system_prefixes_param_forwarded_to_extractor(mock_workspace_client):
     connector.extract()
     connector.transform()
     assert {n.name for n in connector.transformer.governance_tag_key_nodes} == {"class.pii"}
+
+
+def test_re_extract_resets_state_and_does_not_accumulate(mock_workspace_client):
+    """A second extract() resets _transformed; re-transform replaces (not appends) node lists."""
+    connector = _connector(mock_workspace_client)
+    connector.extract()
+    connector.transform()
+    assert connector._transformed is True
+    first_count = len(connector.transformer.governance_tag_key_nodes)
+    assert first_count > 1
+
+    mock_workspace_client.tag_policies.list_tag_policies.return_value = [
+        _tag_policy("only_one", "d", "tp1", ["a"]),
+    ]
+    connector.extract()
+    assert connector._transformed is False  # re-extract clears the transformed flag
+    connector.transform()
+    assert len(connector.transformer.governance_tag_key_nodes) == 1  # replaced, not accumulated
+
+
+def test_failed_re_extract_leaves_transformed_false_and_load_guards(mock_workspace_client):
+    """If a second extract() fails, _transformed stays False and load() raises before touching Neo4j."""
+    connector = _connector(mock_workspace_client)
+    connector.extract()
+    connector.transform()
+    connector.load()
+
+    mock_workspace_client.tag_policies.list_tag_policies.side_effect = RuntimeError("boom")
+    with pytest.raises(ConnectorError):
+        connector.extract()
+    assert connector._transformed is False
+    with pytest.raises(StateError):
+        connector.load()
+    connector.loader.load_governance_tag_key_nodes.assert_called_once()  # only the first load ran
