@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 # pass include_system_tags=True to ingest everything regardless of prefix.
 DEFAULT_SYSTEM_PREFIXES: tuple[str, ...] = ("system.", "class.", "ai.", "sap.")
 
-_CACHE_COLS = ["tag_key", "tag_description", "tag_policy_id", "value_name"]
+_CACHE_COLS = ["tag_key", "tag_description", "value_name"]
+_KEY_COLS = ["source", "tag_key", "tag_description"]
+_VALUE_COLS = ["source", "tag_key", "value_name"]
 
 
 class DatabricksTagsExtractor:
@@ -86,6 +88,10 @@ class DatabricksTagsExtractor:
         )
 
         self._tag_policy_info: pd.DataFrame = pd.DataFrame(columns=_CACHE_COLS)
+        # Projections are computed once at the end of extract_tag_policies (a second
+        # extract() recomputes them); the properties just return the cached frames.
+        self._tag_key_info: pd.DataFrame = pd.DataFrame(columns=_KEY_COLS)
+        self._tag_value_info: pd.DataFrame = pd.DataFrame(columns=_VALUE_COLS)
         self._source: str | None = None
 
     @property
@@ -96,29 +102,34 @@ class DatabricksTagsExtractor:
     @property
     def tag_key_info(self) -> pd.DataFrame:
         """One row per governed tag key (becomes a :GovernanceTagKey)."""
-        cols = ["source", "tag_key", "tag_description", "tag_policy_id"]
-        if self._tag_policy_info.empty:
-            return pd.DataFrame(columns=cols)
-        df = self._tag_policy_info.drop_duplicates(subset=["tag_key"]).copy()
-        df["source"] = self._source
-        return df[cols]
+        return self._tag_key_info
 
     @property
     def tag_value_info(self) -> pd.DataFrame:
         """One row per (governed tag key, allowed value) — becomes a :GovernanceTagValue.
 
-        Value-less governed tags carry ``value_name=None`` and are dropped here, so
-        they yield a :GovernanceTagKey with no :GovernanceTagValue options.
+        Value-less governed tags carry ``value_name=None`` and are dropped, so they
+        yield a :GovernanceTagKey with no :GovernanceTagValue options.
         """
-        cols = ["source", "tag_key", "value_name"]
-        if self._tag_policy_info.empty:
-            return pd.DataFrame(columns=cols)
-        df = self._tag_policy_info[self._tag_policy_info["value_name"].notna()]
-        df = df.drop_duplicates(subset=["tag_key", "value_name"]).copy()
+        return self._tag_value_info
+
+    def _build_tag_key_info(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Project one row per tag key, namespaced by the resolved source."""
         if df.empty:
-            return pd.DataFrame(columns=cols)
-        df["source"] = self._source
-        return df[cols]
+            return pd.DataFrame(columns=_KEY_COLS)
+        out = df.drop_duplicates(subset=["tag_key"]).copy()
+        out["source"] = self._source
+        return out[_KEY_COLS]
+
+    def _build_tag_value_info(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Project one row per (tag key, allowed value); value-less tags drop out."""
+        if df.empty:
+            return pd.DataFrame(columns=_VALUE_COLS)
+        out = df[df["value_name"].notna()].drop_duplicates(subset=["tag_key", "value_name"]).copy()
+        if out.empty:
+            return pd.DataFrame(columns=_VALUE_COLS)
+        out["source"] = self._source
+        return out[_VALUE_COLS]
 
     @log_stage(count=False)
     def extract(self, *, include_system_tags: bool = False) -> None:
@@ -156,14 +167,12 @@ class DatabricksTagsExtractor:
                 if not include_system_tags and self._is_system_tag(tag_key):
                     continue
                 description = policy.description or None
-                policy_id = policy.id
                 values = policy.values or []
                 if not values:
                     records.append(
                         TagPolicyValueInfo(
                             tag_key=tag_key,
                             tag_description=description,
-                            tag_policy_id=policy_id,
                             value_name=None,
                         )
                     )
@@ -173,7 +182,6 @@ class DatabricksTagsExtractor:
                         TagPolicyValueInfo(
                             tag_key=tag_key,
                             tag_description=description,
-                            tag_policy_id=policy_id,
                             value_name=value.name,
                         )
                     )
@@ -182,6 +190,10 @@ class DatabricksTagsExtractor:
 
         df = pd.DataFrame(records, columns=_CACHE_COLS)
         self._tag_policy_info = df
+        # Build the dedup projections once here (source is resolved before this runs);
+        # a re-extract recomputes them, keeping the per-access path free.
+        self._tag_key_info = self._build_tag_key_info(df)
+        self._tag_value_info = self._build_tag_value_info(df)
         return df
 
     def _resolve_source(self) -> None:

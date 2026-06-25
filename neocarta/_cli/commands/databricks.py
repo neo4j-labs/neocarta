@@ -23,9 +23,10 @@ from ..output import cli_status, emit_json
 from ._common import _build_embedder, _neo4j_driver, _require_neo4j_settings, _run_embeddings
 
 # Default platform/system tag-key prefixes excluded unless --include-system-tags.
-# Mirrors neocarta.connectors.databricks.tags.extract.DEFAULT_SYSTEM_PREFIXES; kept
-# as a literal here so the CLI does not import the connector (and its heavy deps)
-# at module load just to render --help.
+# Kept as a literal (not imported from the connector) so `neocarta --help` /
+# agent-context stay import-light — importing the connector pulls pandas at module
+# load. test_cli_default_prefixes_stay_in_sync_with_connector guards it against
+# drift from extract.DEFAULT_SYSTEM_PREFIXES.
 _DEFAULT_SYSTEM_PREFIXES = "system.,class.,ai.,sap."
 
 # Import name the optional ``databricks`` extra provides (the Databricks SDK).

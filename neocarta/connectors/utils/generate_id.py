@@ -256,6 +256,12 @@ def generate_governance_tag_value_id(source: str, key: str, value: str) -> str:
     """
     Generate a GovernanceTagValue id, namespaced by source and key.
 
+    The value segment is content-hashed (md5, like :func:`generate_value_id`) rather
+    than normalized, because governance-tag values are case- and separator-sensitive:
+    normalizing would collapse distinct values such as ``High Risk`` / ``high-risk`` /
+    ``high_risk`` into one id. The original value is preserved on the node's ``name``;
+    only the id is hashed. (Keys are still normalized and may collapse — by design.)
+
     Parameters
     ----------
     source : str
@@ -268,14 +274,15 @@ def generate_governance_tag_value_id(source: str, key: str, value: str) -> str:
     Returns:
     -------
     str
-        The governance tag value id in format: {source}.{key}.{value}
+        The governance tag value id in format: {source}.{key}.{hashed-value}
 
     Examples:
     --------
     >>> generate_governance_tag_value_id("aws:us-west-2:abc-123", "sensitivity", "pii")
-    'aws:us_west_2:abc_123.sensitivity.pii'
+    'aws:us_west_2:abc_123.sensitivity.1eae74adfc325f04a8506be8bd11c67a'
     """
-    return f"{_normalize(source)}.{_normalize(key)}.{_normalize(value)}"
+    value_hash = hashlib.md5(str(value).encode(), usedforsecurity=False).hexdigest()[:32]
+    return f"{_normalize(source)}.{_normalize(key)}.{value_hash}"
 
 
 def generate_governance_tag_instance_id(source_id: str, key: str, value: str) -> str:
@@ -302,14 +309,17 @@ def generate_governance_tag_instance_id(source_id: str, key: str, value: str) ->
     Returns:
     -------
     str
-        The governance tag assignment id in format: {source_id}.{key}.{value}
+        The governance tag assignment id in format: {source_id}.{key}.{hashed-value}
 
     Examples:
     --------
     >>> generate_governance_tag_instance_id("proj.sales.orders.email", "sensitivity", "pii")
-    'proj.sales.orders.email.sensitivity.pii'
+    'proj.sales.orders.email.sensitivity.1eae74adfc325f04a8506be8bd11c67a'
     """
-    return f"{source_id}.{_normalize(key)}.{_normalize(value)}"
+    # Value is content-hashed (see generate_governance_tag_value_id) so case/separator-
+    # distinct values don't collapse; the source_id is a pre-built, already-normalized id.
+    value_hash = hashlib.md5(str(value).encode(), usedforsecurity=False).hexdigest()[:32]
+    return f"{source_id}.{_normalize(key)}.{value_hash}"
 
 
 def create_query_id(query: str) -> str:

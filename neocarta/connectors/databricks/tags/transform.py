@@ -46,38 +46,29 @@ class DatabricksTagsTransformer:
                 name=row.tag_key,
                 description=row.tag_description or None,
             )
-            for _, row in tag_key_info.iterrows()
+            for row in tag_key_info.itertuples(index=False)
         ]
         self.governance_tag_key_nodes = nodes
         return nodes
 
-    def transform_to_governance_tag_value_nodes(
+    def transform_value_layer(
         self, tag_value_info: pd.DataFrame
-    ) -> list[GovernanceTagValue]:
-        """Build :GovernanceTagValue nodes — one per allowed value (name only)."""
-        nodes = [
-            GovernanceTagValue(
-                id=generate_governance_tag_value_id(row.source, row.tag_key, row.value_name),
-                name=row.value_name,
-                description=None,
-            )
-            for _, row in tag_value_info.iterrows()
-        ]
-        self.governance_tag_value_nodes = nodes
-        return nodes
+    ) -> tuple[list[GovernanceTagValue], list[HasValueOption]]:
+        """Build :GovernanceTagValue nodes and their HAS_VALUE_OPTION edges in one pass.
 
-    def transform_to_has_value_option_relationships(
-        self, tag_value_info: pd.DataFrame
-    ) -> list[HasValueOption]:
-        """Build (:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue) edges."""
-        rels = [
-            HasValueOption(
-                governance_tag_key_id=generate_governance_tag_key_id(row.source, row.tag_key),
-                governance_tag_value_id=generate_governance_tag_value_id(
-                    row.source, row.tag_key, row.value_name
-                ),
+        Iterates ``tag_value_info`` once, computing each value id a single time and
+        emitting both the (name-only) value node and the
+        ``(:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue)`` edge.
+        """
+        nodes: list[GovernanceTagValue] = []
+        rels: list[HasValueOption] = []
+        for row in tag_value_info.itertuples(index=False):
+            key_id = generate_governance_tag_key_id(row.source, row.tag_key)
+            value_id = generate_governance_tag_value_id(row.source, row.tag_key, row.value_name)
+            nodes.append(GovernanceTagValue(id=value_id, name=row.value_name, description=None))
+            rels.append(
+                HasValueOption(governance_tag_key_id=key_id, governance_tag_value_id=value_id)
             )
-            for _, row in tag_value_info.iterrows()
-        ]
+        self.governance_tag_value_nodes = nodes
         self.has_value_option_relationships = rels
-        return rels
+        return nodes, rels

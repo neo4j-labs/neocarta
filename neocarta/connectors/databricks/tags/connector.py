@@ -148,8 +148,7 @@ class DatabricksTagsConnector:
         t = self.transformer
 
         t.transform_to_governance_tag_key_nodes(e.tag_key_info)
-        t.transform_to_governance_tag_value_nodes(e.tag_value_info)
-        t.transform_to_has_value_option_relationships(e.tag_value_info)
+        t.transform_value_layer(e.tag_value_info)
         log_transform_counts(logger, t, _TRANSFORM_COUNTS)
         self._transformed = True
 

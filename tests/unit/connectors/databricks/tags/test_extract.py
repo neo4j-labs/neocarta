@@ -36,7 +36,6 @@ def test_tag_key_info_one_row_per_tag(extractor_with_cache):
     assert set(df["source"]) == {METASTORE_ID}
     department = df[df["tag_key"] == "department"].iloc[0]
     assert department["tag_description"] == "Owning department"
-    assert department["tag_policy_id"] == "tp-department"
 
 
 def test_tag_value_info_excludes_value_less_tag(extractor_with_cache):
@@ -124,7 +123,6 @@ def test_extract_against_genuine_sdk_objects(mock_workspace_client):
     assert set(extractor.tag_value_info["value_name"]) == {"finance", "hr"}
     department = extractor.tag_key_info[extractor.tag_key_info["tag_key"] == "department"].iloc[0]
     assert department["tag_description"] == "Owning department"
-    assert department["tag_policy_id"] == "tp-department"
 
 
 def test_default_prefixes_exclude_all_platform_namespaces(mock_workspace_client):

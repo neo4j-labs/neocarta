@@ -19,8 +19,8 @@ def test_governance_tag_key_nodes_carry_description(extractor_with_cache, transf
     assert department.embedding is None
 
 
-def test_governance_tag_value_nodes_are_name_only(extractor_with_cache, transformer):
-    nodes = transformer.transform_to_governance_tag_value_nodes(extractor_with_cache.tag_value_info)
+def test_value_layer_nodes_are_name_only(extractor_with_cache, transformer):
+    nodes, _rels = transformer.transform_value_layer(extractor_with_cache.tag_value_info)
     by_name = {node.name: node for node in nodes}
     assert set(by_name) == {"finance", "hr", "sales", "alpha", "beta"}
     finance = by_name["finance"]
@@ -29,24 +29,24 @@ def test_governance_tag_value_nodes_are_name_only(extractor_with_cache, transfor
     assert all(node.description is None for node in nodes)
 
 
-def test_has_value_option_edges(extractor_with_cache, transformer):
-    rels = transformer.transform_to_has_value_option_relationships(
-        extractor_with_cache.tag_value_info
-    )
+def test_value_layer_emits_has_value_option_edges(extractor_with_cache, transformer):
+    nodes, rels = transformer.transform_value_layer(extractor_with_cache.tag_value_info)
     pairs = {(rel.governance_tag_key_id, rel.governance_tag_value_id) for rel in rels}
     assert (
         generate_governance_tag_key_id(METASTORE_ID, "department"),
         generate_governance_tag_value_id(METASTORE_ID, "department", "finance"),
     ) in pairs
     assert len(rels) == 5
+    # Single pass: one edge per value node, and both caches are populated.
+    assert len(rels) == len(nodes)
+    assert transformer.governance_tag_value_nodes is nodes
+    assert transformer.has_value_option_relationships is rels
 
 
 def test_value_less_tag_has_key_but_no_value_options(extractor_with_cache, transformer):
     """A value-less governed tag becomes a key node with no value options."""
     keys = transformer.transform_to_governance_tag_key_nodes(extractor_with_cache.tag_key_info)
-    rels = transformer.transform_to_has_value_option_relationships(
-        extractor_with_cache.tag_value_info
-    )
+    _nodes, rels = transformer.transform_value_layer(extractor_with_cache.tag_value_info)
     assert any(node.name == "free_form" for node in keys)
     free_form_key_id = generate_governance_tag_key_id(METASTORE_ID, "free_form")
     assert all(rel.governance_tag_key_id != free_form_key_id for rel in rels)

@@ -163,22 +163,22 @@ graph-entity filter):
   namespaces ids by the metastore id (`source`). A tag used across multiple
   metastores/workspaces may appear under more than one namespace if ingested from
   each.
-- **Case/separator-insensitive ids.** Node ids are normalized (lowercased, spaces
-  and hyphens → underscores) by the shared `generate_id` helpers, but Databricks
-  governed-tag keys and values are case-sensitive. Two governed-tag **keys** — or
-  two allowed **values** of one key — that differ only in case or separator (e.g.
-  `Cost Center` / `cost-center` / `cost_center`, or `High Risk` / `high-risk`)
-  therefore share a `GovernanceTagKey` / `GovernanceTagValue` id and MERGE into a
-  single node (the first-loaded `name`/`description` wins). This is an inherent
-  property of the library's id scheme (the glossary ids behave the same); in
-  practice governed-tag key and value sets are distinct slugs.
-- **Dotted segments.** Ids join `source`, key, and value with `.` and that
-  delimiter is not escaped, so a key or value that itself contains `.` makes the
-  segment boundary ambiguous (e.g. key `sap.PersonalData` and the pair
-  `sap` + value `PersonalData` both yield `….sap.personaldata`). Relationship
-  edges are unaffected (the loaders MATCH end nodes by explicit label), and real
-  governed-tag value sets rarely contain dots, but a label-agnostic lookup by id
-  could conflate such nodes. Dotted **keys** occur both as user-authored keys (e.g.
-  `finance.cost_center`, ingested by default) and as the platform namespaces
-  `system.`/`class.`/`ai.`/`sap.` (ingested only with `--include-system-tags` or a
-  narrowed `--system-prefixes`).
+- **Case/separator-sensitive keys (values are safe).** `GovernanceTagValue` ids
+  hash the value segment (md5, like the shared `generate_value_id`), so allowed
+  values that differ only in case or separator (`High Risk` / `high-risk` /
+  `high_risk`, or `PII` vs `pii`) stay **distinct** nodes — the original value is
+  preserved on the node's `name`, only the id is hashed. `GovernanceTagKey` ids,
+  however, normalize the key (lowercased, spaces/hyphens → underscores) like the
+  other `generate_id` helpers, so two governed-tag **keys** that differ only in case
+  or separator (`Cost Center` / `cost-center` / `cost_center`) still share one id and
+  MERGE into a single node (first-loaded `name`/`description` wins). In practice
+  governed-tag key sets are distinct slugs.
+- **Dotted keys.** Ids join `source` and the key with `.` and that delimiter is not
+  escaped, so a **key** containing `.` makes the key/value boundary ambiguous (e.g.
+  key `sap.PersonalData` and the pair `sap` + value `PersonalData` could yield
+  overlapping prefixes). The value segment is hashed, so value-side dot ambiguity is
+  gone; relationship edges are unaffected (the loaders MATCH end nodes by explicit
+  label), but a label-agnostic lookup by id could still conflate dotted keys. Dotted
+  keys occur both as user-authored keys (e.g. `finance.cost_center`, ingested by
+  default) and as the platform namespaces `system.`/`class.`/`ai.`/`sap.` (ingested
+  only with `--include-system-tags` or a narrowed `--system-prefixes`).

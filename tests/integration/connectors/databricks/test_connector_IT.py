@@ -123,13 +123,14 @@ def test_ingest_loads_governance_tag_definitions(neo4j_driver):
         assert _count(session, "MATCH (v:GovernanceTagValue) RETURN count(v) AS c") == 5
 
 
-def test_value_id_normalization_collapses_variant_values(neo4j_driver):
-    """Distinct values that normalize to the same slug collapse into one node.
+def test_value_id_hashing_keeps_variant_values_distinct(neo4j_driver):
+    """Case/separator-variant values stay distinct because the value id is hashed.
 
-    Governed-tag values are case-sensitive in Databricks, but the shared id scheme
-    lowercases and maps spaces/hyphens to underscores, so values differing only in
-    case/separator share a GovernanceTagValue id and MERGE into a single node.
-    Pinned to document the behavior (see the connector README's limitations).
+    Governed-tag values are case-sensitive in Databricks. The value segment of the
+    GovernanceTagValue id is md5-hashed (not normalized), so values differing only in
+    case/separator get distinct ids and DON'T collapse — three values yield three
+    nodes and three HAS_VALUE_OPTION edges. (Keys are still normalized and may
+    collapse; see the connector README's limitations.)
     """
     client = _mock_workspace_client()
     client.tag_policies.list_tag_policies.return_value = [
@@ -138,16 +139,19 @@ def test_value_id_normalization_collapses_variant_values(neo4j_driver):
     DatabricksTagsConnector(workspace_client=client, neo4j_driver=neo4j_driver).ingest()
 
     with neo4j_driver.session(database="neo4j") as session:
-        # Three distinct values, one normalized id -> one node and one edge.
-        assert _count(session, "MATCH (v:GovernanceTagValue) RETURN count(v) AS c") == 1
+        # Three distinct values, three distinct hashed ids -> three nodes and three edges.
+        assert _count(session, "MATCH (v:GovernanceTagValue) RETURN count(v) AS c") == 3
         assert (
             _count(
                 session,
                 "MATCH (:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue) "
                 "RETURN count(*) AS c",
             )
-            == 1
+            == 3
         )
+        # The original values are preserved on the node names.
+        names = {r["n"] for r in session.run("MATCH (v:GovernanceTagValue) RETURN v.name AS n")}
+        assert names == {"High Risk", "high-risk", "high_risk"}
 
 
 def test_empty_governed_tags_does_not_crash(neo4j_driver):

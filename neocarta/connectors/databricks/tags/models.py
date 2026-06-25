@@ -27,5 +27,4 @@ class TagPolicyValueInfo(TypedDict):
 
     tag_key: str
     tag_description: str | None
-    tag_policy_id: str | None
     value_name: str | None

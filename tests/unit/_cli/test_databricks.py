@@ -216,10 +216,18 @@ def test_routes_library_errors_to_exit_codes(monkeypatch, error, expected_exit_c
 
 
 def test_cli_default_prefixes_stay_in_sync_with_connector():
-    """The CLI's literal default must equal the connector's DEFAULT_SYSTEM_PREFIXES tuple."""
+    """The CLI literal default must equal the connector's DEFAULT_SYSTEM_PREFIXES tuple.
+
+    The CLI keeps a literal (rather than importing the connector, which would pull
+    pandas into ``neocarta --help``); this test is the drift guard for that copy.
+    """
     from neocarta._cli.commands.databricks import _DEFAULT_SYSTEM_PREFIXES
     from neocarta.connectors.databricks.tags.extract import DEFAULT_SYSTEM_PREFIXES
 
+    # Exact form the reviewer asked for: the literal is the comma-join of the tuple.
+    joined = ",".join(DEFAULT_SYSTEM_PREFIXES)
+    assert joined == _DEFAULT_SYSTEM_PREFIXES
+    # And it parses back to the tuple (the actual --system-prefixes default path).
     parsed = tuple(p.strip() for p in _DEFAULT_SYSTEM_PREFIXES.split(",") if p.strip())
     assert parsed == DEFAULT_SYSTEM_PREFIXES
 
