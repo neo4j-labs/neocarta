@@ -569,10 +569,16 @@ class Neo4jRDBMSLoader:
         self,
         governance_tag_value_nodes: list[GovernanceTagValue],
         overwrite_existing: bool = False,
-        properties_list: list[str] = ["name", "description"],
+        properties_list: list[str] = ["name"],
         create_name_index: bool = True,
     ) -> dict:
-        """Load GovernanceTagValue nodes into Neo4j."""
+        """Load GovernanceTagValue nodes into Neo4j.
+
+        Defaults to name-only: governance-tag values carry no description on most
+        platforms (Databricks/Snowflake), so the connector writes ``name`` alone.
+        Pass ``properties_list=["name", "description"]`` for a source (e.g. GCP)
+        whose values do carry descriptions.
+        """
         _validate_properties_list(GovernanceTagValue, properties_list)
 
         self._write_node_constraint(node_labels=[NodeLabel.GOVERNANCE_TAG_VALUE])

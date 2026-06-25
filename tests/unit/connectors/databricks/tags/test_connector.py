@@ -24,6 +24,11 @@ def test_missing_workspace_client_raises_config_error():
         DatabricksTagsConnector(workspace_client=None, neo4j_driver=MagicMock())
 
 
+def test_missing_neo4j_driver_raises_config_error():
+    with pytest.raises(ConfigError):
+        DatabricksTagsConnector(workspace_client=MagicMock(), neo4j_driver=None)
+
+
 def test_load_uses_property_lists_that_omit_undefined_props(mock_workspace_client):
     """Loader writes only populated properties — never NULL description on bare values."""
     connector = _connector(mock_workspace_client)

@@ -83,6 +83,11 @@ class DatabricksTagsConnector:
                 "workspace_client is required for the Databricks governance-tags connector.",
                 suggestion="Pass workspace_client=WorkspaceClient(host=..., token=...).",
             )
+        if neo4j_driver is None:
+            raise ConfigError(
+                "neo4j_driver is required for the Databricks governance-tags connector.",
+                suggestion="Pass neo4j_driver=GraphDatabase.driver(...).",
+            )
         self.workspace_client = workspace_client
         self.neo4j_driver = neo4j_driver
         self.database_name = database_name
