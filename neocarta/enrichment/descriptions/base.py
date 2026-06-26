@@ -17,7 +17,6 @@ from .utils import (
 
 logger = logging.getLogger(__name__)
 
-_SUPPORTED_LABELS = (NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN)
 
 
 class BaseDescriptionConnector:
@@ -62,22 +61,6 @@ class BaseDescriptionConnector:
         self.generation_model = generation_model
         self.database_name = database_name
         self.max_example_values = max_example_values
-
-    def _generate_description_sync(self, context: dict[str, Any]) -> str | None:
-        """
-        Generate a description for a single node's context (sync).
-
-        Subclasses must override this.
-        """
-        raise NotImplementedError
-
-    async def _generate_description_async(self, context: dict[str, Any]) -> str | None:
-        """
-        Generate a description for a single node's context (async).
-
-        Subclasses must override this.
-        """
-        raise NotImplementedError
 
     def _generate_descriptions_sync(self, contexts: list[dict[str, Any]]) -> list[str | None]:
         """
