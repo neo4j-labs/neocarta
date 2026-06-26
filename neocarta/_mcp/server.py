@@ -16,6 +16,7 @@ from .inventory import (
     fetch_index_inventory,
     fetch_neocarta_graph_metadata,
     has_business_term_nodes,
+    has_osi_nodes,
 )
 from .settings import mcp_server_settings
 from .tools import (
@@ -23,6 +24,9 @@ from .tools import (
     full_text_search,
     hybrid_business_term_search,
     hybrid_search,
+    osi_catalog,
+    osi_definitions,
+    osi_domain,
     vector_search,
 )
 
@@ -116,12 +120,15 @@ async def create_mcp_server(
     Create and configure the FastMCP server with all semantic-layer tools.
 
     At startup the target database is probed for its node-scoped search indexes and the
-    presence of BusinessTerm nodes. For each searchable label (Table, Column) the single
-    highest-priority retrieval tool whose prerequisites are satisfied is registered:
-    business-term-bridged hybrid, then plain hybrid, then vector or full-text. Schema-level
-    vector retrieval is registered independently.
+    presence of BusinessTerm and OSI nodes. For each searchable label (Table, Column,
+    Metric) the single highest-priority retrieval tool whose prerequisites are satisfied is
+    registered: business-term-bridged hybrid, then plain hybrid, then vector or full-text.
+    Schema-level vector retrieval is registered independently.
 
-    Catalog tools (schema/table listing, full metadata dump) are always registered.
+    Catalog tools (schema/table listing, full metadata dump) are always registered. When an
+    OSI semantic model is present, the OSI reference (list_domains,
+    list_metrics_by_domain), domain-context (get_domain_context), and definition
+    (get_metric_expression) tools are registered as well.
     """
     name = "Neocarta MCP Server"
     instructions = """
@@ -136,6 +143,7 @@ The retrieved context may be used for query generation, query routing or data di
     business_term_index_present = ("BusinessTerm", "FULLTEXT") in inventory
     business_term_nodes_present = await has_business_term_nodes(neo4j_driver, neo4j_database)
     business_term_search_available = business_term_index_present and business_term_nodes_present
+    osi_nodes_present = await has_osi_nodes(neo4j_driver, neo4j_database)
 
     logger.info(
         "Detected search indexes: %s",
@@ -146,8 +154,15 @@ The retrieved context may be used for query generation, query routing or data di
         business_term_index_present,
         business_term_nodes_present,
     )
+    logger.info("OSI semantic model nodes present=%s", osi_nodes_present)
 
     catalog.register(server, neo4j_driver, neo4j_database)
+
+    if osi_nodes_present:
+        osi_catalog.register(server, neo4j_driver, neo4j_database)
+        osi_domain.register(server, neo4j_driver, neo4j_database)
+        osi_definitions.register(server, neo4j_driver, neo4j_database)
+        logger.info("Registered OSI catalog, domain-context, and definition tools")
 
     if ("Schema", "VECTOR") in inventory:
         vector_search.register_schema_tool(server, neo4j_driver, neo4j_database, embedder)
@@ -165,6 +180,12 @@ The retrieved context may be used for query generation, query routing or data di
             "hybrid": hybrid_search.register_column_tool,
             "vector": vector_search.register_column_tool,
             "full_text": full_text_search.register_column_tool,
+        },
+        "Metric": {
+            "business_term_hybrid": hybrid_business_term_search.register_metric_tool,
+            "hybrid": hybrid_search.register_metric_tool,
+            "vector": vector_search.register_metric_tool,
+            "full_text": full_text_search.register_metric_tool,
         },
     }
 
