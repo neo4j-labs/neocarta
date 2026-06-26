@@ -128,7 +128,7 @@ async def create_mcp_server(
     Catalog tools (schema/table listing, full metadata dump) are always registered. When an
     OSI semantic model is present, the OSI reference (list_domains,
     list_metrics_by_domain), domain-context (get_domain_context), and definition
-    (get_metric_expression, get_aspects) tools are registered as well.
+    (get_metric_expression) tools are registered as well.
     """
     name = "Neocarta MCP Server"
     instructions = """

@@ -126,7 +126,19 @@ RETURN {
             from_table: src.name,
             to_table: tgt.name,
             from_columns: coalesce(j.from_columns, []),
-            to_columns: coalesce(j.to_columns, [])
+            to_columns: coalesce(j.to_columns, []),
+            aspects: COLLECT {
+                MATCH (j)-[:HAS_ASPECT]->(a:Aspect)
+                RETURN {
+                    aspect_type: CASE
+                        WHEN a:OsiAiContext THEN "ai_context"
+                        WHEN a:OsiCustomExtensions THEN "custom_extensions"
+                        ELSE "unknown"
+                    END,
+                    data: a.data,
+                    vendor_name: a.vendor_name
+                }
+            }
         }
     },
     aspects: COLLECT {

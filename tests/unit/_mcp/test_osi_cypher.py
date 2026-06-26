@@ -1,9 +1,6 @@
 """Unit tests for the OSI cypher factories (no database required)."""
 
-import pytest
-
 from neocarta._mcp.cypher import (
-    get_aspects_cypher,
     get_context_by_metric_business_term_hybrid_search_cypher,
     get_context_by_metric_full_text_search_cypher,
     get_context_by_metric_hybrid_search_cypher,
@@ -59,20 +56,9 @@ def test_metric_expression_builder_filters_dialect() -> None:
     assert "$metricName" in cypher
 
 
-@pytest.mark.parametrize("entity_type", ["domain", "metric", "join"])
-def test_get_aspects_cypher_id_addressed(entity_type: str) -> None:
-    cypher = get_aspects_cypher(entity_type)
-    assert "$entityId" in cypher
+def test_domain_context_embeds_join_aspects() -> None:
+    """Join aspects ride along on get_domain_context (no standalone aspect query/tool)."""
+    cypher = get_domain_context_cypher()
+    assert "HAS_SOURCE_TABLE" in cypher
+    # The joins projection collects HAS_ASPECT, so join aspects are reachable.
     assert "HAS_ASPECT" in cypher
-
-
-@pytest.mark.parametrize("entity_type", ["table", "column"])
-def test_get_aspects_cypher_name_addressed(entity_type: str) -> None:
-    cypher = get_aspects_cypher(entity_type)
-    assert "$entityName" in cypher
-    assert "$domainId" in cypher
-
-
-def test_get_aspects_cypher_rejects_unknown_entity() -> None:
-    with pytest.raises(ValueError, match="Unsupported entity_type"):
-        get_aspects_cypher("widget")

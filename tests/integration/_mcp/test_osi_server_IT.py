@@ -27,8 +27,9 @@ def test_osi_tools_registered(neo4j_connection, osi_loaded_graph):
         "list_metrics_by_domain",
         "get_domain_context",
         "get_metric_expression",
-        "get_aspects",
     }.issubset(tools)
+    # Aspects are embedded in the context payloads, not a standalone tool.
+    assert "get_aspects" not in tools
     # The OSI load creates Metric + BusinessTerm full-text indexes and the fixture adds a
     # Metric vector index; with BusinessTerm nodes present the metric tool registers at the
     # top business-term-bridged tier (and the lower metric tiers do not).
@@ -124,6 +125,8 @@ def test_get_context_by_metric_search(neo4j_connection, osi_loaded_graph):
     assert any("arr_usd" in e["expression"] for e in arr["expressions"])
     # Metric ai_context synonyms become tagged BusinessTerms surfaced as synonyms.
     assert "ARR" in arr["synonyms"]
+    # Aspects are embedded on the metric payload (no standalone get_aspects tool).
+    assert any(a["aspect_type"] == "ai_context" for a in arr["aspects"])
 
 
 def test_get_context_by_metric_search_domain_filter(neo4j_connection, osi_loaded_graph):
@@ -163,33 +166,6 @@ def test_get_metric_expression_dialect_filter_no_match(neo4j_connection, osi_loa
         )
     )
     assert data == []
-
-
-def test_get_aspects_for_metric(neo4j_connection, osi_loaded_graph):
-    """get_aspects returns the ai_context aspect attached to a metric."""
-    data = asyncio.run(
-        _call_tool(
-            neo4j_connection,
-            "get_aspects",
-            {"entity_type": "metric", "entity_name": "total_arr_usd", "domain_name": DOMAIN_NAME},
-        )
-    )
-
-    assert len(data) >= 1
-    assert any(a["aspect_type"] == "ai_context" for a in data)
-
-
-def test_get_aspects_for_domain(neo4j_connection, osi_loaded_graph):
-    """get_aspects resolves a domain by name and returns its aspects."""
-    data = asyncio.run(
-        _call_tool(
-            neo4j_connection,
-            "get_aspects",
-            {"entity_type": "domain", "entity_name": DOMAIN_NAME},
-        )
-    )
-
-    assert any(a["aspect_type"] == "ai_context" for a in data)
 
 
 def test_table_search_surfaces_osi_aspects_and_expressions(neo4j_connection, osi_loaded_graph):

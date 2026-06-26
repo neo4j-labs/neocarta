@@ -158,6 +158,10 @@ class DomainJoinContext(BaseModel):
     to_columns: list[str] = Field(
         default=[], description="Ordered column names on the 'to' side of the join"
     )
+    aspects: list[AspectContext] = Field(
+        default=[],
+        description="OSI aspects (ai_context / custom_extensions) attached to the join",
+    )
 
 
 class DomainContext(BaseModel):

@@ -20,7 +20,7 @@ from .hybrid_search import (
     get_context_by_table_hybrid_search_cypher,
 )
 from .osi_catalog import list_domains_cypher, list_metrics_by_domain_cypher
-from .osi_definitions import get_aspects_cypher, get_metric_expression_cypher
+from .osi_definitions import get_metric_expression_cypher
 from .osi_domain import get_domain_context_cypher
 from .osi_metric_search import (
     get_context_by_metric_business_term_hybrid_search_cypher,
@@ -35,7 +35,6 @@ from .vector_search import (
 )
 
 __all__ = [
-    "get_aspects_cypher",
     "get_context_by_column_business_term_hybrid_search_cypher",
     "get_context_by_column_full_text_search_cypher",
     "get_context_by_column_hybrid_search_cypher",
