@@ -48,6 +48,8 @@ WITH
         column_name: col.name,
         column_description: col.description,
         data_type: col.type,
+        label: col.label,
+        is_time_dimension: col.is_time_dimension,
         examples: exampleValues,
         key_type: CASE
             WHEN col.is_primary_key THEN "primary"
@@ -55,7 +57,23 @@ WITH
             ELSE null
         END,
         nullable: col.nullable,
-        references: refs
+        references: refs,
+        expressions: COLLECT {
+            MATCH (col)-[:HAS_EXPRESSION]->(e:Expression)
+            RETURN {dialect: e.dialect, expression: e.expression}
+        },
+        aspects: COLLECT {
+            MATCH (col)-[:HAS_ASPECT]->(a:Aspect)
+            RETURN {
+                aspect_type: CASE
+                    WHEN a:OsiAiContext THEN "ai_context"
+                    WHEN a:OsiCustomExtensions THEN "custom_extensions"
+                    ELSE "unknown"
+                END,
+                data: a.data,
+                vendor_name: a.vendor_name
+            }
+        }
   }) AS columns,
   tableScore
 
@@ -69,6 +87,19 @@ RETURN {
     schema_name: schema.name,
     columns: columns,
     num_columns: size(columns),
+    primary_key: coalesce(table.primary_key, []),
+    aspects: COLLECT {
+        MATCH (table)-[:HAS_ASPECT]->(a:Aspect)
+        RETURN {
+            aspect_type: CASE
+                WHEN a:OsiAiContext THEN "ai_context"
+                WHEN a:OsiCustomExtensions THEN "custom_extensions"
+                ELSE "unknown"
+            END,
+            data: a.data,
+            vendor_name: a.vendor_name
+        }
+    },
     table_score: tableScore
 } AS result
 ORDER BY tableScore DESC
@@ -120,6 +151,8 @@ WITH
         column_name: col.name,
         column_description: col.description,
         data_type: col.type,
+        label: col.label,
+        is_time_dimension: col.is_time_dimension,
         examples: exampleValues,
         key_type: CASE
             WHEN col.is_primary_key THEN "primary"
@@ -127,7 +160,23 @@ WITH
         ELSE null
         END,
         nullable: col.nullable,
-        references: refs
+        references: refs,
+        expressions: COLLECT {
+            MATCH (col)-[:HAS_EXPRESSION]->(e:Expression)
+            RETURN {dialect: e.dialect, expression: e.expression}
+        },
+        aspects: COLLECT {
+            MATCH (col)-[:HAS_ASPECT]->(a:Aspect)
+            RETURN {
+                aspect_type: CASE
+                    WHEN a:OsiAiContext THEN "ai_context"
+                    WHEN a:OsiCustomExtensions THEN "custom_extensions"
+                    ELSE "unknown"
+                END,
+                data: a.data,
+                vendor_name: a.vendor_name
+            }
+        }
   }) AS columns,
   AVG(score) AS columnAvgScore
 
@@ -141,6 +190,19 @@ RETURN {
     schema_name: schema.name,
     columns: columns,
     num_columns: size(columns),
+    primary_key: coalesce(table.primary_key, []),
+    aspects: COLLECT {
+        MATCH (table)-[:HAS_ASPECT]->(a:Aspect)
+        RETURN {
+            aspect_type: CASE
+                WHEN a:OsiAiContext THEN "ai_context"
+                WHEN a:OsiCustomExtensions THEN "custom_extensions"
+                ELSE "unknown"
+            END,
+            data: a.data,
+            vendor_name: a.vendor_name
+        }
+    },
     column_avg_score: columnAvgScore
 } AS result
 ORDER BY columnAvgScore DESC
