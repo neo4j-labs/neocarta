@@ -244,6 +244,27 @@ ON CREATE semantics, or node types the base loader doesn't cover.
   inside an `ingest/` or `export/` sub-folder.
 - They subclass `Neo4jRDBMSLoader`; they do not reimplement it.
 
+## 8b. Search entry points — index requirements
+
+A **search entry point** is any node label that a user or agent searches to enter
+the graph — the targets of the MCP full-text / vector / hybrid /
+business-term-bridged search tools. Today these are `Table`, `Column`, `Metric`,
+and `BusinessTerm`. The defining property is that the node carries
+human-meaningful `name` / `description` text and the MCP search tiers are keyed
+on its label.
+
+**For every node label your connector treats as a search entry point, the loader
+must create at load time:**
+
+1. A **name range index** (exact-equality lookups), and
+2. A **full-text index** (`create_full_text_index`), mirroring how the base
+   `Neo4jRDBMSLoader` does for `Table` / `Column` / `BusinessTerm`.
+
+**Override hazard:** if you subclass `Neo4jRDBMSLoader` and override a node
+loader (e.g. `load_osi_table_nodes`), you inherit the responsibility to recreate
+the indexes the base method created. Overriding silently drops them otherwise,
+leaving MCP search tiers unregistered for that label.
+
 ## 9. Cache and lifecycle
 
 Internal cached state on the extractor and transformer is **not part of the public
