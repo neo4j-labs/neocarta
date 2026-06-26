@@ -47,6 +47,8 @@ The CLI reads configuration from environment variables (and a `.env` file in the
 
 Secrets are env-only and never logged.
 
+The Neo4j connection settings can also be set per-command with the `--neo4j-uri`, `--neo4j-username`, and `--neo4j-database` flags (available on every connector command), which take priority over `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_DATABASE`. The password is the exception: it is read only from `NEO4J_PASSWORD`, never a flag, so the secret stays out of shell history and the process list.
+
 ## Global flags
 
 | Flag | Meaning |

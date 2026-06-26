@@ -19,10 +19,12 @@ from ..errors import CLIError, cli_error_from
 from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
+    _apply_neo4j_overrides,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
     _run_embeddings,
+    neo4j_options,
 )
 
 
@@ -73,6 +75,7 @@ def osi() -> None:
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def osi_ingest(
     ctx: click.Context,
@@ -84,6 +87,9 @@ def osi_ingest(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Ingest an OSI YAML semantic model into the Neo4j semantic graph.
 
@@ -97,6 +103,12 @@ def osi_ingest(
     --spec-source flag or the OSI_SPEC_SOURCE env var.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     spec_source = require(
         "--spec-source",
         resolve(spec_source, settings.osi_spec_source),
@@ -200,6 +212,7 @@ def osi_ingest(
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def osi_export(
     ctx: click.Context,
@@ -208,6 +221,9 @@ def osi_export(
     output_path: str | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Export an OSI semantic model from Neo4j to an OSI YAML file.
 
@@ -220,6 +236,12 @@ def osi_export(
     not_found error (exit code 3).
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     semantic_model_name = require(
         "--semantic-model-name",
         resolve(semantic_model_name, settings.osi_semantic_model_name),

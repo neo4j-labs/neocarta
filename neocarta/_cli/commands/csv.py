@@ -16,10 +16,12 @@ from ..errors import cli_error_from
 from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
+    _apply_neo4j_overrides,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
     _run_embeddings,
+    neo4j_options,
 )
 
 
@@ -70,6 +72,7 @@ def csv() -> None:
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def csv_ingest(
     ctx: click.Context,
@@ -81,6 +84,9 @@ def csv_ingest(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Ingest metadata from CSV files into the Neo4j semantic graph.
 
@@ -93,6 +99,12 @@ def csv_ingest(
     from the --csv-directory flag or the CSV_DIRECTORY env var.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     csv_directory = require(
         "--csv-directory",
         resolve(csv_directory, settings.csv_directory),

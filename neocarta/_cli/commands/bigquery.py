@@ -18,10 +18,12 @@ from ..errors import cli_error_from
 from ..output import cli_status, emit_json
 from ._common import (
     DEFAULT_SCHEMA_NODE_LABELS,
+    _apply_neo4j_overrides,
     _build_embedder,
     _neo4j_driver,
     _require_neo4j_settings,
     _run_embeddings,
+    neo4j_options,
 )
 
 
@@ -73,6 +75,7 @@ def bigquery() -> None:
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def bigquery_schema(
     ctx: click.Context,
@@ -85,6 +88,9 @@ def bigquery_schema(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Extract BigQuery schema metadata into the Neo4j semantic graph.
 
@@ -96,6 +102,12 @@ def bigquery_schema(
     BIGQUERY_DATASET_ID env vars.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     project_id = require(
         "--project-id",
         resolve(project_id, settings.gcp_project_id),
@@ -248,6 +260,7 @@ def bigquery_schema(
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def bigquery_logs(
     ctx: click.Context,
@@ -265,6 +278,9 @@ def bigquery_logs(
     embedding_batch_size: int | None,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Extract BigQuery query logs from INFORMATION_SCHEMA.JOBS_BY_PROJECT.
 
@@ -276,6 +292,12 @@ def bigquery_logs(
     BIGQUERY_DATASET_ID env vars.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     project_id = require(
         "--project-id",
         resolve(project_id, settings.gcp_project_id),

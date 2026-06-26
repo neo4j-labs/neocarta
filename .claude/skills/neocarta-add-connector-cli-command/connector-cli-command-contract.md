@@ -76,6 +76,10 @@ call (both kept alphabetical). **The driver does this wiring for you.**
 Every verb body runs the same spine (see `csv.py:csv_ingest`):
 
 1. `settings = load_settings()` — env + `.env`, lowest priority after flags.
+1a. `_apply_neo4j_overrides(settings, neo4j_uri=..., neo4j_username=...,
+   neo4j_database=...)` — folds the shared `--neo4j-*` flags (added by the
+   `@neo4j_options` decorator) onto `settings` so they override the env. The
+   Neo4j password stays env-only (`NEO4J_PASSWORD`), never a flag.
 2. `require(...)` / `resolve(...)` for each required input. `resolve(flag,
    fallback)` prefers the flag; `require(name, value, env_var=...)` raises a
    `usage_error` `CLIError` (exit 2) with a fix-it suggestion when empty.
@@ -99,7 +103,8 @@ Every verb body runs the same spine (see `csv.py:csv_ingest`):
 
 Shared helpers live in
 [neocarta/_cli/commands/_common.py](neocarta/_cli/commands/_common.py):
-`_require_neo4j_settings`, `_neo4j_driver`, `_build_embedder`, `_run_embeddings`,
+`neo4j_options`, `_apply_neo4j_overrides`, `_require_neo4j_settings`,
+`_neo4j_driver`, `_build_embedder`, `_run_embeddings`,
 `DEFAULT_SCHEMA_NODE_LABELS`. Reuse them — never reimplement the driver lifecycle
 or unwrap the Neo4j password into a named local variable.
 
@@ -140,6 +145,11 @@ synonym (`--output json`, `--max`, etc. are banned):
   `--embedding-dimensions` (`type=int, default=None`).
 - `--dry-run` (`is_flag`, `default=False`).
 - `--json` (dest `json_flag`, `is_flag`) — local mirror of the top-level flag.
+- `@neo4j_options` (above `@click.pass_context`) adds the shared `--neo4j-uri` /
+  `--neo4j-username` / `--neo4j-database` overrides; the handler takes the
+  matching `neo4j_uri` / `neo4j_username` / `neo4j_database` keyword-only params
+  and passes them to `_apply_neo4j_overrides` (step 1a). No `--neo4j-password`
+  flag — the password is env-only.
 - `@click.pass_context`; the handler takes `ctx` then **keyword-only** options.
 
 ## 6. Config — `config.py`
