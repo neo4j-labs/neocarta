@@ -24,7 +24,9 @@ _MIXED_POLICIES = [
 
 
 def test_cache_has_one_row_per_value_plus_value_less_tag(extractor_with_cache):
-    df = extractor_with_cache._tag_policy_info
+    # The flattened frame is the return value of extract_tag_policies (source already
+    # resolved by the fixture's extract()); it is not retained on the instance.
+    df = extractor_with_cache.extract_tag_policies()
     # department(3) + cost_center(2) + free_form(1 null value) = 6; system tag excluded.
     assert len(df) == 6
     assert "system.certification_status" not in set(df["tag_key"])

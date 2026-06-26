@@ -87,7 +87,6 @@ class DatabricksTagsExtractor:
             tuple(system_prefixes) if system_prefixes is not None else DEFAULT_SYSTEM_PREFIXES
         )
 
-        self._tag_policy_info: pd.DataFrame = pd.DataFrame(columns=_CACHE_COLS)
         # Projections are computed once at the end of extract_tag_policies (a second
         # extract() recomputes them); the properties just return the cached frames.
         self._tag_key_info: pd.DataFrame = pd.DataFrame(columns=_KEY_COLS)
@@ -200,9 +199,9 @@ class DatabricksTagsExtractor:
             raise self._wrap_sdk_error(exc) from exc
 
         df = pd.DataFrame(records, columns=_CACHE_COLS)
-        self._tag_policy_info = df
         # Build the dedup projections once here (source is resolved before this runs);
-        # a re-extract recomputes them, keeping the per-access path free.
+        # a re-extract recomputes them, keeping the per-access path free. The flattened
+        # frame itself is not retained — only the two projections are consumed downstream.
         self._tag_key_info = self._build_tag_key_info(df)
         self._tag_value_info = self._build_tag_value_info(df)
         return df
