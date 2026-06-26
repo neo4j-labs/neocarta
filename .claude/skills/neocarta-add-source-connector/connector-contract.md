@@ -113,6 +113,16 @@ class FooConnector:
 
     def run(self, ...) -> None:
         """Deprecated shim — emits DeprecationWarning, delegates to ingest()."""
+
+    # Context-manager support (all connectors)
+    def close(self) -> None:
+        """Release resources the connector owns (NOT the injected driver)."""
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """Release owned resources on context-manager exit."""
 ```
 
 Format connector (ingest + export) adds:
@@ -267,6 +277,27 @@ API**. Users interact only through the connector's stage methods.
   `_extracted`).
 - `.ingest()` / `.export()` are end-to-end runs; calling them N times against the
   same instance equals N independent runs against the same Neo4j / file target.
+
+## 9b. Context-manager lifecycle
+
+All connectors support the context-manager protocol:
+
+```python
+with FooConnector(neo4j_driver=driver) as connector:
+    connector.ingest(...)
+# connector-owned resources (e.g. an HTTP client) are released; `driver` stays open
+```
+
+- `.close()` releases only resources the connector **created and owns** (e.g. an
+  HTTP client it built). The Neo4j driver is **injected by the caller**, so the
+  caller owns its lifecycle and `.close()` must **not** close it — closing a
+  borrowed driver would break callers that share one driver across connectors or
+  reuse it after the `with` block. Connectors that own no extra resources (those
+  that only hold the injected driver) have a no-op `.close()`.
+- `.__enter__()` returns `self`.
+- `.__exit__()` delegates to `.close()` unconditionally.
+- A connector that constructs its own client (see the Unity Catalog connector,
+  which builds an `httpx.Client`) overrides `.close()` to release it.
 
 ## 10. Cross-cutting orchestrator behavior
 

@@ -137,6 +137,8 @@ class BigQuerySchemaTransformer:
                 id=generate_database_id(row.project_id),
                 name=row.project_id,
                 description=None,
+                platform="GCP",
+                service="BIGQUERY",
             )
             for _, row in database_info.iterrows()
         ]

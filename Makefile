@@ -72,6 +72,7 @@ refresh-mermaid-data-model-images:
 	mmdc -i assets/mermaid/data_model/query-log-data-model-1.mmd -o assets/images/data_model/query-log-data-model-1.png --scale 2 --backgroundColor transparent
 	mmdc -i assets/mermaid/data_model/table-views-data-model-1.mmd -o assets/images/data_model/table-views-data-model-1.png --scale 2 --backgroundColor transparent
 	mmdc -i assets/mermaid/data_model/osi-data-model-1.mmd -o assets/images/data_model/osi-data-model-1.png --scale 2 --backgroundColor transparent
+	mmdc -i assets/mermaid/data_model/governance-data-model-1.mmd -o assets/images/data_model/governance-data-model-1.png --scale 2 --backgroundColor transparent
 
 refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-connector-architecture.mmd -o assets/images/architecture/bigquery-connector-architecture.png
@@ -80,7 +81,8 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/agent-architecture.mmd -o assets/images/architecture/agent-architecture.png
 	mmdc -i assets/mermaid/architecture/dataplex-connector-architecture.mmd -o assets/images/architecture/dataplex-connector-architecture.png
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
-	
+	mmdc -i assets/mermaid/architecture/quickstart-flow.mmd -o assets/images/architecture/quickstart-flow.png --scale 2 --backgroundColor transparent
+
 test-unit:
 	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent
 

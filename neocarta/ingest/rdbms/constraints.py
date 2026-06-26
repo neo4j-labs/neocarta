@@ -47,6 +47,31 @@ FOR (c:Category) REQUIRE c.id IS UNIQUE;
 
 category_id_key_constraint = category_id_unique_constraint.replace("UNIQUE", "NODE KEY")
 
+governance_tag_key_id_unique_constraint = """
+CREATE CONSTRAINT governance_tag_key_id_constraint IF NOT EXISTS
+FOR (k:GovernanceTagKey) REQUIRE k.id IS UNIQUE;
+"""
+
+governance_tag_key_id_key_constraint = governance_tag_key_id_unique_constraint.replace(
+    "UNIQUE", "NODE KEY"
+)
+
+governance_tag_value_id_unique_constraint = """
+CREATE CONSTRAINT governance_tag_value_id_constraint IF NOT EXISTS
+FOR (v:GovernanceTagValue) REQUIRE v.id IS UNIQUE;
+"""
+
+governance_tag_value_id_key_constraint = governance_tag_value_id_unique_constraint.replace(
+    "UNIQUE", "NODE KEY"
+)
+
+governance_tag_id_unique_constraint = """
+CREATE CONSTRAINT governance_tag_id_constraint IF NOT EXISTS
+FOR (g:GovernanceTag) REQUIRE g.id IS UNIQUE;
+"""
+
+governance_tag_id_key_constraint = governance_tag_id_unique_constraint.replace("UNIQUE", "NODE KEY")
+
 query_id_unique_constraint = """
 CREATE CONSTRAINT query_id_constraint IF NOT EXISTS
 FOR (q:Query) REQUIRE q.id IS UNIQUE;
@@ -100,6 +125,9 @@ UNIQUE_CONSTRAINTS_LOOKUP = {
     NodeLabel.GLOSSARY: glossary_id_unique_constraint,
     NodeLabel.CATEGORY: category_id_unique_constraint,
     NodeLabel.BUSINESS_TERM: business_term_id_unique_constraint,
+    NodeLabel.GOVERNANCE_TAG_KEY: governance_tag_key_id_unique_constraint,
+    NodeLabel.GOVERNANCE_TAG_VALUE: governance_tag_value_id_unique_constraint,
+    NodeLabel.GOVERNANCE_TAG: governance_tag_id_unique_constraint,
     NodeLabel.QUERY: query_id_unique_constraint,
     NodeLabel.CTE: cte_id_unique_constraint,
     NodeLabel.DOMAIN: domain_id_unique_constraint,
@@ -118,6 +146,9 @@ KEY_CONSTRAINTS_LOOKUP = {
     NodeLabel.GLOSSARY: glossary_id_key_constraint,
     NodeLabel.CATEGORY: category_id_key_constraint,
     NodeLabel.BUSINESS_TERM: business_term_id_key_constraint,
+    NodeLabel.GOVERNANCE_TAG_KEY: governance_tag_key_id_key_constraint,
+    NodeLabel.GOVERNANCE_TAG_VALUE: governance_tag_value_id_key_constraint,
+    NodeLabel.GOVERNANCE_TAG: governance_tag_id_key_constraint,
     NodeLabel.QUERY: query_id_key_constraint,
     NodeLabel.CTE: cte_id_key_constraint,
     NodeLabel.DOMAIN: domain_id_key_constraint,

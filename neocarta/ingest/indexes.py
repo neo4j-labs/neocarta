@@ -19,7 +19,9 @@ def create_vector_index(
     neo4j_driver: Driver
         The Neo4j driver to use.
     node_label: str
-        The label of the node to create a vector index for. Must be one of: Database, Schema, Table, Column.
+        The label of the node to create a vector index for. Any label whose nodes carry an
+        ``embedding`` property (e.g. Database, Schema, Table, Column, BusinessTerm,
+        GovernanceTagKey, or the OSI search labels).
     dimensions: int
         The dimensions of the vector index. Must be an integer greater than 0.
     database_name: str

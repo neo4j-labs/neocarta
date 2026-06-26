@@ -11,11 +11,13 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING
 
+import click
+
 from ...enums import NodeLabel
-from ..config import require, require_secret
+from ..config import require, require_secret, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from neo4j import Driver
 
@@ -29,6 +31,55 @@ DEFAULT_SCHEMA_NODE_LABELS = (
     NodeLabel.TABLE,
     NodeLabel.COLUMN,
 )
+
+
+def neo4j_options(func: Callable) -> Callable:
+    """Attach the shared ``--neo4j-*`` connection-override options to a command.
+
+    Adds ``--neo4j-uri``, ``--neo4j-username``, and ``--neo4j-database`` so the
+    NEO4J_URI / NEO4J_USERNAME / NEO4J_DATABASE env vars can be overridden per
+    invocation. Pair this decorator with :func:`_apply_neo4j_overrides`, which
+    folds the supplied flag values onto the settings object (flag > env >
+    default).
+
+    The password is intentionally **not** a flag: it is read only from
+    NEO4J_PASSWORD, so the raw secret never lands in a named local variable,
+    shell history, or the process list — mirroring the JDBC_PASSWORD discipline.
+    """
+    func = click.option(
+        "--neo4j-database",
+        default=None,
+        help="Neo4j database name (default: neo4j). Overrides NEO4J_DATABASE.",
+    )(func)
+    func = click.option(
+        "--neo4j-username",
+        default=None,
+        help="Neo4j username. Overrides NEO4J_USERNAME.",
+    )(func)
+    return click.option(
+        "--neo4j-uri",
+        default=None,
+        help="Neo4j Bolt URI. Overrides NEO4J_URI.",
+    )(func)
+
+
+def _apply_neo4j_overrides(
+    settings: CLISettings,
+    *,
+    neo4j_uri: str | None = None,
+    neo4j_username: str | None = None,
+    neo4j_database: str | None = None,
+) -> None:
+    """Fold ``--neo4j-*`` flag values onto ``settings`` in place.
+
+    A ``None`` override means "flag not supplied", leaving the env-derived value
+    (or built-in default) untouched, so the resolution order stays flag > env >
+    default. The password is deliberately absent — it is only ever read from
+    NEO4J_PASSWORD (see :func:`neo4j_options`).
+    """
+    settings.neo4j_uri = resolve(neo4j_uri, settings.neo4j_uri)
+    settings.neo4j_username = resolve(neo4j_username, settings.neo4j_username)
+    settings.neo4j_database = resolve(neo4j_database, settings.neo4j_database)
 
 
 def _require_neo4j_settings(settings: CLISettings) -> None:

@@ -20,7 +20,7 @@ from ...errors import NeocartaError
 from ..config import load_settings, require, resolve
 from ..errors import CLIError, cli_error_from
 from ..output import cli_status, emit_json
-from ._common import _neo4j_driver, _require_neo4j_settings
+from ._common import _apply_neo4j_overrides, _neo4j_driver, _require_neo4j_settings, neo4j_options
 
 
 @click.group("query-log")
@@ -52,6 +52,7 @@ def query_log() -> None:
     default=False,
     help="Emit JSON on stdout. Also accepted as a top-level flag.",
 )
+@neo4j_options
 @click.pass_context
 def query_log_ingest(
     ctx: click.Context,
@@ -60,6 +61,9 @@ def query_log_ingest(
     source: str,
     dry_run: bool,
     json_flag: bool,
+    neo4j_uri: str | None,
+    neo4j_username: str | None,
+    neo4j_database: str | None,
 ) -> None:
     """Parse a local query-log file into the Neo4j semantic graph.
 
@@ -71,6 +75,12 @@ def query_log_ingest(
     embeddings are generated: query-log nodes carry no descriptions to embed.
     """
     settings = load_settings()
+    _apply_neo4j_overrides(
+        settings,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_database=neo4j_database,
+    )
     query_log_file = require(
         "--query-log-file",
         resolve(query_log_file, settings.query_log_file),
