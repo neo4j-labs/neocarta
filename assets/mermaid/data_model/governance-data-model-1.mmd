@@ -1,0 +1,28 @@
+---
+config:
+    layout: elk
+---
+graph LR
+%% Nodes
+GovernanceTagKey("GovernanceTagKey<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+GovernanceTagValue("GovernanceTagValue<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING")
+GovernanceTag("GovernanceTag<br/>id: STRING<br/>key: STRING<br/>value: STRING")
+TaggedEntity("Column|Table|Schema")
+
+%% Relationships
+GovernanceTagKey -->|HAS_VALUE_OPTION| GovernanceTagValue
+TaggedEntity -->|TAGGED_WITH| GovernanceTag
+GovernanceTag -->|HAS_DEFINITION| GovernanceTagValue
+
+%% Styling
+classDef node_0_color fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000,font-size:12px
+class GovernanceTagKey node_0_color
+
+classDef node_1_color fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000,font-size:12px
+class GovernanceTagValue node_1_color
+
+classDef node_2_color fill:#fce4ec,stroke:#c2185b,stroke-width:3px,color:#000,font-size:12px
+class GovernanceTag node_2_color
+
+classDef node_3_color fill:#fff9c4,stroke:#f57f17,stroke-width:3px,color:#000,font-size:12px
+class TaggedEntity node_3_color

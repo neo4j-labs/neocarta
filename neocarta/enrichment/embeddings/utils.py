@@ -28,7 +28,8 @@ def get_nodes_to_embed(
     neo4j_driver: Driver
         The Neo4j driver to use.
     node_label: str
-        The label of the node to embed. Must be one of: Database, Table, Column.
+        The label of the node to embed. Any label whose nodes carry a ``description`` property
+        (e.g. Database, Schema, Table, Column, BusinessTerm, GovernanceTagKey, or the OSI labels).
     min_length: int
         The minimum length of the description to embed. Must be greater than 0.
     database_name: str
@@ -220,7 +221,8 @@ def write_embeddings_to_graph(
         A Pandas DataFrame where each row represents a node.
         Has columns `id`, and `embedding`.
     node_label: str
-        The label of the node to write embeddings to. Must be one of: Database, Table, Column.
+        The label of the node to write embeddings to. Any label whose nodes carry a ``description``
+        property (e.g. Database, Schema, Table, Column, BusinessTerm, GovernanceTagKey, or OSI labels).
     neo4j_driver: Driver
         The Neo4j driver to use.
     database_name: str

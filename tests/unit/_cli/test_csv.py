@@ -35,8 +35,32 @@ def test_ingest_help_documents_key_flags():
         "--embedding-dimensions",
         "--embedding-batch-size",
         "--dry-run",
+        "--neo4j-uri",
+        "--neo4j-username",
+        "--neo4j-database",
     ):
         assert token in output, f"--help should document {token}"
+    # The password is intentionally never a CLI flag (env-only, per #222).
+    assert "--neo4j-password" not in output
+
+
+def test_ingest_dry_run_reflects_neo4j_database_override():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "--json",
+            "csv",
+            "ingest",
+            "--csv-directory",
+            "datasets/csv",
+            "--neo4j-database",
+            "override_db",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["csv_ingest"]["database"] == "override_db"
 
 
 def test_ingest_dry_run_emits_json_and_skips_clients():
@@ -125,6 +149,49 @@ def test_ingest_success_emits_json():
     payload = json.loads(out[out.index("{") :])
     assert payload["csv_ingest"]["status"] == "succeeded"
     assert payload["csv_ingest"]["embeddings"] is False
+
+
+def test_ingest_neo4j_flags_satisfy_requirement_without_env(monkeypatch):
+    # Reproduces #222: with NEO4J_URI / NEO4J_USERNAME absent from the env, the
+    # --neo4j-* flags alone must satisfy _require_neo4j_settings (the password
+    # stays env-only) and the override database must reach the connector.
+    monkeypatch.setattr("neocarta._cli.config.load_dotenv", lambda *_a, **_kw: None)
+    monkeypatch.delenv("NEO4J_URI", raising=False)
+    monkeypatch.delenv("NEO4J_USERNAME", raising=False)
+    monkeypatch.delenv("NEO4J_DATABASE", raising=False)
+    monkeypatch.setenv("NEO4J_PASSWORD", "password")
+    monkeypatch.setenv("CSV_DIRECTORY", "datasets/csv")
+
+    runner = CliRunner()
+    with (
+        patch("neocarta._cli.commands.csv._neo4j_driver") as mock_driver_ctx,
+        patch("neocarta.connectors.csv.CSVConnector", return_value=MagicMock()) as mock_connector,
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+
+        result = runner.invoke(
+            cli,
+            [
+                "--json",
+                "csv",
+                "ingest",
+                "--neo4j-uri",
+                "bolt://flag-host:7687",
+                "--neo4j-username",
+                "flag_user",
+                "--neo4j-database",
+                "flag_db",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    out = result.output
+    payload = json.loads(out[out.index("{") :])
+    assert payload["csv_ingest"]["status"] == "succeeded"
+    assert payload["csv_ingest"]["database"] == "flag_db"
+    # The override database is threaded into the connector, not just the envelope.
+    assert mock_connector.call_args.kwargs["database_name"] == "flag_db"
 
 
 @pytest.mark.parametrize(

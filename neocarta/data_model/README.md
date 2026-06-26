@@ -13,6 +13,7 @@ structural layer is partitioned by source database type.
 | [`metadata/`](./metadata/README.md) | Graph-level bookkeeping (the `NeocartaGraph` singleton) |
 | [`schema/`](./schema/README.md) | Structural metadata — partitioned into [`rdbms/`](./schema/rdbms/README.md) and [`lpg/`](./schema/lpg/README.md) |
 | [`glossary/`](./glossary/README.md) | Business terminology (glossaries, categories, business terms, tagging) |
+| [`governance/`](./governance/README.md) | Vendor-neutral governance tags (tag keys, allowed values, assignments) |
 | [`instance/`](./instance/README.md) | Instance-level data values (`Value` nodes) |
 | [`query/`](./query/README.md) | Cached SQL queries, CTEs, and parsed table/column usage |
 | [`osi/`](./osi/README.md) | Open Semantic Interchange (OSI) semantic-model components |
