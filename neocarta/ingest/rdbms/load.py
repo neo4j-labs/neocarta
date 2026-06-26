@@ -13,6 +13,14 @@ from ...data_model.glossary import (
     HasCategory,
     TaggedWith,
 )
+from ...data_model.governance import (
+    GovernanceTag,
+    GovernanceTagKey,
+    GovernanceTagValue,
+    HasDefinition,
+    HasValueOption,
+    TaggedWithGovernanceTag,
+)
 from ...data_model.instance import HasValue, Value
 from ...data_model.metadata import NeocartaGraph
 from ...data_model.query import CTE, Defines, Query, UsesColumn, UsesTable
@@ -524,6 +532,229 @@ class Neo4jRDBMSLoader:
             [n.model_dump() for n in tagged_with_relationships],
             pattern=_relationship_pattern(
                 RelationshipType.TAGGED_WITH, NodeLabel.TABLE, NodeLabel.BUSINESS_TERM
+            ),
+        )
+
+    def load_governance_tag_key_nodes(
+        self,
+        governance_tag_key_nodes: list[GovernanceTagKey],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = ["name", "description"],
+        create_full_text_index: bool = True,
+        create_name_index: bool = True,
+    ) -> dict:
+        """Load GovernanceTagKey nodes into Neo4j.
+
+        The full-text index over (name, description) makes the tag key the
+        agent-searchable surface for the governance layer.
+        """
+        _validate_properties_list(GovernanceTagKey, properties_list)
+
+        self._write_node_constraint(node_labels=[NodeLabel.GOVERNANCE_TAG_KEY])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.GOVERNANCE_TAG_KEY)
+        if create_full_text_index:
+            self._create_full_text_index(node_labels=[NodeLabel.GOVERNANCE_TAG_KEY])
+        query = _build_node_ingest_query(
+            NodeLabel.GOVERNANCE_TAG_KEY, overwrite_existing, properties_list
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in governance_tag_key_nodes],
+            pattern=_node_pattern(NodeLabel.GOVERNANCE_TAG_KEY),
+        )
+
+    def load_governance_tag_value_nodes(
+        self,
+        governance_tag_value_nodes: list[GovernanceTagValue],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = ["name"],
+        create_name_index: bool = True,
+    ) -> dict:
+        """Load GovernanceTagValue nodes into Neo4j.
+
+        Defaults to name-only: governance-tag values carry no description on most
+        platforms (Databricks/Snowflake), so the connector writes ``name`` alone.
+        Pass ``properties_list=["name", "description"]`` for a source (e.g. GCP)
+        whose values do carry descriptions.
+        """
+        _validate_properties_list(GovernanceTagValue, properties_list)
+
+        self._write_node_constraint(node_labels=[NodeLabel.GOVERNANCE_TAG_VALUE])
+        if create_name_index:
+            self._create_name_range_index(node_label=NodeLabel.GOVERNANCE_TAG_VALUE)
+        query = _build_node_ingest_query(
+            NodeLabel.GOVERNANCE_TAG_VALUE, overwrite_existing, properties_list
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in governance_tag_value_nodes],
+            pattern=_node_pattern(NodeLabel.GOVERNANCE_TAG_VALUE),
+        )
+
+    def load_governance_tag_nodes(
+        self,
+        governance_tag_nodes: list[GovernanceTag],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = ["key", "value"],
+    ) -> dict:
+        """Load GovernanceTag (assignment) nodes into Neo4j."""
+        _validate_properties_list(GovernanceTag, properties_list)
+
+        self._write_node_constraint(node_labels=[NodeLabel.GOVERNANCE_TAG])
+        query = _build_node_ingest_query(
+            NodeLabel.GOVERNANCE_TAG, overwrite_existing, properties_list
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in governance_tag_nodes],
+            pattern=_node_pattern(NodeLabel.GOVERNANCE_TAG),
+        )
+
+    def load_has_value_option_relationships(
+        self,
+        has_value_option_relationships: list[HasValueOption],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:GovernanceTagKey)-[:HAS_VALUE_OPTION]->(:GovernanceTagValue) relationships."""
+        if properties_list:
+            _validate_properties_list(HasValueOption, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.HAS_VALUE_OPTION,
+            NodeLabel.GOVERNANCE_TAG_KEY,
+            NodeLabel.GOVERNANCE_TAG_VALUE,
+            "governance_tag_key_id",
+            "governance_tag_value_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_value_option_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_VALUE_OPTION,
+                NodeLabel.GOVERNANCE_TAG_KEY,
+                NodeLabel.GOVERNANCE_TAG_VALUE,
+            ),
+        )
+
+    def load_has_definition_relationships(
+        self,
+        has_definition_relationships: list[HasDefinition],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:GovernanceTag)-[:HAS_DEFINITION]->(:GovernanceTagValue) relationships."""
+        if properties_list:
+            _validate_properties_list(HasDefinition, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.HAS_DEFINITION,
+            NodeLabel.GOVERNANCE_TAG,
+            NodeLabel.GOVERNANCE_TAG_VALUE,
+            "governance_tag_id",
+            "governance_tag_value_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in has_definition_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.HAS_DEFINITION,
+                NodeLabel.GOVERNANCE_TAG,
+                NodeLabel.GOVERNANCE_TAG_VALUE,
+            ),
+        )
+
+    def load_column_tagged_with_governance_tag_relationships(
+        self,
+        tagged_with_relationships: list[TaggedWithGovernanceTag],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:Column)-[:TAGGED_WITH]->(:GovernanceTag) relationships into Neo4j."""
+        if properties_list:
+            _validate_properties_list(TaggedWithGovernanceTag, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.TAGGED_WITH,
+            NodeLabel.COLUMN,
+            NodeLabel.GOVERNANCE_TAG,
+            "source_id",
+            "governance_tag_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in tagged_with_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.TAGGED_WITH, NodeLabel.COLUMN, NodeLabel.GOVERNANCE_TAG
+            ),
+        )
+
+    def load_table_tagged_with_governance_tag_relationships(
+        self,
+        tagged_with_relationships: list[TaggedWithGovernanceTag],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:Table)-[:TAGGED_WITH]->(:GovernanceTag) relationships into Neo4j."""
+        if properties_list:
+            _validate_properties_list(TaggedWithGovernanceTag, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.TAGGED_WITH,
+            NodeLabel.TABLE,
+            NodeLabel.GOVERNANCE_TAG,
+            "source_id",
+            "governance_tag_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in tagged_with_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.TAGGED_WITH, NodeLabel.TABLE, NodeLabel.GOVERNANCE_TAG
+            ),
+        )
+
+    def load_schema_tagged_with_governance_tag_relationships(
+        self,
+        tagged_with_relationships: list[TaggedWithGovernanceTag],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """Load (:Schema)-[:TAGGED_WITH]->(:GovernanceTag) relationships into Neo4j."""
+        if properties_list:
+            _validate_properties_list(TaggedWithGovernanceTag, properties_list)
+
+        query = _build_relationship_ingest_query(
+            RelationshipType.TAGGED_WITH,
+            NodeLabel.SCHEMA,
+            NodeLabel.GOVERNANCE_TAG,
+            "source_id",
+            "governance_tag_id",
+            overwrite_existing,
+            properties_list,
+        )
+
+        return self._run_write(
+            query,
+            [n.model_dump() for n in tagged_with_relationships],
+            pattern=_relationship_pattern(
+                RelationshipType.TAGGED_WITH, NodeLabel.SCHEMA, NodeLabel.GOVERNANCE_TAG
             ),
         )
 

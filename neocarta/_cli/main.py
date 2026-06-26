@@ -13,6 +13,7 @@ from .._logging import configure_logging
 from .agent_context import agent_context
 from .commands.bigquery import bigquery
 from .commands.csv import csv
+from .commands.databricks import databricks
 from .commands.dataplex import dataplex
 from .commands.jdbc import jdbc
 from .commands.mcp import mcp
@@ -89,6 +90,7 @@ def cli(
 
 cli.add_command(bigquery)
 cli.add_command(csv)
+cli.add_command(databricks)
 cli.add_command(dataplex)
 cli.add_command(jdbc)
 cli.add_command(mcp)

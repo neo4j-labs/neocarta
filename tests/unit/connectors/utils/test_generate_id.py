@@ -1,4 +1,56 @@
-from neocarta.connectors.utils.generate_id import generate_value_id
+import hashlib
+
+from neocarta.connectors.utils.generate_id import (
+    generate_governance_tag_instance_id,
+    generate_governance_tag_key_id,
+    generate_governance_tag_value_id,
+    generate_value_id,
+)
+
+
+def _h(value: str) -> str:
+    return hashlib.md5(value.encode(), usedforsecurity=False).hexdigest()[:32]
+
+
+def test_governance_tag_key_id_namespaced_and_normalized():
+    assert generate_governance_tag_key_id("aws:us-west-2:abc-123", "Cost Center") == (
+        "aws:us_west_2:abc_123.cost_center"
+    )
+
+
+def test_governance_tag_value_id_namespaces_key_and_hashes_value():
+    # source/key are normalized; the value segment is md5-hashed (not normalized).
+    assert generate_governance_tag_value_id("acct", "sensitivity", "PII") == (
+        f"acct.sensitivity.{_h('PII')}"
+    )
+
+
+def test_governance_tag_value_id_keeps_case_separator_variants_distinct():
+    """Hashing the value prevents the silent collapse normalization would cause."""
+    ids = {
+        generate_governance_tag_value_id("acct", "risk", v)
+        for v in ("High Risk", "high-risk", "high_risk")
+    }
+    assert len(ids) == 3
+    # case-only variants are distinct too
+    assert generate_governance_tag_value_id("acct", "s", "PII") != (
+        generate_governance_tag_value_id("acct", "s", "pii")
+    )
+
+
+def test_governance_tag_instance_id_hashes_value_and_keeps_source_id_verbatim():
+    # source_id is a pre-built (already-normalized) object id and is NOT re-normalized;
+    # the value is hashed, mirroring generate_governance_tag_value_id.
+    assert generate_governance_tag_instance_id("proj.sales.orders.email", "sensitivity", "PII") == (
+        f"proj.sales.orders.email.sensitivity.{_h('PII')}"
+    )
+
+
+def test_governance_key_id_normalization_collapses_case_separator_variants():
+    """Documented limitation: case/separator-variant KEYS still share one id (see README)."""
+    base = generate_governance_tag_key_id("acct", "cost_center")
+    assert generate_governance_tag_key_id("acct", "Cost Center") == base
+    assert generate_governance_tag_key_id("acct", "cost-center") == base
 
 
 def test_generate_value_id_string():

@@ -42,3 +42,21 @@ class UnsupportedOsiVersionWarning(NeocartaWarning):
 
         warnings.filterwarnings("ignore", category=UnsupportedOsiVersionWarning)
     """
+
+
+class DatabricksTagsWarning(NeocartaWarning):
+    """
+    Emitted by the Databricks governance-tags connector for non-fatal soft errors.
+
+    Currently raised when the workspace's metastore id cannot be read, so the
+    governance-tag id namespace falls back to the workspace host (which is
+    workspace-scoped, while governed tags are account-level). Pass ``source=...``
+    to set the namespace explicitly and silence it.
+
+    Users can silence the warning category specifically::
+
+        import warnings
+        from neocarta.warnings import DatabricksTagsWarning
+
+        warnings.filterwarnings("ignore", category=DatabricksTagsWarning)
+    """
