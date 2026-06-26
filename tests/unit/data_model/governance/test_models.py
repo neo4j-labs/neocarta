@@ -1,6 +1,7 @@
 """Unit tests for the governance-tag data model components."""
 
 import numpy as np
+import pandas as pd
 import pytest
 from pydantic import ValidationError
 
@@ -58,7 +59,7 @@ def test_governance_tag_instance_carries_key_and_value():
     assert tag.value == "pii"
 
 
-@pytest.mark.parametrize("missing", [None, np.nan])
+@pytest.mark.parametrize("missing", [None, np.nan, pd.NA])
 def test_governance_tag_rejects_missing_key_or_value(missing):
     """key/value are required and NOT coerced — a missing tag part fails fast at
     construction. The id is built from the same (key, value), so the producer must

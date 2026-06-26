@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from neocarta.data_model.governance import (
+    GovernanceTagValue,
     HasDefinition,
     HasValueOption,
     TaggedWithGovernanceTag,
@@ -86,6 +87,16 @@ def test_tagged_with_governance_tag_loaders_columns_match_model(loader_method, l
     assert "(n2:GovernanceTag {id: row.governance_tag_id})" in q
     assert "[r:TAGGED_WITH]" in q
     assert _row_tokens(q) <= set(rel.model_dump())
+
+
+def test_governance_tag_value_node_default_is_name_only():
+    """The value-node loader defaults to name-only — values are bare on most platforms,
+    so the default must not write a NULL description (connector contract)."""
+    loader, captured = _loader_capturing()
+    loader.load_governance_tag_value_nodes([GovernanceTagValue(id="s.k.h", name="pii")])
+    merge = next(q for q in captured if q and "MERGE (n:GovernanceTagValue" in q)
+    assert "n.name = row.name" in merge
+    assert "description" not in merge
 
 
 def test_create_vector_index_for_governance_tag_key():
