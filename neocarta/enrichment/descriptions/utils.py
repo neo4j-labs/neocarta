@@ -66,6 +66,12 @@ def get_node_context(
     """
     Fetch immediate-neighbor context (and example values, for Columns) for a node.
 
+    For Schemas and Tables, the children's *generated descriptions* are
+    included alongside their names (where available) — this lets
+    higher-level descriptions be generated using the lower-level
+    descriptions already written to the graph, when nodes are processed
+    bottom-up (Column -> Table -> Schema).
+
     Parameters
     ----------
     neo4j_driver: Driver
@@ -83,9 +89,19 @@ def get_node_context(
     -------
     dict[str, Any]
         Context for the node, shape depends on node_label:
-        - Schema: {"database_name": str | None, "table_names": list[str]}
-        - Table: {"schema_name": str | None, "column_names": list[str]}
+        - Schema: {
+              "database_name": str | None,
+              "table_names": list[str],
+              "table_descriptions": list[str | None],
+          }
+        - Table: {
+              "schema_id": str | None,
+              "schema_name": str | None,
+              "column_names": list[str],
+              "column_descriptions": list[str | None],
+          }
         - Column: {
+              "table_id": str | None,
               "table_name": str | None,
               "sibling_column_names": list[str],
               "column_type": str | None,
@@ -96,26 +112,32 @@ def get_node_context(
         query = """
 MATCH (n:Schema {id: $node_id})
 OPTIONAL MATCH (db:Database)-[:HAS_SCHEMA]->(n)
-OPTIONAL MATCH (n)-[:HAS_TABLE]->(t:Table)
-RETURN db.name as database_name, collect(DISTINCT t.name) as table_names
+MATCH (n)-[:HAS_TABLE]->(t:Table)
+WITH db, collect(DISTINCT t) as tables
+RETURN db.name as database_name,
+    [x in tables | x.name] as table_names,
+    [x in tables | x.description] as table_descriptions
 """
     elif node_label == NodeLabel.TABLE:
         query = """
 MATCH (n:Table {id: $node_id})
 OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(n)
 OPTIONAL MATCH (n)-[:HAS_COLUMN]->(c:Column)
-RETURN s.name as schema_name, collect(DISTINCT c.name) as column_names
+WITH s, collect(DISTINCT c) as columns
+RETURN s.id as schema_id, s.name as schema_name,
+    [x in columns | x.name] as column_names,
+    [x in columns | x.description] as column_descriptions
 """
     elif node_label == NodeLabel.COLUMN:
         query = """
 MATCH (n:Column {id: $node_id})
-OPTIONAL MATCH (t:Table)-[:HAS_COLUMN]->(n)
+MATCH (t:Table)-[:HAS_COLUMN]->(n)
 OPTIONAL MATCH (t)-[:HAS_COLUMN]->(sibling:Column)
 WHERE sibling.id <> n.id
 OPTIONAL MATCH (n)-[:HAS_VALUE]->(v:Value)
-WITH n, t, collect(DISTINCT sibling.name) as sibling_column_names,
+WITH t, collect(DISTINCT sibling.name) as sibling_column_names,
     collect(DISTINCT v.value)[0..$max_example_values] as example_values
-RETURN t.name as table_name, sibling_column_names, n.type as column_type, example_values
+RETURN t.id as table_id, t.name as table_name, sibling_column_names, n.type as column_type, example_values
 """
     else:
         raise ConfigError(
@@ -134,6 +156,81 @@ RETURN t.name as table_name, sibling_column_names, n.type as column_type, exampl
     return results[0] if results else {}
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate (~4 chars/token) — avoids a tokenizer dependency."""
+    return max(1, len(text) // 4)
+
+
+def _estimate_row_tokens(row: pd.Series) -> int:
+    """Rough token estimate for a node's full context row."""
+    text = " ".join(str(v) for v in row.to_dict().values() if v is not None and v != "")
+    return _estimate_tokens(text)
+
+
+def build_token_aware_batches(
+    nodes_df: pd.DataFrame,
+    parent_key: str | None,
+    token_budget: int = 4000,
+    max_batch_size: int = 25,
+) -> list[pd.DataFrame]:
+    """
+    Group nodes into batches, each meant to be sent as a single LLM request.
+
+    Batches never cross a parent boundary — e.g. columns from different
+    tables, or tables from different schemas, are never mixed into one
+    request, per the bottom-up bubble-up design. Within a parent group,
+    nodes are packed greedily until either the estimated token budget or
+    the hard batch-size ceiling would be exceeded.
+
+    Parameters
+    ----------
+    nodes_df: pd.DataFrame
+        Nodes with context columns attached (as built by
+        ``BaseDescriptionConnector._build_nodes_with_context``).
+    parent_key: Optional[str]
+        The column to group by before batching — e.g. ``"table_id"`` for
+        Columns, ``"schema_id"`` for Tables. ``None`` means no parent
+        grouping (e.g. Schemas, which have no shared parent to bound by).
+    token_budget: int
+        The approximate maximum input tokens (context only) per batch.
+    max_batch_size: int
+        The hard ceiling on the number of nodes per batch, regardless of
+        token budget — guards against many tiny contexts producing one
+        unwieldy LLM response to parse.
+
+    Returns:
+    -------
+    list[pd.DataFrame]
+        The nodes grouped into batches, each safe to send as one request.
+    """
+    if len(nodes_df) == 0:
+        return []
+
+    if parent_key and parent_key in nodes_df.columns:
+        groups = [group for _, group in nodes_df.groupby(parent_key, dropna=False, sort=False)]
+    else:
+        groups = [nodes_df]
+
+    batches: list[pd.DataFrame] = []
+    for group in groups:
+        current_rows: list[pd.Series] = []
+        current_tokens = 0
+        for _, row in group.iterrows():
+            row_tokens = _estimate_row_tokens(row)
+            exceeds_budget = bool(current_rows) and (current_tokens + row_tokens > token_budget)
+            exceeds_count = len(current_rows) >= max_batch_size
+            if exceeds_budget or exceeds_count:
+                batches.append(pd.DataFrame(current_rows))
+                current_rows = []
+                current_tokens = 0
+            current_rows.append(row)
+            current_tokens += row_tokens
+        if current_rows:
+            batches.append(pd.DataFrame(current_rows))
+
+    return batches
+
+
 def _generate_descriptions_for_batch_sync(
     description_fn: Callable[[list[dict[str, Any]]], list[str | None]], batch: pd.DataFrame
 ) -> list[tuple[str, str]]:
@@ -149,7 +246,6 @@ def _generate_descriptions_for_batch_sync(
         any that failed).
     batch : pd.DataFrame
         A Pandas DataFrame where each row represents a node to describe.
-        Has columns `id`, `node_label`, `name`, and `context`.
 
     Returns:
     -------
@@ -179,23 +275,19 @@ async def _generate_descriptions_for_batch_async(
     ]
 
 
-def generate_descriptions_in_batches_sync(
+def generate_descriptions_for_batches_sync(
     description_fn: Callable[[list[dict[str, Any]]], list[str | None]],
-    nodes_dataframe: pd.DataFrame,
-    batch_size: int,
+    batches: list[pd.DataFrame],
 ) -> list[tuple[str, str]]:
     """
-    Generate descriptions for a Pandas DataFrame of nodes in batches (sync version).
+    Generate descriptions for a list of pre-built batches (sync version).
 
     Parameters
     ----------
     description_fn: Callable
         The description function to use.
-    nodes_dataframe : pd.DataFrame
-        A Pandas DataFrame where each row represents a node.
-        Has columns `id`, `node_label`, `name`, and `context`.
-    batch_size : int
-        The number of nodes to process in each batch.
+    batches: list[pd.DataFrame]
+        Batches as produced by :func:`build_token_aware_batches`.
 
     Returns:
     -------
@@ -203,44 +295,21 @@ def generate_descriptions_in_batches_sync(
         A list of (node id, generated description) tuples.
     """
     results = []
-
-    for batch_idx, i in enumerate(range(0, len(nodes_dataframe), batch_size)):
-        logger.debug(
-            "Generating descriptions for batch %d/%d",
-            batch_idx + 1,
-            ceil(len(nodes_dataframe) / batch_size),
-        )
-        if i + batch_size >= len(nodes_dataframe):
-            batch = nodes_dataframe.iloc[i:]
-        else:
-            batch = nodes_dataframe.iloc[i : i + batch_size]
-        batch_results = _generate_descriptions_for_batch_sync(description_fn, batch)
-        results.extend(batch_results)
-
+    for batch_idx, batch in enumerate(batches):
+        logger.debug("Generating descriptions for batch %d/%d", batch_idx + 1, len(batches))
+        results.extend(_generate_descriptions_for_batch_sync(description_fn, batch))
     return results
 
 
-async def generate_descriptions_in_batches_async(
-    description_fn: Callable[[list[dict[str, Any]]], list[str | None]],
-    nodes_dataframe: pd.DataFrame,
-    batch_size: int,
+async def generate_descriptions_for_batches_async(
+    description_fn: Callable[[list[dict[str, Any]]], Any],
+    batches: list[pd.DataFrame],
 ) -> list[tuple[str, str]]:
-    """Async variant of :func:`generate_descriptions_in_batches_sync`."""
+    """Async variant of :func:`generate_descriptions_for_batches_sync`."""
     results = []
-
-    for batch_idx, i in enumerate(range(0, len(nodes_dataframe), batch_size)):
-        logger.debug(
-            "Generating descriptions for batch %d/%d",
-            batch_idx + 1,
-            ceil(len(nodes_dataframe) / batch_size),
-        )
-        if i + batch_size >= len(nodes_dataframe):
-            batch = nodes_dataframe.iloc[i:]
-        else:
-            batch = nodes_dataframe.iloc[i : i + batch_size]
-        batch_results = await _generate_descriptions_for_batch_async(description_fn, batch)
-        results.extend(batch_results)
-
+    for batch_idx, batch in enumerate(batches):
+        logger.debug("Generating descriptions for batch %d/%d", batch_idx + 1, len(batches))
+        results.extend(await _generate_descriptions_for_batch_async(description_fn, batch))
     return results
 
 
