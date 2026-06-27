@@ -50,7 +50,7 @@ def get_nodes_to_embed(
 MATCH (n:{node_label})
 WHERE n.description IS NOT NULL
     AND n.embedding IS NULL
-    AND size(n.description) > 0
+    AND size(n.description) > $min_length
 RETURN n.id as id,
     labels(n)[0] as node_label,
     n.description as description
