@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Callable
-from math import ceil
 from typing import Any
 
 import pandas as pd

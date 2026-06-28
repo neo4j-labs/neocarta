@@ -7,6 +7,8 @@ import pandas as pd
 from neo4j import Driver
 
 from ...enums import NodeLabel
+
+_SUPPORTED_LABELS: frozenset[NodeLabel] = frozenset({NodeLabel.TABLE, NodeLabel.COLUMN})
 from .utils import (
     generate_descriptions_in_batches_async,
     generate_descriptions_in_batches_sync,
