@@ -114,6 +114,16 @@ RETURN {
                     data: a.data,
                     vendor_name: a.vendor_name
                 }
+            },
+            backing_tables: COLLECT {
+                MATCH (m)-[:USES_TABLE]->(mt)
+                RETURN mt.name
+            },
+            backing_columns: COLLECT {
+                MATCH (m)-[:USES_COLUMN]->(mc:Column)
+                OPTIONAL MATCH (mco)-[:HAS_COLUMN|USES_COLUMN]->(mc)
+                WHERE mco:Table OR mco:Query
+                RETURN CASE WHEN mco IS NULL THEN mc.name ELSE mco.name + "." + mc.name END
             }
         }
     },

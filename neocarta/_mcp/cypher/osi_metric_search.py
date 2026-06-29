@@ -40,6 +40,18 @@ RETURN {
             vendor_name: a.vendor_name
         }
     },
+    backing_tables: COLLECT {
+        MATCH (metric)-[:USES_TABLE]->(bt)
+        RETURN bt.name
+    },
+    backing_columns: COLLECT {
+        MATCH (metric)-[:USES_COLUMN]->(bc:Column)
+        // The column's owner is its :Table (HAS_COLUMN) or, for a query-backed dataset,
+        // its :Query (USES_COLUMN). Exclude the metric's own USES_COLUMN edge via the label.
+        OPTIONAL MATCH (bco)-[:HAS_COLUMN|USES_COLUMN]->(bc)
+        WHERE bco:Table OR bco:Query
+        RETURN CASE WHEN bco IS NULL THEN bc.name ELSE bco.name + "." + bc.name END
+    },
     metric_score: score
 } AS result
 ORDER BY score DESC

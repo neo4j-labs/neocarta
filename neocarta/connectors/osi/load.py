@@ -22,6 +22,8 @@ from ...data_model.osi import (
     HasTargetTable,
     Join,
     Metric,
+    MetricUsesColumn,
+    MetricUsesTable,
     OsiAiContext,
     OsiColumn,
     OsiCustomExtensions,
@@ -342,6 +344,43 @@ ON CREATE SET n.id = row.id{", " + set_extras if set_extras else ""}
             properties_list,
         )
         return self._run_write(query, [r.model_dump() for r in rels])
+
+    def load_metric_uses_column_relationships(
+        self,
+        rels: list[MetricUsesColumn],
+        overwrite_existing: bool = False,
+        properties_list: list[str] = [],
+    ) -> dict:
+        """(:Metric)-[:USES_COLUMN]->(:Column).
+
+        Derived from parsing metric expressions; the column is matched by id (it is always
+        an existing :Column node since the transformer only emits edges for declared columns).
+        """
+        query = _build_relationship_ingest_query(
+            RelationshipType.USES_COLUMN,
+            NodeLabel.METRIC,
+            NodeLabel.COLUMN,
+            "metric_id",
+            "column_id",
+            overwrite_existing,
+            properties_list,
+        )
+        return self._run_write(query, [r.model_dump() for r in rels])
+
+    def load_metric_uses_table_relationships(self, rels: list[MetricUsesTable]) -> dict:
+        """(:Metric)-[:USES_TABLE]->(:Table) (target matched by id only, may be a Query).
+
+        Mirrors :meth:`load_has_source_table_relationships`: a metric expression may
+        reference a query-backed dataset, whose owner node is a :Query rather than a
+        :Table, so the target is matched by id without a label constraint.
+        """
+        cypher = f"""
+UNWIND $rows AS row
+MATCH (m:{NodeLabel.METRIC} {{id: row.metric_id}})
+MATCH (t {{id: row.table_id}})
+MERGE (m)-[:{RelationshipType.USES_TABLE}]->(t)
+""".strip()
+        return self._run_write(cypher, [r.model_dump() for r in rels])
 
     def load_has_aspect_relationships(self, rels: list[HasAspect]) -> dict:
         """

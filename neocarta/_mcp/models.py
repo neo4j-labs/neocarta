@@ -137,6 +137,20 @@ class MetricContext(BaseModel):
         default=[],
         description="OSI aspects (ai_context / custom_extensions) attached to the metric",
     )
+    backing_tables: list[str] = Field(
+        default=[],
+        description=(
+            "Names of the tables the metric's expression references (from USES_TABLE edges). "
+            "These are the datasets to FROM/JOIN when computing the metric."
+        ),
+    )
+    backing_columns: list[str] = Field(
+        default=[],
+        description=(
+            "Columns the metric's expression references (from USES_COLUMN edges), in "
+            "'table_name.column_name' form where the owning table is known."
+        ),
+    )
     metric_score: float | None = Field(
         default=None, description="The metric embedding/search similarity score"
     )

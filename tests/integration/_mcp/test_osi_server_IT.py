@@ -90,6 +90,11 @@ def test_get_domain_context(neo4j_connection, osi_loaded_graph):
     assert len(data["metrics"]) == len(EXPECTED_METRIC_NAMES)
     assert {m["metric_name"] for m in data["metrics"]} == EXPECTED_METRIC_NAMES
 
+    # Each metric carries its backing tables/columns derived from its expression (#210).
+    arr_metric = next(m for m in data["metrics"] if m["metric_name"] == "total_arr_usd")
+    assert "subscriptions" in arr_metric["backing_tables"]
+    assert any(c.endswith("arr_usd") for c in arr_metric["backing_columns"])
+
     assert len(data["tables"]) > 20
     assert len(data["joins"]) > 0
 
@@ -123,6 +128,10 @@ def test_get_context_by_metric_search(neo4j_connection, osi_loaded_graph):
     assert arr["metric_score"] is not None
     assert arr["metric_score"] > 0.5
     assert any("arr_usd" in e["expression"] for e in arr["expressions"])
+    # Backing tables/columns derived from the metric expression (issue #210): the agent
+    # learns the metric reads from `subscriptions` and touches its `arr_usd` column.
+    assert "subscriptions" in arr["backing_tables"]
+    assert any(c.endswith("arr_usd") for c in arr["backing_columns"])
     # Metric ai_context synonyms become tagged BusinessTerms surfaced as synonyms.
     assert "ARR" in arr["synonyms"]
     # Aspects are embedded on the metric payload (no standalone get_aspects tool).

@@ -256,3 +256,32 @@ class HasTargetTable(BaseModel):
 
     join_id: str = Field(..., description="The unique identifier for the join")
     table_id: str = Field(..., description="The unique identifier for the target table")
+
+
+class MetricUsesTable(BaseModel):
+    """
+    A relationship between a Metric and a table its expression references.
+    (:Metric)-[:USES_TABLE]->(:Table).
+
+    Derived at ingest by parsing the metric's dialect expressions. The target is
+    matched by id at load time and — like :class:`HasSourceTable` — may resolve to
+    a query-backed dataset's ``:Query`` node, so it is not constrained to ``:Table``.
+    """
+
+    metric_id: str = Field(..., description="The unique identifier for the metric")
+    table_id: str = Field(
+        ...,
+        description="The unique identifier for the backing table (or query-backed dataset) node",
+    )
+
+
+class MetricUsesColumn(BaseModel):
+    """
+    A relationship between a Metric and a column its expression references.
+    (:Metric)-[:USES_COLUMN]->(:Column).
+
+    Derived at ingest by parsing the metric's dialect expressions.
+    """
+
+    metric_id: str = Field(..., description="The unique identifier for the metric")
+    column_id: str = Field(..., description="The unique identifier for the backing column")

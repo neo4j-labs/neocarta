@@ -287,6 +287,31 @@ def test_ingest_creates_tagged_with_edges_to_business_terms(neo4j_driver, tpcds_
     assert table_tags > 0, "No Table→BusinessTerm tags created from OSI synonyms"
 
 
+def test_ingest_creates_metric_uses_table_and_column_edges(neo4j_driver, tpcds_yaml_path: Path):
+    """Metric expressions emit (:Metric)-[:USES_TABLE]->(:Table) and (:Metric)-[:USES_COLUMN]->(:Column)."""
+    OsiConnector(neo4j_driver=neo4j_driver, database_name="neo4j").ingest(tpcds_yaml_path)
+
+    with neo4j_driver.session(database="neo4j") as session:
+        uses_table = session.run(
+            "MATCH (:Metric)-[r:USES_TABLE]->(:Table) RETURN count(r) AS c"
+        ).single()["c"]
+        uses_column = session.run(
+            "MATCH (:Metric)-[r:USES_COLUMN]->(:Column) RETURN count(r) AS c"
+        ).single()["c"]
+        # total_sales = SUM(store_sales.ss_ext_sales_price) links exactly that table + column.
+        total_sales_table = session.run(
+            "MATCH (:Metric {name: 'total_sales'})-[:USES_TABLE]->(t:Table) RETURN t.name AS name"
+        ).single()
+        total_sales_col = session.run(
+            "MATCH (:Metric {name: 'total_sales'})-[:USES_COLUMN]->(c:Column) RETURN c.name AS name"
+        ).single()
+
+    assert uses_table > 0
+    assert uses_column > 0
+    assert total_sales_table["name"] == "store_sales"
+    assert total_sales_col["name"] == "ss_ext_sales_price"
+
+
 def test_ingest_creates_has_expression_edges_for_columns_and_metrics(
     neo4j_driver, tpcds_yaml_path: Path
 ):

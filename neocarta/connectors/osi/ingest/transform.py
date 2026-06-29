@@ -1,6 +1,7 @@
 """Transform a parsed OSI spec dict into graph node and relationship models."""
 
 import json
+import logging
 import re
 from typing import Any, TypedDict
 
@@ -16,6 +17,8 @@ from ....data_model.osi import (
     HasTargetTable,
     Join,
     Metric,
+    MetricUsesColumn,
+    MetricUsesTable,
     OsiAiContext,
     OsiColumn,
     OsiCustomExtensions,
@@ -47,6 +50,9 @@ from ...utils.generate_id import (
     generate_schema_id,
     generate_table_id,
 )
+from .expression_refs import extract_column_references
+
+logger = logging.getLogger(__name__)
 
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -118,6 +124,9 @@ class OsiIngestTransformer:
         self.uses_column_rels: list[UsesColumn] = []
         self.references_rels: list[References] = []
         self.has_metric_rels: list[HasMetric] = []
+        # Metric → backing table/column, derived by parsing metric expressions.
+        self.metric_uses_table_rels: list[MetricUsesTable] = []
+        self.metric_uses_column_rels: list[MetricUsesColumn] = []
         self.has_source_table_rels: list[HasSourceTable] = []
         self.has_target_table_rels: list[HasTargetTable] = []
         self.used_in_join_rels: list[UsedInJoin] = []
@@ -130,10 +139,16 @@ class OsiIngestTransformer:
         self._seen_business_term_ids: set[str] = set()
         self._seen_expression_ids: set[str] = set()
         self._seen_aspect_ids: set[str] = set()
+        self._seen_metric_uses_table: set[tuple[str, str]] = set()
+        self._seen_metric_uses_column: set[tuple[str, str]] = set()
         # Per-semantic-model: dataset name → backing node id, and dataset name → label
         # ("Table" or "Query"). Cleared at the start of each _transform_semantic_model.
         self._dataset_name_to_owner_id: dict[str, str] = {}
         self._dataset_name_to_owner_label: dict[str, str] = {}
+        # Per-semantic-model set of materialized column ids, used to (a) emit
+        # metric→column edges only for declared columns and (b) resolve unqualified
+        # metric column references by candidate-id lookup. Cleared per semantic model.
+        self._sm_column_ids: set[str] = set()
         # Active semantic model name. Set in _transform_semantic_model so aspect/metric/
         # join id generation can address it without parameter threading.
         self._current_sm_name: str = ""
@@ -161,6 +176,7 @@ class OsiIngestTransformer:
         # in one model never reference datasets defined in another.
         self._dataset_name_to_owner_id = {}
         self._dataset_name_to_owner_label = {}
+        self._sm_column_ids = set()
 
         sm_name = model["name"]
         self._current_sm_name = sm_name
@@ -341,6 +357,9 @@ class OsiIngestTransformer:
     ) -> None:
         field_name = field["name"]
         column_id_str = self._make_column_id(owner_id, owner_label, field_name)
+        # Track declared column ids for this semantic model so metric-expression parsing
+        # can emit USES_COLUMN edges only for columns that actually exist as nodes.
+        self._sm_column_ids.add(column_id_str)
 
         # Only persist is_time_dimension when the OSI field explicitly declares
         # ``dimension.is_time`` as a bool. Missing / non-bool values leave the
@@ -477,6 +496,8 @@ class OsiIngestTransformer:
                 expression=dialect_entry.get("expression"),
             )
 
+        self._link_metric_backing(metric_id_str, metric)
+
         self._maybe_add_ai_context(
             source_id=metric_id_str, source_label="Metric", value=metric.get("ai_context")
         )
@@ -484,6 +505,118 @@ class OsiIngestTransformer:
             source_id=metric_id_str,
             source_label="Metric",
             extensions=metric.get("custom_extensions"),
+        )
+
+    def _link_metric_backing(self, metric_id: str, metric: dict[str, Any]) -> None:
+        """
+        Emit ``(:Metric)-[:USES_TABLE]->`` / ``(:Metric)-[:USES_COLUMN]->`` edges for the
+        datasets and columns a metric's expressions reference.
+
+        Each dialect expression is parsed with :func:`extract_column_references`. Column
+        qualifiers are OSI dataset names resolved against the current semantic model;
+        unqualified columns are matched by name across the model's datasets. A USES_TABLE
+        edge is emitted for every resolved owner; a USES_COLUMN edge only when the column is
+        a declared field of that dataset (so it has a graph node to point at). Unparseable
+        expressions and unresolvable references are skipped (logged at debug), never failing
+        the ingest.
+        """
+        for dialect_entry in ((metric.get("expression") or {}).get("dialects")) or []:
+            expression = dialect_entry.get("expression")
+            if not expression:
+                continue
+            refs = extract_column_references(expression, dialect_entry.get("dialect"))
+            if refs is None:  # unparseable — extract_column_references already logged it
+                continue
+            for qualifier, column_name in refs:
+                owner = self._resolve_metric_reference(metric_id, qualifier, column_name)
+                if owner is None:
+                    continue
+                owner_id, owner_label = owner
+                self._add_metric_uses_table(metric_id, owner_id)
+                column_id = self._make_column_id(owner_id, owner_label, column_name)
+                if column_id in self._sm_column_ids:
+                    self._add_metric_uses_column(metric_id, column_id)
+                else:
+                    logger.debug(
+                        "Metric %s references column %r not declared on dataset %r; "
+                        "USES_COLUMN skipped (USES_TABLE kept)",
+                        metric_id,
+                        column_name,
+                        qualifier,
+                    )
+
+    def _resolve_metric_reference(
+        self, metric_id: str, qualifier: str | None, column_name: str
+    ) -> tuple[str, str] | None:
+        """
+        Resolve a metric column reference to its dataset's ``(owner_id, owner_label)``.
+
+        Qualified references resolve the qualifier (an OSI dataset name) directly against the
+        current semantic model. Unqualified references are matched by computing the candidate
+        column id under every dataset and checking membership in the model's materialized
+        column-id set; they resolve only when exactly one dataset declares the column.
+        Returns ``None`` (logged at debug) when the reference can't be resolved.
+        """
+        if qualifier is not None:
+            owner_id = self._dataset_name_to_owner_id.get(qualifier)
+            owner_label = self._dataset_name_to_owner_label.get(qualifier, "Table")
+            if owner_id is None:
+                # Every table/column id is normalized (lowercase, space/hyphen -> "_") by
+                # generate_*_id, but the dataset-name map keys are the raw OSI names. Fall
+                # back to a normalized match so a qualifier whose case/separators differ
+                # from the declared dataset name (e.g. `Orders` vs `orders`) still resolves
+                # — mirroring how column names are matched. (generate_database_id is the
+                # public form of the shared id normalizer.)
+                normalized = generate_database_id(qualifier)
+                for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
+                    if generate_database_id(ds_name) == normalized:
+                        owner_id = ds_owner_id
+                        owner_label = self._dataset_name_to_owner_label.get(ds_name, "Table")
+                        break
+            if owner_id is None:
+                logger.debug(
+                    "Metric %s references unknown dataset %r; skipping reference",
+                    metric_id,
+                    qualifier,
+                )
+                return None
+            return owner_id, owner_label
+
+        # Unqualified: a dataset owns the column iff its candidate column id was materialized.
+        candidates: set[tuple[str, str]] = set()
+        for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
+            ds_owner_label = self._dataset_name_to_owner_label.get(ds_name, "Table")
+            if (
+                self._make_column_id(ds_owner_id, ds_owner_label, column_name)
+                in self._sm_column_ids
+            ):
+                candidates.add((ds_owner_id, ds_owner_label))
+        if len(candidates) == 1:
+            return next(iter(candidates))
+        logger.debug(
+            "Metric %s references unqualified column %r resolving to %d datasets; skipping",
+            metric_id,
+            column_name,
+            len(candidates),
+        )
+        return None
+
+    def _add_metric_uses_table(self, metric_id: str, table_id: str) -> None:
+        """Append a deduped ``MetricUsesTable`` edge (owner may be a Table or Query node)."""
+        key = (metric_id, table_id)
+        if key in self._seen_metric_uses_table:
+            return
+        self._seen_metric_uses_table.add(key)
+        self.metric_uses_table_rels.append(MetricUsesTable(metric_id=metric_id, table_id=table_id))
+
+    def _add_metric_uses_column(self, metric_id: str, column_id: str) -> None:
+        """Append a deduped ``MetricUsesColumn`` edge."""
+        key = (metric_id, column_id)
+        if key in self._seen_metric_uses_column:
+            return
+        self._seen_metric_uses_column.add(key)
+        self.metric_uses_column_rels.append(
+            MetricUsesColumn(metric_id=metric_id, column_id=column_id)
         )
 
     # ------------------------------------------------------------------ #
