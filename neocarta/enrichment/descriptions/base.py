@@ -8,8 +8,8 @@ from neo4j import Driver
 
 from ...enums import NodeLabel
 from .utils import (
-    generate_descriptions_in_batches_async,
-    generate_descriptions_in_batches_sync,
+    generate_descriptions_for_batches_async,
+    generate_descriptions_for_batches_sync,
     get_node_context,
     get_nodes_to_describe,
     write_descriptions_to_graph,
@@ -139,7 +139,7 @@ class BaseDescriptionConnector:
                 logger.info("No %s nodes needed a description", label)
                 continue
 
-            results = generate_descriptions_in_batches_sync(
+            results = generate_descriptions_for_batches_sync(
                 self._generate_descriptions_sync, nodes_df, batch_size
             )
             logger.info("Generated %d descriptions", len(results))
@@ -181,7 +181,7 @@ class BaseDescriptionConnector:
                 logger.info("No %s nodes needed a description", label)
                 continue
 
-            results = await generate_descriptions_in_batches_async(
+            results = await generate_descriptions_for_batches_async(
                 self._generate_descriptions_async, nodes_df, batch_size
             )
             logger.info("Generated %d descriptions", len(results))
