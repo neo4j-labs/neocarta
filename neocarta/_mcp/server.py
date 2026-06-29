@@ -1,8 +1,8 @@
 """FastMCP server exposing semantic layer metadata tools."""
 
 import asyncio
-import os
 import logging
+import os
 from collections.abc import Callable
 
 from dotenv import load_dotenv
