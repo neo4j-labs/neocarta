@@ -108,6 +108,24 @@ def test_unqualified_column_ambiguous_is_skipped():
     assert t.metric_uses_column_rels == []
 
 
+def test_unqualified_column_ambiguous_across_aliased_datasets_is_skipped():
+    """Two datasets backed by the SAME source still make an unqualified column ambiguous.
+
+    They collapse to one owner id, but they are two distinct dataset declarations of the
+    column, so the reference must stay ambiguous and be skipped (not silently resolved).
+    """
+    spec = _sm(
+        datasets=[
+            _dataset("orders", "warehouse.public.orders", ["amount"]),
+            _dataset("orders_copy", "warehouse.public.orders", ["amount"]),
+        ],
+        metrics=[_metric("rev", "SUM(amount)")],
+    )
+    t = _run(spec)
+    assert t.metric_uses_table_rels == []
+    assert t.metric_uses_column_rels == []
+
+
 def test_unknown_dataset_qualifier_is_skipped():
     """A qualifier that is not a dataset in the model produces no edges."""
     spec = _sm(

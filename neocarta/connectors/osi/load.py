@@ -368,16 +368,17 @@ ON CREATE SET n.id = row.id{", " + set_extras if set_extras else ""}
         return self._run_write(query, [r.model_dump() for r in rels])
 
     def load_metric_uses_table_relationships(self, rels: list[MetricUsesTable]) -> dict:
-        """(:Metric)-[:USES_TABLE]->(:Table) (target matched by id only, may be a Query).
+        """(:Metric)-[:USES_TABLE]->(:Table|:Query).
 
-        Mirrors :meth:`load_has_source_table_relationships`: a metric expression may
-        reference a query-backed dataset, whose owner node is a :Query rather than a
-        :Table, so the target is matched by id without a label constraint.
+        A metric expression may reference a table-backed dataset (a :Table) or a
+        query-backed dataset (a :Query), so the target is matched against both labels —
+        constrained so Neo4j can use the label-scoped id index/constraint rather than
+        scanning every node by id.
         """
         cypher = f"""
 UNWIND $rows AS row
 MATCH (m:{NodeLabel.METRIC} {{id: row.metric_id}})
-MATCH (t {{id: row.table_id}})
+MATCH (t:{NodeLabel.TABLE}|{NodeLabel.QUERY} {{id: row.table_id}})
 MERGE (m)-[:{RelationshipType.USES_TABLE}]->(t)
 """.strip()
         return self._run_write(cypher, [r.model_dump() for r in rels])

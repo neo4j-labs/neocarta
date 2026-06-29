@@ -583,21 +583,24 @@ class OsiIngestTransformer:
             return owner_id, owner_label
 
         # Unqualified: a dataset owns the column iff its candidate column id was materialized.
-        candidates: set[tuple[str, str]] = set()
+        # Count matching DATASETS (one entry per dataset), not distinct owner ids — two
+        # dataset aliases backed by the same table/query are still two declarations of the
+        # column, so the reference stays ambiguous and is skipped.
+        matches: list[tuple[str, str]] = []
         for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
             ds_owner_label = self._dataset_name_to_owner_label.get(ds_name, "Table")
             if (
                 self._make_column_id(ds_owner_id, ds_owner_label, column_name)
                 in self._sm_column_ids
             ):
-                candidates.add((ds_owner_id, ds_owner_label))
-        if len(candidates) == 1:
-            return next(iter(candidates))
+                matches.append((ds_owner_id, ds_owner_label))
+        if len(matches) == 1:
+            return matches[0]
         logger.debug(
             "Metric %s references unqualified column %r resolving to %d datasets; skipping",
             metric_id,
             column_name,
-            len(candidates),
+            len(matches),
         )
         return None
 
