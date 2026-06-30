@@ -122,7 +122,25 @@ class DatabricksSchemaConnector:
         ----------
         schema : str
             The Unity Catalog schema to extract within the connector's catalog.
+
+        Raises:
+        ------
+        ConfigError
+            If ``schema`` is empty or contains a backtick (a malformed identifier).
         """
+        if not schema:
+            raise ConfigError(
+                "schema is required for the Databricks schema connector.",
+                suggestion="Pass connector.ingest(schema=...) / connector.extract(schema=...).",
+            )
+        # Validate the schema identifier up front so a malformed name fails fast and
+        # uniformly, regardless of value_sample_limit (off the sampling path the schema is
+        # only ever a bound parameter, so it would otherwise never be checked).
+        if "`" in schema:
+            raise ConfigError(
+                f"Invalid schema identifier {schema!r}: backticks are not allowed.",
+                suggestion="Pass a schema name without backtick characters.",
+            )
         logger.info("Extracting Databricks schema metadata...")
         self._extracted = False
         self._transformed = False

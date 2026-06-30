@@ -49,35 +49,44 @@ def main(
     )
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
 
-    # The caller builds and owns the connection (mirroring the BigQuery client);
-    # the connector never closes it. Use it as a context manager so it is released.
-    with sql.connect(
-        server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
-        http_path=os.getenv("DATABRICKS_HTTP_PATH"),
-        access_token=os.getenv("DATABRICKS_TOKEN"),
-    ) as connection:
-        print(f"Ingesting Databricks schema metadata for {catalog}.{schema} into Neo4j...")
-        DatabricksSchemaConnector(
-            connection=connection,
-            catalog=catalog,
-            neo4j_driver=neo4j_driver,
-            database_name=neo4j_database,
-            value_sample_limit=value_sample_limit,
-        ).ingest(schema=schema)
+    # Close both client pools unconditionally — an error during ingest or embeddings
+    # must not leak the Neo4j driver or the Databricks connection. The connector never
+    # closes the connection itself (the caller owns it, mirroring the BigQuery client).
+    try:
+        with sql.connect(
+            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
+            http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+            access_token=os.getenv("DATABRICKS_TOKEN"),
+        ) as connection:
+            print(f"Ingesting Databricks schema metadata for {catalog}.{schema} into Neo4j...")
+            DatabricksSchemaConnector(
+                connection=connection,
+                catalog=catalog,
+                neo4j_driver=neo4j_driver,
+                database_name=neo4j_database,
+                value_sample_limit=value_sample_limit,
+            ).ingest(schema=schema)
 
-    if with_embeddings:
-        print("Generating embeddings for Database/Schema/Table/Column nodes...")
-        # Configure provider via env vars (e.g. OPENAI_API_KEY, GEMINI_API_KEY).
-        embeddings = LiteLLMEmbeddingsConnector(
-            neo4j_driver=neo4j_driver,
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-            database_name=neo4j_database,
-        )
-        embeddings.run(
-            node_labels=[NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN]
-        )
+        if with_embeddings:
+            print("Generating embeddings for Database/Schema/Table/Column nodes...")
+            # Configure provider via env vars (e.g. OPENAI_API_KEY, GEMINI_API_KEY).
+            embeddings = LiteLLMEmbeddingsConnector(
+                neo4j_driver=neo4j_driver,
+                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+                database_name=neo4j_database,
+            )
+            embeddings.run(
+                node_labels=[
+                    NodeLabel.DATABASE,
+                    NodeLabel.SCHEMA,
+                    NodeLabel.TABLE,
+                    NodeLabel.COLUMN,
+                ]
+            )
 
-    print("Connector completed successfully!")
+        print("Connector completed successfully!")
+    finally:
+        neo4j_driver.close()
 
 
 if __name__ == "__main__":

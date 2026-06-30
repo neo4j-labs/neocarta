@@ -107,6 +107,15 @@ class DatabricksSchemaExtractor:
                 "catalog is required for the Databricks schema extractor.",
                 suggestion="Pass catalog=... (the Unity Catalog catalog name).",
             )
+        if (
+            not isinstance(value_sample_limit, int)
+            or isinstance(value_sample_limit, bool)
+            or value_sample_limit < 0
+        ):
+            raise ConfigError(
+                "value_sample_limit must be a non-negative integer.",
+                suggestion="Pass value_sample_limit=0 to disable value sampling.",
+            )
         self.connection = connection
         self.catalog = catalog
         self.value_sample_limit = value_sample_limit
@@ -225,8 +234,12 @@ WHERE catalog_name = %(catalog)s
         )
 
         if df.empty:
-            df = pd.DataFrame(
-                [{"catalog_name": self.catalog, "schema_name": schema, "description": None}]
+            raise ConfigError(
+                f"Schema {schema!r} was not found in catalog {self.catalog!r}.",
+                suggestion=(
+                    "Verify the catalog/schema names and that the warehouse can read "
+                    "information_schema."
+                ),
             )
 
         if cache:
@@ -315,6 +328,12 @@ ORDER BY table_name, ordinal_position
             {"catalog": self.catalog, "schema": schema},
         )
 
+        # information_schema reports nullability as the string 'YES'/'NO'; normalize to a real
+        # boolean so the cache and the Column model carry a bool, not a string. Treat only an
+        # explicit 'NO' as not-nullable; anything unexpected/NULL defaults to True (nullable —
+        # the Column model default) rather than silently asserting the column is NOT NULL.
+        df["is_nullable"] = df["is_nullable"].astype(str).str.strip().str.upper().ne("NO")
+
         pk_columns, fk_columns = self._extract_key_columns(schema)
         if df.empty:
             df["is_primary_key"] = pd.Series(dtype=bool)
@@ -386,21 +405,23 @@ WHERE kcu.table_catalog = %(catalog)s
         Returns:
         -------
         pd.DataFrame
-            Columns ``constraint_catalog``, ``constraint_schema``,
-            ``constraint_name``, ``constraint_type``, ``table_name``,
-            ``column_name``, ``ordinal_position``, ``referenced_table``,
-            ``referenced_column``.
+            Columns ``constraint_type``, ``table_catalog``, ``table_schema``,
+            ``table_name``, ``column_name``, ``ordinal_position``,
+            ``referenced_catalog``, ``referenced_schema``, ``referenced_table``,
+            ``referenced_column``. The ``referenced_*`` fields describe the table the
+            foreign key points at (which may live in a different schema/catalog).
         """
         df = self._run_query(
             f"""
 SELECT
-    rc.constraint_catalog AS constraint_catalog,
-    rc.constraint_schema AS constraint_schema,
-    rc.constraint_name AS constraint_name,
     'FOREIGN KEY' AS constraint_type,
+    fk.table_catalog AS table_catalog,
+    fk.table_schema AS table_schema,
     fk.table_name AS table_name,
     fk.column_name AS column_name,
     fk.ordinal_position AS ordinal_position,
+    pk.table_catalog AS referenced_catalog,
+    pk.table_schema AS referenced_schema,
     pk.table_name AS referenced_table,
     pk.column_name AS referenced_column
 FROM {self._qualify()}.referential_constraints rc
@@ -412,10 +433,10 @@ JOIN {self._qualify()}.key_column_usage pk
     ON pk.constraint_catalog = rc.unique_constraint_catalog
     AND pk.constraint_schema = rc.unique_constraint_schema
     AND pk.constraint_name = rc.unique_constraint_name
-    AND pk.ordinal_position = fk.ordinal_position
+    AND pk.ordinal_position = fk.position_in_unique_constraint
 WHERE fk.table_catalog = %(catalog)s
     AND fk.table_schema = %(schema)s
-ORDER BY fk.table_name, rc.constraint_name, fk.ordinal_position
+ORDER BY fk.table_name, fk.constraint_name, fk.ordinal_position
 """,
             {"catalog": self.catalog, "schema": schema},
         )
@@ -461,6 +482,13 @@ ORDER BY fk.table_name, rc.constraint_name, fk.ordinal_position
             Columns ``column_name``, ``unique_value``, ``column_id``, ``value_id``.
         """
         limit = self.value_sample_limit if limit is None else limit
+        # ``limit`` is interpolated into the SQL (slice(..., 1, {limit})), so it must be a
+        # plain non-negative int — never a bool or arbitrary value that could break/inject.
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
+            raise ConfigError(
+                "limit must be a non-negative integer.",
+                suggestion="Pass limit=0 to disable value sampling for this call.",
+            )
         if limit <= 0:
             return _empty_value_frame()
 

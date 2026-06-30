@@ -149,13 +149,23 @@ def _capture_connection(frame: pd.DataFrame) -> MagicMock:
 def test_extract_schema_info_is_catalog_scoped():
     """The schema query filters by catalog and binds both catalog and schema."""
     conn = _capture_connection(
-        pd.DataFrame({"catalog_name": [], "schema_name": [], "description": []})
+        pd.DataFrame([{"catalog_name": "cat", "schema_name": "sch", "description": None}])
     )
     ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
     ex.extract_schema_info("sch")
     sql, params = conn.cursor.return_value.execute.call_args[0]
     assert "catalog_name = %(catalog)s" in sql
     assert params == {"catalog": "cat", "schema": "sch"}
+
+
+def test_extract_schema_info_missing_schema_raises_config_error():
+    """An empty schemata result is a config error, not a synthesized schema row."""
+    conn = _capture_connection(
+        pd.DataFrame({"catalog_name": [], "schema_name": [], "description": []})
+    )
+    ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
+    with pytest.raises(ConfigError, match="not found"):
+        ex.extract_schema_info("ghost")
 
 
 def test_extract_table_info_is_catalog_scoped():
@@ -180,7 +190,8 @@ def test_extract_table_info_is_catalog_scoped():
 
 def test_extract_column_info_queries_are_catalog_scoped():
     """Both the columns query and the constraint query filter by catalog."""
-    conn = _capture_connection(
+    conn = MagicMock()
+    conn.cursor.return_value.fetchall_arrow.return_value.to_pandas.side_effect = [
         pd.DataFrame(
             {
                 "table_catalog": [],
@@ -191,8 +202,15 @@ def test_extract_column_info_queries_are_catalog_scoped():
                 "data_type": [],
                 "description": [],
             }
-        )
-    )
+        ),
+        pd.DataFrame(
+            {
+                "table_name": [],
+                "column_name": [],
+                "constraint_type": [],
+            }
+        ),
+    ]
     ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
     ex.extract_column_info("sch")
     calls = conn.cursor.return_value.execute.call_args_list
@@ -228,6 +246,9 @@ def test_extract_references_info_is_catalog_scoped():
     sql, params = conn.cursor.return_value.execute.call_args[0]
     assert "referential_constraints" in sql
     assert "fk.table_catalog = %(catalog)s" in sql
+    # FK columns must pair to referenced PK columns by position_in_unique_constraint
+    # (order-independent), NOT by the FK column's own ordinal_position.
+    assert "fk.position_in_unique_constraint" in sql
     assert params == {"catalog": "cat", "schema": "sch"}
 
 
@@ -251,6 +272,58 @@ def test_extract_column_info_empty_schema_yields_empty_key_flags():
     assert df.empty
     assert "is_primary_key" in df.columns
     assert "is_foreign_key" in df.columns
+
+
+def test_extract_column_info_normalizes_is_nullable_to_bool():
+    """The 'YES'/'NO' nullability flag is normalized to a real boolean."""
+    conn = MagicMock()
+    conn.cursor.return_value.fetchall_arrow.return_value.to_pandas.side_effect = [
+        pd.DataFrame(
+            {
+                "table_catalog": ["cat", "cat"],
+                "table_schema": ["sch", "sch"],
+                "table_name": ["t", "t"],
+                "column_name": ["a", "b"],
+                "is_nullable": ["NO", "YES"],
+                "data_type": ["INT", "STRING"],
+                "description": [None, None],
+            }
+        ),
+        pd.DataFrame({"table_name": [], "column_name": [], "constraint_type": []}),
+    ]
+    ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
+    df = ex.extract_column_info("sch")
+    assert df["is_nullable"].tolist() == [False, True]
+    assert df["is_nullable"].dtype == bool
+
+
+def test_extract_column_info_unknown_nullable_defaults_to_true():
+    """An unexpected/NULL is_nullable defaults to True (nullable), not False (NOT NULL)."""
+    conn = MagicMock()
+    conn.cursor.return_value.fetchall_arrow.return_value.to_pandas.side_effect = [
+        pd.DataFrame(
+            {
+                "table_catalog": ["cat"],
+                "table_schema": ["sch"],
+                "table_name": ["t"],
+                "column_name": ["a"],
+                "is_nullable": [None],
+                "data_type": ["INT"],
+                "description": [None],
+            }
+        ),
+        pd.DataFrame({"table_name": [], "column_name": [], "constraint_type": []}),
+    ]
+    ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
+    df = ex.extract_column_info("sch")
+    assert df["is_nullable"].tolist() == [True]
+
+
+@pytest.mark.parametrize("bad", [-1, True, 2.5])
+def test_extractor_rejects_invalid_value_sample_limit(bad):
+    """A non-(plain-int) / negative value_sample_limit is rejected at construction."""
+    with pytest.raises(ConfigError):
+        DatabricksSchemaExtractor(connection=MagicMock(), catalog="cat", value_sample_limit=bad)
 
 
 # --- value sampling -------------------------------------------------------------
@@ -312,6 +385,18 @@ def test_value_sampling_disabled_skips_query():
     )
 
     assert result.empty
+    connection.cursor.assert_not_called()
+
+
+@pytest.mark.parametrize("bad_limit", [-1, 2.5, "5", True])
+def test_value_sampling_rejects_invalid_limit(bad_limit):
+    """A non-(plain-int) / negative limit is rejected before it reaches the SQL."""
+    connection = MagicMock()
+    extractor = DatabricksSchemaExtractor(connection=connection, catalog=CATALOG)
+    with pytest.raises(ConfigError):
+        extractor.extract_column_unique_values_for_table(
+            "customers", ["customer_id"], SCHEMA, limit=bad_limit, cache=False
+        )
     connection.cursor.assert_not_called()
 
 

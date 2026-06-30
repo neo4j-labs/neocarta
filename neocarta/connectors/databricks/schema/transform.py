@@ -395,8 +395,9 @@ class DatabricksSchemaTransformer:
         ----------
         column_references_info: pd.DataFrame
             A Pandas DataFrame containing the column references information. Has columns
-            `constraint_catalog`, `constraint_schema`, `constraint_type`, `table_name`,
-            `column_name`, `referenced_table`, and `referenced_column`.
+            `constraint_type`, `table_catalog`, `table_schema`, `table_name`,
+            `column_name`, `referenced_catalog`, `referenced_schema`, `referenced_table`,
+            and `referenced_column`.
         cache: bool = True
             Whether to cache the transform.
 
@@ -409,15 +410,17 @@ class DatabricksSchemaTransformer:
 
         references_relationships = []
         for _, row in fk_rows.iterrows():
+            # Source uses the foreign key's own catalog/schema; target uses the *referenced*
+            # table's catalog/schema, so cross-schema/catalog foreign keys resolve correctly.
             source_column_id = generate_column_id(
-                row.constraint_catalog,
-                row.constraint_schema,
+                row.table_catalog,
+                row.table_schema,
                 row.table_name,
                 row.column_name,
             )
             target_column_id = generate_column_id(
-                row.constraint_catalog,
-                row.constraint_schema,
+                row.referenced_catalog,
+                row.referenced_schema,
                 row.referenced_table,
                 row.referenced_column,
             )

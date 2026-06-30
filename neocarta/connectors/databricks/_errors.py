@@ -177,7 +177,10 @@ def wrap_databricks_errors(func: F) -> F:
             raise
         except Exception as exc:
             base = _databricks_error_base()
-            if base is not None and not isinstance(exc, base):
+            # Reclassify ONLY genuine databricks.sql errors. If the extra is not installed
+            # (base is None), no such exception can have been raised, so anything here is a
+            # local bug — re-raise it untouched rather than mask it as a NeocartaError.
+            if base is None or not isinstance(exc, base):
                 raise
             raise _classify(exc, func.__name__) from exc
 

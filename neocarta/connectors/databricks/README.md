@@ -154,7 +154,10 @@ control, not a graph-entity filter).
 ## Known issues / limitations
 
 - **PAT auth only (v1).** OAuth M2M / service-principal auth is a documented
-  follow-up.
+  follow-up. Note that `databricks.sql.connect(...)` validates the token
+  **eagerly**, so an invalid PAT raises at connection construction (in your code,
+  before the connector runs) rather than as a connector error — the connector
+  receives an already-open, caller-owned connection.
 - **One schema per call.** `ingest(schema=...)` ingests a single schema, like the
   BigQuery connector's per-dataset model; loop over schemas to ingest several.
 - **Value sampling reads table data.** It is on by default (`value_sample_limit=10`)
@@ -167,10 +170,14 @@ control, not a graph-entity filter).
   and appear only when tables declare constraints; without declared keys, column
   key flags stay `False` and no `REFERENCES` edges are produced. Inferred-FK
   discovery is out of scope.
-- **Same-schema FK assumption.** A `REFERENCES` edge is built using the foreign
-  key's own catalog/schema for both endpoints, so a foreign key that references a
-  table in a *different* schema is not yet modelled. Cross-schema FK resolution is
-  a possible follow-up.
+- **Missing schema fails fast.** If `information_schema.schemata` returns no row for
+  the requested schema (a typo, or the warehouse can't see it), the connector raises
+  a `ConfigError` rather than synthesizing an empty schema — a config problem surfaces
+  as a failure, not a silent partial graph.
+- **Cross-schema/catalog foreign keys.** A `REFERENCES` edge uses the foreign key's
+  own catalog/schema for the source column and the *referenced* table's catalog/schema
+  for the target, so a foreign key pointing at a table in another schema resolves
+  correctly. (Unity Catalog foreign keys are informational and usually intra-schema.)
 - **Pass a regular catalog, not `system`.** Every query is scoped to the catalog
   you pass (`WHERE table_catalog = <catalog>`), so a normal catalog's per-catalog
   `information_schema` is read as expected. The special `system` catalog exposes an

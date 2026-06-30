@@ -159,35 +159,38 @@ def test_transform_to_references_relationships_drops_self_fk(
     column_references_info = pd.DataFrame(
         [
             {
-                "constraint_catalog": CATALOG,
-                "constraint_schema": SCHEMA,
-                "constraint_name": "fk_bogus",
                 "constraint_type": "FOREIGN KEY",
+                "table_catalog": CATALOG,
+                "table_schema": SCHEMA,
                 "table_name": "orders",
                 "column_name": "customer_id",
                 "ordinal_position": 1,
+                "referenced_catalog": CATALOG,
+                "referenced_schema": SCHEMA,
                 "referenced_table": "orders",
                 "referenced_column": "customer_id",
             },
             {
-                "constraint_catalog": CATALOG,
-                "constraint_schema": SCHEMA,
-                "constraint_name": "fk_customer",
                 "constraint_type": "FOREIGN KEY",
+                "table_catalog": CATALOG,
+                "table_schema": SCHEMA,
                 "table_name": "orders",
                 "column_name": "customer_id",
                 "ordinal_position": 1,
+                "referenced_catalog": CATALOG,
+                "referenced_schema": SCHEMA,
                 "referenced_table": "customers",
                 "referenced_column": "customer_id",
             },
             {
-                "constraint_catalog": CATALOG,
-                "constraint_schema": SCHEMA,
-                "constraint_name": "fk_manager",
                 "constraint_type": "FOREIGN KEY",
+                "table_catalog": CATALOG,
+                "table_schema": SCHEMA,
                 "table_name": "employees",
                 "column_name": "manager_id",
                 "ordinal_position": 1,
+                "referenced_catalog": CATALOG,
+                "referenced_schema": SCHEMA,
                 "referenced_table": "employees",
                 "referenced_column": "employee_id",
             },
@@ -234,18 +237,46 @@ def test_transform_references_empty_frame(
     """An empty references frame (schema with no foreign keys) yields no edges, no crash."""
     empty = pd.DataFrame(
         columns=[
-            "constraint_catalog",
-            "constraint_schema",
-            "constraint_name",
             "constraint_type",
+            "table_catalog",
+            "table_schema",
             "table_name",
             "column_name",
             "ordinal_position",
+            "referenced_catalog",
+            "referenced_schema",
             "referenced_table",
             "referenced_column",
         ]
     )
     assert databricks_transformer.transform_to_references_relationships(empty) == []
+
+
+def test_transform_references_resolves_cross_schema_target(
+    databricks_transformer: DatabricksSchemaTransformer,
+):
+    """A foreign key whose target table is in another schema resolves to that schema."""
+    refs = pd.DataFrame(
+        [
+            {
+                "constraint_type": "FOREIGN KEY",
+                "table_catalog": CATALOG,
+                "table_schema": "sales",
+                "table_name": "orders",
+                "column_name": "customer_id",
+                "ordinal_position": 1,
+                "referenced_catalog": CATALOG,
+                "referenced_schema": "core",
+                "referenced_table": "customers",
+                "referenced_column": "customer_id",
+            }
+        ]
+    )
+    rels = databricks_transformer.transform_to_references_relationships(refs, cache=False)
+    assert len(rels) == 1
+    assert rels[0].source_column_id == f"{CATALOG}.sales.orders.customer_id"
+    # target uses the *referenced* schema 'core', not the FK's own 'sales'
+    assert rels[0].target_column_id == f"{CATALOG}.core.customers.customer_id"
 
 
 def test_transform_columns_empty_frame(

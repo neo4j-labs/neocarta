@@ -16,6 +16,7 @@ from neocarta.connectors.databricks import DatabricksSchemaConnector
 from neocarta.errors import ConfigError, StateError
 
 PACKAGE = "neocarta.connectors.databricks"
+SCHEMA_PACKAGE = "neocarta.connectors.databricks.schema"
 
 
 def _make_connector() -> DatabricksSchemaConnector:
@@ -71,6 +72,24 @@ def test_init_still_exports_tags_connector():
     assert "DatabricksSchemaConnector" in module.__all__
     assert "DatabricksTagsConnector" in module.__all__
     assert "DatabricksTagsWarning" in module.__all__
+
+
+def test_schema_subpackage_exports_are_minimal():
+    """The schema sub-package's own __init__.py exports only its connector class.
+
+    The parent-package checks above cover the source-package contract (README +
+    __all__ at neocarta.connectors.databricks); this verifies the schema
+    sub-package root independently so a broken schema/__init__.py can't slip
+    through.
+    """
+    module = importlib.import_module(SCHEMA_PACKAGE)
+    exported = getattr(module, "__all__", None)
+    assert exported is not None, "schema/__init__.py must define __all__"
+    assert "DatabricksSchemaConnector" in exported
+    for name in exported:
+        assert not name.endswith(("Extractor", "Transformer", "Loader")), (
+            f"{name} should not be re-exported from {SCHEMA_PACKAGE}.__init__.py"
+        )
 
 
 def test_transform_before_extract_raises_state_error():
@@ -159,3 +178,17 @@ def test_missing_driver_raises_config_error():
     """A missing Neo4j driver is a configuration error."""
     with pytest.raises(ConfigError):
         DatabricksSchemaConnector(connection=MagicMock(), catalog="test_catalog", neo4j_driver=None)
+
+
+def test_extract_rejects_empty_schema():
+    """extract() requires a schema name."""
+    connector = _make_connector()
+    with pytest.raises(ConfigError):
+        connector.extract("")
+
+
+def test_extract_rejects_backtick_schema():
+    """A malformed schema identifier fails fast and uniformly (any value_sample_limit)."""
+    connector = _make_connector()
+    with pytest.raises(ConfigError):
+        connector.extract("bad`schema")
