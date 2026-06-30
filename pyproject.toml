@@ -57,10 +57,14 @@ cli = [
     "rich>=13.0.0",
     "pydantic-settings>=2.12.0",
 ]
-# Managed-Databricks governance-tags connector (Unity Catalog governed tags).
+# Managed-Databricks connectors (Unity Catalog). Covers the SQL-warehouse schema
+# connector (databricks-sql-connector, in-process DB-API) and the governance-tags
+# connector (databricks-sdk). A Spark-based variant would live in its own extra so
+# this warehouse-only group never pulls Spark.
 # Install with: pip install neocarta[databricks]
 databricks = [
     "databricks-sdk>=0.118.0",
+    "databricks-sql-connector>=3.0.0",
 ]
 
 [project.scripts]
