@@ -84,9 +84,12 @@ def main(
                 ]
             )
 
-        print("Connector completed successfully!")
     finally:
         neo4j_driver.close()
+
+    # Only report success after cleanup finishes, so a close() failure isn't
+    # hidden behind a "completed successfully" message.
+    print("Connector completed successfully!")
 
 
 if __name__ == "__main__":
