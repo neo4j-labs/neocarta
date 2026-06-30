@@ -103,8 +103,40 @@ class DatabricksMetricsTransformer:
         # generation without threading it through every call.
         self._current_sm_name: str = ""
 
+    def _reset(self) -> None:
+        """Clear all per-run caches so a reused transformer starts clean.
+
+        The caches are instance-level and append-only, so without this a second
+        :meth:`transform` (e.g. a second ``ingest`` on the same connector) would
+        carry the previous run's nodes/relationships forward into the next load.
+        """
+        for cache in (
+            self.osi_semantic_model_nodes,
+            self.table_nodes,
+            self.column_nodes,
+            self.metric_nodes,
+            self.expression_nodes,
+            self.ai_context_nodes,
+            self.business_term_nodes,
+            self.domain_has_table_rels,
+            self.has_column_rels,
+            self.has_metric_rels,
+            self.has_expression_rels,
+            self.has_aspect_rels,
+            self.tagged_with_rels,
+        ):
+            cache.clear()
+        self._seen_expression_ids.clear()
+        self._seen_aspect_ids.clear()
+        self._seen_business_term_ids.clear()
+        self._current_sm_name = ""
+
     def transform(self, metric_views: list[MetricViewInfo]) -> None:
         """Transform discovered metric views into graph nodes and relationships.
+
+        Re-runnable: the per-run caches are reset at the start, so a reused
+        transformer (e.g. a second ``ingest`` on the same connector) does not
+        accumulate the previous run's output.
 
         Parameters
         ----------
@@ -112,6 +144,7 @@ class DatabricksMetricsTransformer:
             The metric views produced by
             :meth:`DatabricksMetricsExtractor.extract_metric_views`.
         """
+        self._reset()
         for metric_view in metric_views:
             self._transform_metric_view(metric_view)
 
@@ -264,10 +297,15 @@ def _ai_context_payload(item: dict[str, Any]) -> dict[str, Any] | None:
     payload: dict[str, Any] = {}
     synonyms = item.get("synonyms")
     if isinstance(synonyms, list):
-        cleaned = [s for s in synonyms if isinstance(s, str) and s.strip()]
+        # Strip each synonym and drop duplicates (order-preserving) so padded /
+        # repeated variants don't produce divergent aspect ids or duplicate
+        # BusinessTerms (e.g. " revenue " and "revenue").
+        cleaned = list(
+            dict.fromkeys(s.strip() for s in synonyms if isinstance(s, str) and s.strip())
+        )
         if cleaned:
             payload["synonyms"] = cleaned
     display_name = item.get("display_name")
     if isinstance(display_name, str) and display_name.strip():
-        payload["display_name"] = display_name
+        payload["display_name"] = display_name.strip()
     return payload or None

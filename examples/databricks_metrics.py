@@ -1,10 +1,12 @@
 """Example: load Databricks Unity Catalog metric views into Neo4j.
 
-Reads metric-view (Business Semantics) definitions from a catalog's
-``<catalog>.information_schema.views`` over a Databricks SQL warehouse using the
-in-process ``databricks-sql-connector`` (DB-API) — no Spark, no JDBC — and maps
-them onto the OSI semantic-model nodes (OsiSemanticModel / OsiTable / OsiColumn /
-Metric / Expression / OsiAiContext). One schema per ``ingest()`` call.
+Discovers metric views (Business Semantics) from a catalog's
+``<catalog>.information_schema.tables`` (``table_type = 'METRIC_VIEW'``) and reads
+each one's YAML definition (via ``DESCRIBE TABLE EXTENDED … AS JSON``) over a
+Databricks SQL warehouse using the in-process ``databricks-sql-connector``
+(DB-API) — no Spark, no JDBC — and maps them onto the OSI semantic-model nodes
+(OsiSemanticModel / OsiTable / OsiColumn / Metric / Expression / OsiAiContext).
+One schema per ``ingest()`` call.
 
 Requires the ``databricks`` extra: ``pip install neocarta[databricks]`` (or
 ``uv sync --all-extras``). Set in ``.env``:

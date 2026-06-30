@@ -3,7 +3,7 @@
 ## Overview
 
 This connector reads metadata from **managed Databricks** Unity Catalog into this
-library's graph data model. It provides two sub-connectors:
+library's graph data model. It provides three sub-connectors:
 
 - **Schema** — structural metadata (`Database` / `Schema` / `Table` / `Column` /
   `Value` and the `HAS_*` / `REFERENCES` edges) read from a catalog's
@@ -15,6 +15,11 @@ library's graph data model. It provides two sub-connectors:
   and pulls the results into pandas, mirroring the BigQuery schema connector. This
   is the lightweight in-process path for users who have a SQL warehouse but no
   Spark runtime.
+- **Metrics** — Unity Catalog **metric views** (Business Semantics) mapped onto
+  the OSI semantic-model nodes (`OsiSemanticModel` / `OsiTable` / `OsiColumn` /
+  `Metric` / `Expression` / `OsiAiContext`). Uses the same SQL-warehouse transport
+  as the schema sub-connector — **no Spark**. See
+  [`metrics/README.md`](metrics/README.md).
 - **Governance tags** — governed-tag *definitions* mapped into the vendor-neutral
   governance-tag layer (`GovernanceTagKey` / `GovernanceTagValue`), read through
   the Databricks SDK (`WorkspaceClient.tag_policies`) — **no SQL warehouse
@@ -35,10 +40,13 @@ warehouse-only package never pulls Spark.
 
 ## Connector type
 
-Source connector (ingest only). It provides two data-type sub-connectors:
+Source connector (ingest only). It provides three data-type sub-connectors:
 
 - `DatabricksSchemaConnector` — Unity Catalog `information_schema` →
   `Database` / `Schema` / `Table` / `Column` / `Value`.
+- `DatabricksMetricsConnector` — Unity Catalog metric views →
+  `OsiSemanticModel` / `OsiTable` / `OsiColumn` / `Metric` / `Expression` /
+  `OsiAiContext`.
 - `DatabricksTagsConnector` — governed-tag definitions → `GovernanceTagKey` /
   `GovernanceTagValue`.
 

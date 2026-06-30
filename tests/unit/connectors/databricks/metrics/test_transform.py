@@ -140,3 +140,55 @@ def test_empty_input_produces_nothing(metrics_transformer):
     metrics_transformer.transform([])
     assert metrics_transformer.osi_semantic_model_nodes == []
     assert metrics_transformer.metric_nodes == []
+
+
+def test_transform_is_rerunnable(metrics_transformer, sample_metric_views):
+    """A second transform() resets caches rather than accumulating the first run."""
+    metrics_transformer.transform(sample_metric_views)
+    first = (
+        len(metrics_transformer.metric_nodes),
+        len(metrics_transformer.column_nodes),
+        len(metrics_transformer.business_term_nodes),
+        len(metrics_transformer.has_metric_rels),
+    )
+    metrics_transformer.transform(sample_metric_views)
+    second = (
+        len(metrics_transformer.metric_nodes),
+        len(metrics_transformer.column_nodes),
+        len(metrics_transformer.business_term_nodes),
+        len(metrics_transformer.has_metric_rels),
+    )
+    assert first == second
+
+
+def test_synonyms_are_stripped_and_deduped(metrics_transformer):
+    """Padded/duplicate synonyms collapse to one trimmed BusinessTerm; display_name is trimmed."""
+    definition = {
+        "version": "1.1",
+        "source": "main.sales.orders",
+        "measures": [
+            {
+                "name": "rev",
+                "expr": "SUM(o_totalprice)",
+                "display_name": "  Total Revenue  ",
+                "synonyms": [" revenue ", "revenue", "  ", "sales"],
+            }
+        ],
+    }
+    metrics_transformer.transform(
+        [
+            {
+                "full_name": "main.sales.mv",
+                "catalog": "main",
+                "schema": "sales",
+                "name": "mv",
+                "comment": None,
+                "definition": definition,
+            }
+        ]
+    )
+    # " revenue " and "revenue" collapse to one term; the blank is dropped; "sales" kept.
+    assert sorted(b.name for b in metrics_transformer.business_term_nodes) == ["revenue", "sales"]
+    payloads = [json.loads(a.data) for a in metrics_transformer.ai_context_nodes]
+    assert any(p.get("display_name") == "Total Revenue" for p in payloads)  # trimmed
+    assert all(" revenue " not in (p.get("synonyms") or []) for p in payloads)

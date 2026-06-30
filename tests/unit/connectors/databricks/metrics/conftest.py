@@ -43,14 +43,19 @@ def describe_json(view_text: str | None, *, name: str = VIEW) -> str:
     return json.dumps(payload)
 
 
-def make_connection(views: dict[str, str | None]) -> MagicMock:
+def make_connection(
+    views: dict[str, str | None], *, describe_has_view_text: bool = True
+) -> MagicMock:
     """Build a mock databricks.sql connection that mimics the real read path.
 
     ``views`` maps each metric-view name to the ``view_text`` it should report
     (or ``None`` to simulate a definition with no ``view_text``). The mock
     dispatches on the SQL: the ``information_schema.tables`` listing returns the
-    metric-view names, and ``DESCRIBE TABLE EXTENDED <name> AS JSON`` returns that
-    view's payload.
+    metric-view names, ``DESCRIBE TABLE EXTENDED <name> AS JSON`` returns that
+    view's JSON payload, and ``SHOW CREATE TABLE <name>`` returns the YAML fenced
+    in a ``CREATE VIEW … AS $$…$$`` statement (the extractor's fallback). When
+    ``describe_has_view_text`` is False, the DESCRIBE payload omits ``view_text``
+    so the extractor must fall back to ``SHOW CREATE TABLE``.
     """
     connection = MagicMock()
 
@@ -68,9 +73,19 @@ def make_connection(views: dict[str, str | None]) -> MagicMock:
                 return pd.DataFrame(rows, columns=["table_name", "table_comment"])
             if "DESCRIBE TABLE EXTENDED" in sql:
                 name = next((n for n in views if f"`{n}`" in sql), None)
+                view_text = views.get(name) if describe_has_view_text else None
                 return pd.DataFrame(
-                    [[describe_json(views.get(name), name=name or "")]], columns=["json_metadata"]
+                    [[describe_json(view_text, name=name or "")]], columns=["json_metadata"]
                 )
+            if "SHOW CREATE TABLE" in sql:
+                name = next((n for n in views if f"`{n}`" in sql), None)
+                vt = views.get(name)
+                stmt = (
+                    f"CREATE VIEW `{name}` WITH METRICS LANGUAGE YAML AS\n$$\n{vt}\n$$"
+                    if vt
+                    else None
+                )
+                return pd.DataFrame([[stmt]], columns=["createtab_stmt"])
             return pd.DataFrame()
 
         cursor.execute.side_effect = execute

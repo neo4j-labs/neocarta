@@ -101,15 +101,17 @@ Require the `databricks` extra (`pip install neocarta[databricks]`).
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABRICKS_SERVER_HOSTNAME` | Yes (schema connector) | — | SQL warehouse host, e.g. `dbc-xxxx.cloud.databricks.com` |
-| `DATABRICKS_HTTP_PATH` | Yes (schema connector) | — | SQL warehouse HTTP path, e.g. `/sql/1.0/warehouses/abc123` |
-| `DATABRICKS_CATALOG` | Yes (schema connector) | — | Unity Catalog catalog to ingest (the `:Database`) |
-| `DATABRICKS_SCHEMA` | Yes (schema connector) | — | Schema to ingest (one per `ingest()` call) |
+| `DATABRICKS_SERVER_HOSTNAME` | Yes (schema & metrics) | — | SQL warehouse host, e.g. `dbc-xxxx.cloud.databricks.com` |
+| `DATABRICKS_HTTP_PATH` | Yes (schema & metrics) | — | SQL warehouse HTTP path, e.g. `/sql/1.0/warehouses/abc123` |
+| `DATABRICKS_CATALOG` | Yes (schema & metrics) | — | Unity Catalog catalog to ingest (the `:Database`) |
+| `DATABRICKS_SCHEMA` | Yes (schema & metrics) | — | Schema to ingest (one per `ingest()` call) |
 | `DATABRICKS_HOST` | Yes (governance-tags connector) | — | Workspace URL, e.g. `https://dbc-xxxx.cloud.databricks.com` |
 | `DATABRICKS_TOKEN` | Yes | — | Personal access token (PAT), used by both connectors |
 
-Used by: Databricks schema connector (SQL warehouse, `information_schema`) and the
-Databricks governance-tags connector (Databricks SDK).
+Used by: Databricks schema connector and Databricks **metrics** connector (both
+over a SQL warehouse, `information_schema`) and the Databricks governance-tags
+connector (Databricks SDK). The metrics connector reads Unity Catalog **metric
+views** (`table_type = 'METRIC_VIEW'`) using the same SQL-warehouse variables.
 
 ---
 
@@ -122,6 +124,7 @@ Databricks governance-tags connector (Databricks SDK).
 | BigQuery logs connector | + `GCP_PROJECT_ID`, `BIGQUERY_DATASET_ID`, `BIGQUERY_REGION` |
 | Dataplex connector | + `GCP_PROJECT_ID`, `GCP_PROJECT_NUMBER`, `DATAPLEX_LOCATION`, `DATAPLEX_GLOSSARY_ID` |
 | Databricks schema connector | + `DATABRICKS_SERVER_HOSTNAME`, `DATABRICKS_HTTP_PATH`, `DATABRICKS_TOKEN`, `DATABRICKS_CATALOG`, `DATABRICKS_SCHEMA` |
+| Databricks metrics connector | + `DATABRICKS_SERVER_HOSTNAME`, `DATABRICKS_HTTP_PATH`, `DATABRICKS_TOKEN`, `DATABRICKS_CATALOG`, `DATABRICKS_SCHEMA` |
 | Embeddings workflow | + provider credentials for `EMBEDDING_MODEL` (e.g. `OPENAI_API_KEY`, `GEMINI_API_KEY`) |
 | MCP server | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, + provider credentials for `EMBEDDING_MODEL` |
 | Agent (`run_agent.py`) | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`, + provider credentials for `AGENT_MODEL` and `EMBEDDING_MODEL` |

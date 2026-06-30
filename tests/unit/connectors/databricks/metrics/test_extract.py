@@ -9,6 +9,7 @@ import pytest
 
 from neocarta.connectors.databricks.metrics.extract import (
     DatabricksMetricsExtractor,
+    _parse_show_create_view_text,
     _parse_view_text,
 )
 from neocarta.errors import AuthError, ConfigError
@@ -64,11 +65,25 @@ def test_extract_no_metric_views_returns_empty():
 
 
 def test_extract_skips_view_without_view_text():
-    """A listed metric view whose DESCRIBE payload has no view_text is skipped."""
+    """A listed metric view with neither a DESCRIBE view_text nor a SHOW CREATE body is skipped."""
     extractor = DatabricksMetricsExtractor(
         connection=make_connection({VIEW: None}), catalog=CATALOG
     )
     assert extractor.extract_metric_views(schema=SCHEMA) == []
+
+
+def test_extract_falls_back_to_show_create_table():
+    """When DESCRIBE … AS JSON omits view_text, the YAML is read via SHOW CREATE TABLE."""
+    extractor = DatabricksMetricsExtractor(
+        connection=make_connection({VIEW: METRIC_VIEW_YAML}, describe_has_view_text=False),
+        catalog=CATALOG,
+    )
+    result = extractor.extract_metric_views(schema=SCHEMA)
+    assert len(result) == 1
+    assert [m["name"] for m in result[0]["definition"]["measures"]] == [
+        "total_revenue",
+        "order_count",
+    ]
 
 
 def test_extract_discovers_multiple_metric_views():
@@ -90,10 +105,12 @@ def test_quote_identifier_rejects_backtick():
 
 def test_databricks_error_maps_to_auth_error():
     """A databricks.sql error with an auth signal is mapped to AuthError."""
-    from databricks.sql.exc import OperationalError
+    exc = pytest.importorskip("databricks.sql.exc")
 
     extractor = DatabricksMetricsExtractor(
-        connection=make_failing_connection(OperationalError("Unauthorized: invalid access token")),
+        connection=make_failing_connection(
+            exc.OperationalError("Unauthorized: invalid access token")
+        ),
         catalog=CATALOG,
     )
     with pytest.raises(AuthError):
@@ -102,9 +119,9 @@ def test_databricks_error_maps_to_auth_error():
 
 def test_cursor_closed_even_on_error():
     """The cursor is closed even when the query raises."""
-    from databricks.sql.exc import OperationalError
+    exc = pytest.importorskip("databricks.sql.exc")
 
-    connection = make_failing_connection(OperationalError("boom"))
+    connection = make_failing_connection(exc.OperationalError("boom"))
     extractor = DatabricksMetricsExtractor(connection=connection, catalog=CATALOG)
     with pytest.raises(Exception):  # noqa: B017, PT011 - mapping covered above; assert cleanup here
         extractor.extract_metric_views(schema=SCHEMA)
@@ -147,3 +164,20 @@ def test_parse_view_text_handles_none_and_empty():
     assert _parse_view_text(None) is None
     assert _parse_view_text("") is None
     assert _parse_view_text(float("nan")) is None
+
+
+# --- _parse_show_create_view_text (SHOW CREATE TABLE fallback) --------------- #
+
+
+def test_parse_show_create_view_text_extracts_yaml():
+    """The YAML body between $$ fences in a SHOW CREATE TABLE statement parses to a mapping."""
+    stmt = f"CREATE VIEW `x` WITH METRICS LANGUAGE YAML AS\n$$\n{METRIC_VIEW_YAML}\n$$"
+    parsed = _parse_show_create_view_text(stmt)
+    assert isinstance(parsed, dict)
+    assert parsed["source"] == "main.sales.orders"
+
+
+def test_parse_show_create_view_text_without_fence_returns_none():
+    """A statement with no $$ fence (a plain view) or a non-string yields None."""
+    assert _parse_show_create_view_text("CREATE VIEW x AS SELECT 1") is None
+    assert _parse_show_create_view_text(None) is None

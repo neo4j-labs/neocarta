@@ -96,6 +96,31 @@ def _parse_view_text(json_metadata: Any) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+def _parse_show_create_view_text(createtab_stmt: Any) -> dict[str, Any] | None:
+    """Extract and parse a metric view's YAML body from a ``SHOW CREATE TABLE`` statement.
+
+    ``SHOW CREATE TABLE <view>`` returns the ``CREATE VIEW … WITH METRICS LANGUAGE
+    YAML AS $$<yaml>$$`` statement; the YAML body sits between the ``$$`` fences.
+    Used as a fallback when ``DESCRIBE … AS JSON`` exposes no ``view_text``.
+    Returns the parsed YAML mapping, or ``None`` if no fenced body is found / it
+    doesn't parse to a mapping.
+    """
+    if not isinstance(createtab_stmt, str):
+        return None
+    start = createtab_stmt.find("$$")
+    end = createtab_stmt.rfind("$$")
+    if start == -1 or end <= start:
+        return None
+    body = createtab_stmt[start + 2 : end]
+    if not body.strip():
+        return None
+    try:
+        parsed = yaml.safe_load(body)
+    except yaml.YAMLError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 class DatabricksMetricsExtractor:
     """Extractor for Databricks Unity Catalog metric-view definitions.
 
@@ -178,15 +203,26 @@ ORDER BY table_name
         )
 
     def _read_metric_view_yaml(self, schema: str, table_name: str) -> dict[str, Any] | None:
-        """Read and parse one metric view's YAML definition via ``DESCRIBE … AS JSON``."""
+        """Read and parse one metric view's YAML definition.
+
+        Primary path is ``DESCRIBE TABLE EXTENDED … AS JSON`` (the ``view_text``
+        field); falls back to ``SHOW CREATE TABLE`` (the YAML between ``$$`` fences)
+        for runtimes where the JSON payload omits ``view_text``.
+        """
         fq = (
             f"{_quote_identifier(self.catalog)}."
             f"{_quote_identifier(schema)}.{_quote_identifier(table_name)}"
         )
         df = self._run_query(f"DESCRIBE TABLE EXTENDED {fq} AS JSON")
-        if df.empty:
+        if not df.empty:
+            parsed = _parse_view_text(df.iloc[0, 0])
+            if parsed is not None:
+                return parsed
+
+        create_df = self._run_query(f"SHOW CREATE TABLE {fq}")
+        if create_df.empty:
             return None
-        return _parse_view_text(df.iloc[0, 0])
+        return _parse_show_create_view_text(create_df.iloc[0, 0])
 
     @wrap_databricks_errors
     @log_stage
