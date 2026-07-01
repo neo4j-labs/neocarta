@@ -151,6 +151,89 @@ def test_qualified_reference_resolves_case_insensitively():
     }
 
 
+def test_multi_part_source_path_qualifier_resolves():
+    """A metric that qualifies by the db.schema.table source path resolves to the dataset."""
+    spec = _sm(
+        datasets=[_dataset("store_sales", "tpcds.public.store_sales", ["ss_ext_sales_price"])],
+        metrics=[_metric("total", "SUM(tpcds.public.store_sales.ss_ext_sales_price)")],
+    )
+    t = _run(spec)
+    metric_id = generate_metric_id("m", "total")
+    assert _table_edges(t) == {(metric_id, generate_table_id("tpcds", "public", "store_sales"))}
+    assert _column_edges(t) == {
+        (metric_id, generate_column_id("tpcds", "public", "store_sales", "ss_ext_sales_price"))
+    }
+
+
+def test_alias_in_full_select_resolves_to_real_dataset():
+    """A full-SELECT metric expression resolves its FROM alias to the real dataset name."""
+    spec = _sm(
+        datasets=[_dataset("subscriptions", "w.c.subscriptions", ["arr_usd"])],
+        metrics=[_metric("arr", "SELECT SUM(s.arr_usd) FROM subscriptions s")],
+    )
+    t = _run(spec)
+    metric_id = generate_metric_id("m", "arr")
+    assert _table_edges(t) == {(metric_id, generate_table_id("w", "c", "subscriptions"))}
+    assert _column_edges(t) == {
+        (metric_id, generate_column_id("w", "c", "subscriptions", "arr_usd"))
+    }
+
+
+def test_star_reference_links_table_only():
+    """`COUNT(orders.*)` links the orders table but emits no column edge."""
+    spec = _sm(
+        datasets=[_dataset("orders", "warehouse.public.orders", ["order_id"])],
+        metrics=[_metric("cnt", "COUNT(orders.*)")],
+    )
+    t = _run(spec)
+    metric_id = generate_metric_id("m", "cnt")
+    assert _table_edges(t) == {(metric_id, generate_table_id("warehouse", "public", "orders"))}
+    assert t.metric_uses_column_rels == []
+
+
+def test_non_sql_dialect_metric_creates_no_edges():
+    """A metric whose only expression is a non-SQL dialect (MDX/Tableau/MAQL) yields no edges."""
+    spec = _sm(
+        datasets=[_dataset("orders", "warehouse.public.orders", ["amount"])],
+        metrics=[_metric("mdx_metric", "SUM([Measures].[Amount])", dialect="MDX")],
+    )
+    t = _run(spec)
+    assert t.metric_uses_table_rels == []
+    assert t.metric_uses_column_rels == []
+
+
+def test_subquery_alias_matching_dataset_name_creates_no_spurious_edge():
+    """A derived-table alias that collides with a dataset name must not create backing edges."""
+    spec = _sm(
+        datasets=[_dataset("sub", "w.c.sub_table", ["amount"])],
+        metrics=[_metric("m1", "SELECT SUM(sub.amount) FROM (SELECT amount FROM orders) sub")],
+    )
+    t = _run(spec)
+    # `sub` here is the subquery alias, not the dataset `sub`; `orders` is not a dataset.
+    assert t.metric_uses_table_rels == []
+    assert t.metric_uses_column_rels == []
+
+
+def test_reused_alias_links_both_tables_without_wrong_column():
+    """A reused alias across subqueries links both real tables but no mis-attributed column."""
+    spec = _sm(
+        datasets=[
+            _dataset("revenue", "w.c.revenue", ["value"]),
+            _dataset("costs", "w.c.costs", ["value"]),
+        ],
+        metrics=[
+            _metric("net", "SUM((SELECT t.value FROM revenue t) - (SELECT t.value FROM costs t))")
+        ],
+    )
+    t = _run(spec)
+    metric_id = generate_metric_id("m", "net")
+    assert _table_edges(t) == {
+        (metric_id, generate_table_id("w", "c", "revenue")),
+        (metric_id, generate_table_id("w", "c", "costs")),
+    }
+    assert t.metric_uses_column_rels == []  # ambiguous alias -> no wrong-table column edge
+
+
 def test_query_backed_dataset_links_by_id():
     """A metric over a query-backed dataset links the :Query owner id (label-agnostic)."""
     source = "SELECT customer_id, region FROM customers WHERE active = true"
@@ -189,7 +272,7 @@ def test_backing_edges_dedupe_across_dialects():
                 "expression": {
                     "dialects": [
                         {"dialect": "ANSI_SQL", "expression": "SUM(orders.amount)"},
-                        {"dialect": "BigQuery", "expression": "SUM(orders.amount)"},
+                        {"dialect": "SNOWFLAKE", "expression": "SUM(orders.amount)"},
                     ]
                 },
             }

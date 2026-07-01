@@ -46,10 +46,11 @@ RETURN {
     },
     backing_columns: COLLECT {
         MATCH (metric)-[:USES_COLUMN]->(bc:Column)
-        // The column's owner is its :Table (HAS_COLUMN) or, for a query-backed dataset,
-        // its :Query (USES_COLUMN). Exclude the metric's own USES_COLUMN edge via the label.
-        OPTIONAL MATCH (bco)-[:HAS_COLUMN|USES_COLUMN]->(bc)
-        WHERE bco:Table OR bco:Query
+        // A column id is `<owner_id>.<column>`, so the owning Table/Query id is the id with
+        // its trailing segment removed — look the owner up by that id (indexed) instead of
+        // traversing the ownership relationship.
+        WITH bc, left(bc.id, size(bc.id) - size(last(split(bc.id, "."))) - 1) AS ownerId
+        OPTIONAL MATCH (bco:Table|Query {id: ownerId})
         RETURN CASE WHEN bco IS NULL THEN bc.name ELSE bco.name + "." + bc.name END
     },
     metric_score: score

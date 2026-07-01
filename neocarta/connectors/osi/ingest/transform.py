@@ -36,6 +36,7 @@ from ....data_model.schema.rdbms import (
     Schema,
 )
 from ...utils.generate_id import (
+    _normalize,
     create_query_id,
     generate_ai_context_id,
     generate_business_term_id,
@@ -50,7 +51,7 @@ from ...utils.generate_id import (
     generate_schema_id,
     generate_table_id,
 )
-from .expression_refs import extract_column_references
+from .expression_refs import extract_references
 
 logger = logging.getLogger(__name__)
 
@@ -512,23 +513,35 @@ class OsiIngestTransformer:
         Emit ``(:Metric)-[:USES_TABLE]->`` / ``(:Metric)-[:USES_COLUMN]->`` edges for the
         datasets and columns a metric's expressions reference.
 
-        Each dialect expression is parsed with :func:`extract_column_references`. Column
-        qualifiers are OSI dataset names resolved against the current semantic model;
-        unqualified columns are matched by name across the model's datasets. A USES_TABLE
-        edge is emitted for every resolved owner; a USES_COLUMN edge only when the column is
-        a declared field of that dataset (so it has a graph node to point at). Unparseable
-        expressions and unresolvable references are skipped (logged at debug), never failing
-        the ingest.
+        Each dialect expression is parsed with :func:`extract_references`, which returns the
+        table and column references (aliases resolved, stars captured). Qualifiers are
+        resolved against the current semantic model as dataset names or ``db.schema.table``
+        source paths; unqualified columns are matched by name across the model's datasets.
+        A USES_TABLE edge is emitted for every resolved table reference; a USES_COLUMN edge
+        only when the column is a declared field of that dataset (so it has a graph node to
+        point at). Non-SQL / unparseable expressions and unresolvable references are skipped
+        (logged at debug), never failing the ingest.
         """
+        owner_labels = self._owner_id_to_label()
         for dialect_entry in ((metric.get("expression") or {}).get("dialects")) or []:
             expression = dialect_entry.get("expression")
             if not expression:
                 continue
-            refs = extract_column_references(expression, dialect_entry.get("dialect"))
-            if refs is None:  # unparseable — extract_column_references already logged it
+            refs = extract_references(expression, dialect_entry.get("dialect"))
+            if refs is None:  # non-SQL dialect / unparseable — extract_references logged it
                 continue
-            for qualifier, column_name in refs:
-                owner = self._resolve_metric_reference(metric_id, qualifier, column_name)
+            # USES_TABLE for every referenced dataset (incl. FROM tables and star refs).
+            for qualifier in refs.tables:
+                owner = self._resolve_qualifier(qualifier, owner_labels)
+                if owner is not None:
+                    self._add_metric_uses_table(metric_id, owner[0])
+            # USES_COLUMN (and USES_TABLE) for each concrete column reference.
+            for qualifier, column_name in refs.columns:
+                owner = (
+                    self._resolve_qualifier(qualifier, owner_labels)
+                    if qualifier is not None
+                    else self._resolve_unqualified_column(column_name)
+                )
                 if owner is None:
                     continue
                 owner_id, owner_label = owner
@@ -536,56 +549,51 @@ class OsiIngestTransformer:
                 column_id = self._make_column_id(owner_id, owner_label, column_name)
                 if column_id in self._sm_column_ids:
                     self._add_metric_uses_column(metric_id, column_id)
-                else:
-                    logger.debug(
-                        "Metric %s references column %r not declared on dataset %r; "
-                        "USES_COLUMN skipped (USES_TABLE kept)",
-                        metric_id,
-                        column_name,
-                        qualifier,
-                    )
 
-    def _resolve_metric_reference(
-        self, metric_id: str, qualifier: str | None, column_name: str
+    def _owner_id_to_label(self) -> dict[str, str]:
+        """Reverse of the dataset maps: backing-node id → ``"Table"`` / ``"Query"``."""
+        return {
+            owner_id: self._dataset_name_to_owner_label.get(ds_name, "Table")
+            for ds_name, owner_id in self._dataset_name_to_owner_id.items()
+        }
+
+    def _resolve_qualifier(
+        self, qualifier: str, owner_labels: dict[str, str]
     ) -> tuple[str, str] | None:
         """
-        Resolve a metric column reference to its dataset's ``(owner_id, owner_label)``.
+        Resolve a table qualifier to its dataset's ``(owner_id, owner_label)``.
 
-        Qualified references resolve the qualifier (an OSI dataset name) directly against the
-        current semantic model. Unqualified references are matched by computing the candidate
-        column id under every dataset and checking membership in the model's materialized
-        column-id set; they resolve only when exactly one dataset declares the column.
-        Returns ``None`` (logged at debug) when the reference can't be resolved.
+        Tries, in order: an exact dataset-name match; a normalized dataset-name match
+        (case/separator-insensitive via :func:`_normalize`, since ids are normalized
+        everywhere else); and — for a 3-part ``database.schema.table`` source path — the
+        corresponding table id. Returns ``None`` when nothing matches.
         """
-        if qualifier is not None:
-            owner_id = self._dataset_name_to_owner_id.get(qualifier)
-            owner_label = self._dataset_name_to_owner_label.get(qualifier, "Table")
-            if owner_id is None:
-                # Every table/column id is normalized (lowercase, space/hyphen -> "_") by
-                # generate_*_id, but the dataset-name map keys are the raw OSI names. Fall
-                # back to a normalized match so a qualifier whose case/separators differ
-                # from the declared dataset name (e.g. `Orders` vs `orders`) still resolves
-                # — mirroring how column names are matched. (generate_database_id is the
-                # public form of the shared id normalizer.)
-                normalized = generate_database_id(qualifier)
-                for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
-                    if generate_database_id(ds_name) == normalized:
-                        owner_id = ds_owner_id
-                        owner_label = self._dataset_name_to_owner_label.get(ds_name, "Table")
-                        break
-            if owner_id is None:
-                logger.debug(
-                    "Metric %s references unknown dataset %r; skipping reference",
-                    metric_id,
-                    qualifier,
-                )
-                return None
-            return owner_id, owner_label
+        owner_id = self._dataset_name_to_owner_id.get(qualifier)
+        if owner_id is not None:
+            return owner_id, self._dataset_name_to_owner_label.get(qualifier, "Table")
 
-        # Unqualified: a dataset owns the column iff its candidate column id was materialized.
-        # Count matching DATASETS (one entry per dataset), not distinct owner ids — two
-        # dataset aliases backed by the same table/query are still two declarations of the
-        # column, so the reference stays ambiguous and is skipped.
+        normalized = _normalize(qualifier)
+        for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
+            if _normalize(ds_name) == normalized:
+                return ds_owner_id, self._dataset_name_to_owner_label.get(ds_name, "Table")
+
+        parts = qualifier.split(".")
+        if len(parts) == 3:  # a database.schema.table source-path reference
+            candidate = generate_table_id(parts[0], parts[1], parts[2])
+            label = owner_labels.get(candidate)
+            if label is not None:
+                return candidate, label
+        return None
+
+    def _resolve_unqualified_column(self, column_name: str) -> tuple[str, str] | None:
+        """
+        Resolve an unqualified column to its dataset's ``(owner_id, owner_label)``.
+
+        A dataset owns the column iff its candidate column id was materialized. Matching
+        DATASETS are counted (one entry per dataset, not per distinct owner id) so two
+        dataset aliases backed by the same table/query stay ambiguous; resolves only when
+        exactly one dataset declares the column.
+        """
         matches: list[tuple[str, str]] = []
         for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
             ds_owner_label = self._dataset_name_to_owner_label.get(ds_name, "Table")
@@ -594,15 +602,7 @@ class OsiIngestTransformer:
                 in self._sm_column_ids
             ):
                 matches.append((ds_owner_id, ds_owner_label))
-        if len(matches) == 1:
-            return matches[0]
-        logger.debug(
-            "Metric %s references unqualified column %r resolving to %d datasets; skipping",
-            metric_id,
-            column_name,
-            len(matches),
-        )
-        return None
+        return matches[0] if len(matches) == 1 else None
 
     def _add_metric_uses_table(self, metric_id: str, table_id: str) -> None:
         """Append a deduped ``MetricUsesTable`` edge (owner may be a Table or Query node)."""

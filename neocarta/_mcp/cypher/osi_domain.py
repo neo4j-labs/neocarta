@@ -121,8 +121,8 @@ RETURN {
             },
             backing_columns: COLLECT {
                 MATCH (m)-[:USES_COLUMN]->(mc:Column)
-                OPTIONAL MATCH (mco)-[:HAS_COLUMN|USES_COLUMN]->(mc)
-                WHERE mco:Table OR mco:Query
+                WITH mc, left(mc.id, size(mc.id) - size(last(split(mc.id, "."))) - 1) AS ownerId
+                OPTIONAL MATCH (mco:Table|Query {id: ownerId})
                 RETURN CASE WHEN mco IS NULL THEN mc.name ELSE mco.name + "." + mc.name END
             }
         }
