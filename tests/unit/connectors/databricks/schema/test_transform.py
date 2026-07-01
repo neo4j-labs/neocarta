@@ -152,36 +152,17 @@ def test_transform_to_references_relationships(
     assert rels[0].target_column_id == f"{CATALOG}.{SCHEMA}.customers.customer_id"
 
 
-def test_transform_to_references_relationships_drops_self_fk(
+def test_transform_self_table_fk_is_kept(
     databricks_transformer: DatabricksSchemaTransformer,
 ):
-    """Self-referencing FK rows (col -> same col on same table) must be dropped."""
-    column_references_info = pd.DataFrame(
+    """A self-referential-table FK across different columns produces an edge.
+
+    (The Databricks referential query pairs FK->PK columns by ordinal and never
+    collapses a column onto itself the way BigQuery's CONSTRAINT_COLUMN_USAGE join
+    can, so there is no self-FK filtering.)
+    """
+    refs = pd.DataFrame(
         [
-            {
-                "constraint_type": "FOREIGN KEY",
-                "table_catalog": CATALOG,
-                "table_schema": SCHEMA,
-                "table_name": "orders",
-                "column_name": "customer_id",
-                "ordinal_position": 1,
-                "referenced_catalog": CATALOG,
-                "referenced_schema": SCHEMA,
-                "referenced_table": "orders",
-                "referenced_column": "customer_id",
-            },
-            {
-                "constraint_type": "FOREIGN KEY",
-                "table_catalog": CATALOG,
-                "table_schema": SCHEMA,
-                "table_name": "orders",
-                "column_name": "customer_id",
-                "ordinal_position": 1,
-                "referenced_catalog": CATALOG,
-                "referenced_schema": SCHEMA,
-                "referenced_table": "customers",
-                "referenced_column": "customer_id",
-            },
             {
                 "constraint_type": "FOREIGN KEY",
                 "table_catalog": CATALOG,
@@ -193,28 +174,13 @@ def test_transform_to_references_relationships_drops_self_fk(
                 "referenced_schema": SCHEMA,
                 "referenced_table": "employees",
                 "referenced_column": "employee_id",
-            },
+            }
         ]
     )
-
-    refs = databricks_transformer.transform_to_references_relationships(
-        column_references_info, cache=False
-    )
-
-    pairs = {(r.source_column_id, r.target_column_id) for r in refs}
-    assert (
-        f"{CATALOG}.{SCHEMA}.orders.customer_id",
-        f"{CATALOG}.{SCHEMA}.orders.customer_id",
-    ) not in pairs
-    assert (
-        f"{CATALOG}.{SCHEMA}.orders.customer_id",
-        f"{CATALOG}.{SCHEMA}.customers.customer_id",
-    ) in pairs
-    assert (
-        f"{CATALOG}.{SCHEMA}.employees.manager_id",
-        f"{CATALOG}.{SCHEMA}.employees.employee_id",
-    ) in pairs
-    assert len(refs) == 2
+    rels = databricks_transformer.transform_to_references_relationships(refs, cache=False)
+    assert len(rels) == 1
+    assert rels[0].source_column_id == f"{CATALOG}.{SCHEMA}.employees.manager_id"
+    assert rels[0].target_column_id == f"{CATALOG}.{SCHEMA}.employees.employee_id"
 
 
 def test_transform_to_has_value_relationships(

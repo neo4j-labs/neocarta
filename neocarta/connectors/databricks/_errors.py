@@ -8,13 +8,14 @@ ever see :class:`~neocarta.errors.NeocartaError` subtypes, never raw
 The optional ``databricks-sql-connector`` extra may be absent at import time
 (the package must import without it — see the Databricks tags connector, which
 applies the same discipline to the Databricks SDK). So this module never imports
-``databricks.sql`` at module load: the exception base is imported lazily, and
-classification falls back to matching the raised exception's MRO class names plus
-small, documented message heuristics. ``databricks.sql`` exposes only the coarse
-PEP-249 hierarchy (no dedicated auth / timeout / rate-limit classes), so unlike
-the typed BigQuery mapping these signals are detected from the class name and
-message — the message is read for classification but, per the contract, never
-logged: only the exception *type* is recorded in ``details``.
+``databricks.sql`` at module load: the exception base is imported lazily.
+
+Classification is by the **exception class only** — the stable PEP-249 /
+``databricks.sql`` class hierarchy — never by matching error *message* text,
+which is not part of any API contract and can change between releases. A
+``ProgrammingError`` (invalid SQL / request) maps to :class:`ConfigError`; every
+other genuine ``databricks.sql`` error maps to :class:`ExtractionError`. Only the
+exception *type* is recorded in ``details`` — never the message or SQL.
 """
 
 from __future__ import annotations
@@ -23,53 +24,11 @@ from collections.abc import Callable
 from functools import lru_cache, wraps
 from typing import Any, TypeVar, cast
 
-from ...errors import (
-    AuthError,
-    ConfigError,
-    ExtractionError,
-    NeocartaError,
-    OperationTimeoutError,
-    RateLimitError,
-)
+from ...errors import ConfigError, ExtractionError, NeocartaError
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-# Lowercased substrings used to classify a coarse ``databricks.sql`` error from
-# its message when the PEP-249 class name is not specific enough. databricks.sql
-# has no dedicated auth/timeout/rate-limit exception classes, so these are the
-# pragmatic signals. They are read for classification only — never logged.
-_AUTH_TOKENS = (
-    "permission_denied",
-    "permission denied",
-    "unauthorized",
-    "unauthenticated",
-    "forbidden",
-    "invalid access token",
-    "authentication",
-    " 401",
-    " 403",
-)
-_NOT_FOUND_TOKENS = (
-    "not_found",
-    "not found",
-    "does not exist",
-    "no such",
-    "cannot be found",
-)
-_RATE_LIMIT_TOKENS = (
-    "too many requests",
-    "rate limit",
-    "rate-limit",
-    "throttl",
-    " 429",
-)
-_TIMEOUT_TOKENS = (
-    "timeout",
-    "timed out",
-    "deadline",
-)
-
-# PEP-249 class names treated as transient (worth retrying as-is).
+# PEP-249 / databricks.sql class names treated as transient (worth retrying as-is).
 _RETRYABLE_NAMES = frozenset({"OperationalError", "RequestError", "ServerOperationError"})
 
 
@@ -90,12 +49,14 @@ def _databricks_error_base() -> type[BaseException] | None:
 
 
 def _classify(exc: Exception, op: str) -> NeocartaError:
-    """Map a ``databricks.sql`` exception to a typed Neocarta error.
+    """Map a ``databricks.sql`` exception to a typed Neocarta error by its class.
 
-    Classification order (most actionable first): auth → config (bad SQL /
-    missing catalog or schema) → rate limit → timeout → extraction. Only the
-    exception *type* is preserved in ``details`` — never the message or SQL
-    (contract §16).
+    Uses only the exception's class hierarchy — never the message text. A
+    ``ProgrammingError`` (invalid SQL / request) becomes a :class:`ConfigError`;
+    every other genuine ``databricks.sql`` error becomes an
+    :class:`ExtractionError` (``retryable=True`` for the transient operational /
+    request / server-operation classes). Only the exception *type* is preserved
+    in ``details`` (contract §16) — never the message or SQL.
 
     Parameters
     ----------
@@ -110,36 +71,14 @@ def _classify(exc: Exception, op: str) -> NeocartaError:
         The mapped error, to be raised ``from`` the original.
     """
     names = {klass.__name__ for klass in type(exc).__mro__}
-    message = str(exc).lower()
     details: dict[str, Any] = {
         "connector": "databricks",
         "op": op,
         "error_type": type(exc).__name__,
     }
-
-    if any(token in message for token in _AUTH_TOKENS):
-        return AuthError(
-            f"Databricks rejected the credentials during {op}.",
-            suggestion=(
-                "Verify the access token (PAT) is valid and that it can read "
-                "the catalog's information_schema."
-            ),
-            details=details,
-        )
-    if "ProgrammingError" in names or any(token in message for token in _NOT_FOUND_TOKENS):
+    if "ProgrammingError" in names:
         return ConfigError(
-            f"Databricks rejected the request during {op} "
-            "(invalid SQL, or the catalog/schema was not found).",
-            details=details,
-        )
-    if any(token in message for token in _RATE_LIMIT_TOKENS):
-        return RateLimitError(
-            f"Databricks rate-limited the request during {op}.",
-            details=details,
-        )
-    if any(token in message for token in _TIMEOUT_TOKENS):
-        return OperationTimeoutError(
-            f"Databricks query timed out during {op}.",
+            f"Databricks rejected the request during {op} (invalid SQL or request).",
             details=details,
         )
     return ExtractionError(
@@ -159,14 +98,11 @@ def wrap_databricks_errors(func: F) -> F:
     ``databricks.sql.exc.Error`` base); unrelated exceptions propagate untouched
     so real bugs are never masked as extraction failures.
 
-    Mapping
-    -------
-    * auth / permission / token signals → :class:`AuthError`
-    * ``ProgrammingError`` / not-found signals → :class:`ConfigError`
-    * rate-limit signals → :class:`RateLimitError`
-    * timeout signals → :class:`OperationTimeoutError`
-    * anything else → :class:`ExtractionError` (``retryable=True`` for transient
-      operational / request / server-operation errors)
+    Mapping (by exception class, never by message text)
+    ---------------------------------------------------
+    * ``ProgrammingError`` (invalid SQL / request) → :class:`ConfigError`
+    * any other genuine ``databricks.sql`` error → :class:`ExtractionError`
+      (``retryable=True`` for transient operational / request / server errors)
     """
 
     @wraps(func)

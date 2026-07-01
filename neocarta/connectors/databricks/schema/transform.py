@@ -424,11 +424,6 @@ class DatabricksSchemaTransformer:
                 row.referenced_table,
                 row.referenced_column,
             )
-            # Skip bogus self-FKs (a column referencing itself) — a quirk of how
-            # INFORMATION_SCHEMA constraint joins can collapse when both sides
-            # resolve to the same column.
-            if source_column_id == target_column_id:
-                continue
             references_relationships.append(
                 References(
                     source_column_id=source_column_id,

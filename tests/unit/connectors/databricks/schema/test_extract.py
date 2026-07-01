@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock
 
 import pandas as pd
@@ -10,13 +11,7 @@ from neocarta.connectors.databricks.schema.extract import (
     _quote_identifier,
 )
 from neocarta.connectors.utils.generate_id import generate_column_id, generate_value_id
-from neocarta.errors import (
-    AuthError,
-    ConfigError,
-    ExtractionError,
-    OperationTimeoutError,
-    RateLimitError,
-)
+from neocarta.errors import ConfigError, ExtractionError
 
 CATALOG = "test_catalog"
 SCHEMA = "test_schema"
@@ -249,7 +244,38 @@ def test_extract_references_info_is_catalog_scoped():
     # FK columns must pair to referenced PK columns by position_in_unique_constraint
     # (order-independent), NOT by the FK column's own ordinal_position.
     assert "fk.position_in_unique_constraint" in sql
+    # The referenced-PK side is LEFT JOINed so cross-catalog FKs surface as NULL rows.
+    assert "LEFT JOIN" in sql
     assert params == {"catalog": "cat", "schema": "sch"}
+
+
+def _fk_row(referenced_catalog, referenced_table="parent"):
+    return {
+        "constraint_type": "FOREIGN KEY",
+        "table_catalog": "cat",
+        "table_schema": "sch",
+        "table_name": "child",
+        "column_name": "fk",
+        "ordinal_position": 1,
+        "referenced_catalog": referenced_catalog,
+        "referenced_schema": "sch" if referenced_catalog else None,
+        "referenced_table": referenced_table if referenced_catalog else None,
+        "referenced_column": "id" if referenced_catalog else None,
+    }
+
+
+def test_extract_references_drops_cross_catalog_fk_and_warns(caplog):
+    """A cross-catalog FK (referenced PK LEFT-JOINed to NULL) is dropped, with a warning."""
+    frame = pd.DataFrame([_fk_row("cat"), _fk_row(None)])  # one resolved, one cross-catalog
+    conn = _capture_connection(frame)
+    ex = DatabricksSchemaExtractor(connection=conn, catalog="cat")
+    with caplog.at_level(logging.WARNING):
+        out = ex.extract_column_references_info("sch")
+    assert len(out) == 1
+    assert out.iloc[0]["referenced_table"] == "parent"
+    assert any(
+        "outside catalog" in r.message or "cross-catalog" in r.message for r in caplog.records
+    )
 
 
 def test_extract_column_info_empty_schema_yields_empty_key_flags():
@@ -411,10 +437,9 @@ def test_value_sampling_for_all_tables_requires_extracted_state():
 
 # --- error mapping --------------------------------------------------------------
 #
-# `_classify` is tested directly (it has no dependency on whether the optional
-# extra is installed): dummy classes named to match the PEP-249 hierarchy exercise
-# the MRO-name + message-token classification. The wrapper's base-guard and
-# NeocartaError passthrough are tested separately.
+# `_classify` is tested directly (no dependency on whether the optional extra is
+# installed). Classification is by exception CLASS only — never message text — so
+# the dummy classes are named to match the PEP-249 / databricks.sql hierarchy.
 
 
 class ProgrammingError(Exception):
@@ -425,36 +450,47 @@ class OperationalError(Exception):
     """Stand-in for databricks.sql.exc.OperationalError."""
 
 
-def test_classify_auth():
-    """A permission/credential signal classifies as AuthError."""
-    assert isinstance(_classify(OperationalError("PERMISSION_DENIED: token"), "op"), AuthError)
+class RequestError(Exception):
+    """Stand-in for databricks.sql.exc.RequestError."""
 
 
-def test_classify_config_programming_error():
-    """A ProgrammingError classifies as ConfigError."""
+class ServerOperationError(Exception):
+    """Stand-in for databricks.sql.exc.ServerOperationError."""
+
+
+class Error(Exception):
+    """Stand-in for the databricks.sql.exc.Error base."""
+
+
+def test_classify_programming_error_is_config():
+    """A ProgrammingError (invalid SQL/request) classifies as ConfigError."""
     assert isinstance(_classify(ProgrammingError("syntax error near FROM"), "op"), ConfigError)
 
 
-def test_classify_config_not_found():
-    """A not-found signal classifies as ConfigError."""
-    assert isinstance(_classify(Exception("Catalog 'nope' not found"), "op"), ConfigError)
-
-
-def test_classify_rate_limit():
-    """A rate-limit signal classifies as RateLimitError."""
-    assert isinstance(_classify(Exception("429 Too Many Requests"), "op"), RateLimitError)
-
-
-def test_classify_timeout():
-    """A timeout signal classifies as OperationTimeoutError."""
-    assert isinstance(_classify(Exception("query timed out"), "op"), OperationTimeoutError)
-
-
-def test_classify_generic_extraction_is_retryable():
-    """An OperationalError without a more specific signal is a retryable ExtractionError."""
-    mapped = _classify(OperationalError("unexpected server hiccup"), "op")
+@pytest.mark.parametrize("exc_cls", [OperationalError, RequestError, ServerOperationError])
+def test_classify_transient_is_retryable_extraction(exc_cls):
+    """Operational/request/server errors classify as a retryable ExtractionError."""
+    mapped = _classify(exc_cls("boom"), "op")
     assert isinstance(mapped, ExtractionError)
     assert mapped.retryable is True
+
+
+def test_classify_generic_error_not_retryable():
+    """A plain Error classifies as a non-retryable ExtractionError."""
+    mapped = _classify(Error("boom"), "op")
+    assert isinstance(mapped, ExtractionError)
+    assert mapped.retryable is False
+
+
+def test_classify_ignores_message_wording():
+    """Classification uses the class, NOT message text: auth/not-found/429/timeout
+    words in a non-Programming error do not change the mapping (guards against
+    Databricks changing error wording)."""
+    noisy = ServerOperationError("PERMISSION_DENIED 403 not found 429 timed out")
+    mapped = _classify(noisy, "op")
+    assert isinstance(mapped, ExtractionError)  # NOT Auth/Config/RateLimit/Timeout
+    assert mapped.retryable is True
+    assert mapped.details["error_type"] == "ServerOperationError"
 
 
 def test_wrapper_passes_through_neocarta_error():
@@ -472,13 +508,13 @@ def test_wrapper_classifies_databricks_error(monkeypatch):
     """With the extra treated as present, a databricks-like error is classified."""
     # Force the base to a type the raised exception IS an instance of, so the
     # wrapper takes the classify path regardless of whether the extra is installed.
-    monkeypatch.setattr(_errors, "_databricks_error_base", lambda: OperationalError)
+    monkeypatch.setattr(_errors, "_databricks_error_base", lambda: ProgrammingError)
 
     @wrap_databricks_errors
     def fn():
-        raise OperationalError("403 PERMISSION_DENIED")
+        raise ProgrammingError("bad sql")
 
-    with pytest.raises(AuthError):
+    with pytest.raises(ConfigError):
         fn()
 
 

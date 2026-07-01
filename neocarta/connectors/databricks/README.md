@@ -166,6 +166,12 @@ control, not a graph-entity filter).
   the catalog metadata, and can surface PII. Pass `value_sample_limit=0` to skip it
   (no `:Value` nodes / `HAS_VALUE` edges). Complex/non-groupable column types
   (ARRAY/MAP/STRUCT/BINARY/VARIANT) are skipped automatically.
+- **Re-ingest is additive.** Re-running against the same schema adds newly-created
+  tables/columns/values, but it does **not** refresh changed metadata (e.g. an
+  edited comment or type on an existing column) and does **not** remove tables,
+  columns, or edges that were dropped at the source — the shared `Neo4jRDBMSLoader`
+  MERGEs with `ON CREATE` semantics and never deletes. To make the graph faithful to
+  a changed source, clear the affected subgraph before re-ingesting.
 - **Keys are informational.** Unity Catalog primary/foreign keys are *not enforced*
   and appear only when tables declare constraints; without declared keys, column
   key flags stay `False` and no `REFERENCES` edges are produced. Inferred-FK
@@ -174,10 +180,13 @@ control, not a graph-entity filter).
   the requested schema (a typo, or the warehouse can't see it), the connector raises
   a `ConfigError` rather than synthesizing an empty schema — a config problem surfaces
   as a failure, not a silent partial graph.
-- **Cross-schema/catalog foreign keys.** A `REFERENCES` edge uses the foreign key's
-  own catalog/schema for the source column and the *referenced* table's catalog/schema
-  for the target, so a foreign key pointing at a table in another schema resolves
-  correctly. (Unity Catalog foreign keys are informational and usually intra-schema.)
+- **Cross-schema foreign keys resolve; cross-catalog are skipped.** A `REFERENCES`
+  edge uses the foreign key's own catalog/schema for the source column and the
+  *referenced* table's catalog/schema for the target, so a foreign key pointing at a
+  table in a different **schema of the same catalog** resolves correctly. A foreign
+  key whose referenced table lives in a **different catalog** is skipped (with a
+  logged warning): the connector ingests one catalog at a time, so that referenced
+  table — and its `:Column` node — is not part of the graph anyway.
 - **Pass a regular catalog, not `system`.** Every query is scoped to the catalog
   you pass (`WHERE table_catalog = <catalog>`), so a normal catalog's per-catalog
   `information_schema` is read as expected. The special `system` catalog exposes an

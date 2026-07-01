@@ -9,6 +9,7 @@ DataFrame column names match what :class:`DatabricksSchemaTransformer` consumes.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -21,6 +22,8 @@ from .models import SchemaExtractorCache
 
 if TYPE_CHECKING:
     from databricks.sql.client import Connection
+
+logger = logging.getLogger(__name__)
 
 # Unity Catalog column types that cannot be passed to ``collect_set`` / sampled
 # with a distinct aggregate (complex / non-groupable types). Compared against an
@@ -411,6 +414,11 @@ WHERE kcu.table_catalog = %(catalog)s
             ``referenced_column``. The ``referenced_*`` fields describe the table the
             foreign key points at (which may live in a different schema/catalog).
         """
+        # The referenced-PK side is LEFT JOINed: a foreign key that references a PK in a
+        # *different catalog* has its key_column_usage rows in that other catalog's
+        # information_schema (not this one), so the join yields NULLs. Such rows are dropped
+        # below (with a warning) rather than silently vanishing — the referenced table is not
+        # part of a single-catalog ingest anyway, so the edge would dangle.
         df = self._run_query(
             f"""
 SELECT
@@ -429,7 +437,7 @@ JOIN {self._qualify()}.key_column_usage fk
     ON fk.constraint_catalog = rc.constraint_catalog
     AND fk.constraint_schema = rc.constraint_schema
     AND fk.constraint_name = rc.constraint_name
-JOIN {self._qualify()}.key_column_usage pk
+LEFT JOIN {self._qualify()}.key_column_usage pk
     ON pk.constraint_catalog = rc.unique_constraint_catalog
     AND pk.constraint_schema = rc.unique_constraint_schema
     AND pk.constraint_name = rc.unique_constraint_name
@@ -440,6 +448,21 @@ ORDER BY fk.table_name, fk.constraint_name, fk.ordinal_position
 """,
             {"catalog": self.catalog, "schema": schema},
         )
+
+        if not df.empty:
+            resolved = df[df["referenced_table"].notna()]
+            skipped = len(df) - len(resolved)
+            if skipped:
+                logger.warning(
+                    "Skipped %d foreign-key column reference(s) in schema %r whose referenced "
+                    "table is outside catalog %r; cross-catalog foreign keys are not modelled "
+                    "in a single-catalog ingest.",
+                    skipped,
+                    schema,
+                    self.catalog,
+                )
+            df = resolved.reset_index(drop=True)
+
         if cache:
             self._cache["column_references_info"] = df
         return df
@@ -595,24 +618,19 @@ ORDER BY fk.table_name, fk.constraint_name, fk.ordinal_position
                 self._cache["column_unique_values"] = empty
             return empty
 
-        value_info = pd.DataFrame()
-        for table_name in table_info["table_name"].unique():
-            column_names = column_info[column_info["table_name"] == table_name][
-                "column_name"
-            ].unique()
-            value_info = pd.concat(
-                [
-                    value_info,
-                    self.extract_column_unique_values_for_table(
-                        table_name,
-                        list(column_names),
-                        schema,
-                        column_info=column_info,
-                        cache=False,
-                    ),
-                ],
-                ignore_index=True,
+        # Collect each table's values, then concat ONCE (concatenating inside the loop is
+        # quadratic — it recopies the growing frame on every iteration).
+        per_table = [
+            self.extract_column_unique_values_for_table(
+                table_name,
+                list(column_info[column_info["table_name"] == table_name]["column_name"].unique()),
+                schema,
+                column_info=column_info,
+                cache=False,
             )
+            for table_name in table_info["table_name"].unique()
+        ]
+        value_info = pd.concat(per_table, ignore_index=True) if per_table else _empty_value_frame()
 
         if cache:
             self._cache["column_unique_values"] = value_info
