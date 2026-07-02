@@ -218,6 +218,13 @@ def test_transform_references_empty_frame(
     assert databricks_transformer.transform_to_references_relationships(empty) == []
 
 
+def test_transform_references_columnless_frame(
+    databricks_transformer: DatabricksSchemaTransformer,
+):
+    """A bare empty frame carrying no ``constraint_type`` column yields no edges, no KeyError."""
+    assert databricks_transformer.transform_to_references_relationships(pd.DataFrame()) == []
+
+
 def test_transform_references_resolves_cross_schema_target(
     databricks_transformer: DatabricksSchemaTransformer,
 ):

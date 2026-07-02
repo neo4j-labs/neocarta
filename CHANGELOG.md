@@ -4,6 +4,8 @@
 ## Upcoming
 
 ### Fixed
+- `DatabricksSchemaExtractor.extract_column_unique_values_for_table` no longer accumulates duplicate sampled values in its cache when called more than once for the same table with `cache=True`; the cached values frame is now de-duplicated by `value_id`, so repeated calls can't produce duplicate `:Value` nodes / `HAS_VALUE` edges. It also now warns when no column metadata is available (so non-sampleable complex types can't be detected), instead of silently pushing a complex column into a `collect_set` query that Databricks would reject.
+- `DatabricksSchemaTransformer.transform_to_references_relationships` no longer re-filters on `constraint_type == "FOREIGN KEY"` (the extractor already emits foreign-key rows exclusively); the redundant filter was also a latent `KeyError` on a column-less empty frame. It now iterates the references frame directly and tolerates an empty frame that carries no `constraint_type` column.
 - `write_embeddings_to_graph` now logs the actual number of embeddings written based on input row count, instead of `summary.counters.properties_set`, which is always 0 because `db.create.setNodeVectorProperty` is a procedure call and Neo4j query summary counters do not track procedure-call writes. (#216)
 - Connector skills now document search-entry-point index requirements and embedding label obligations. Any node label used as an MCP search entry point must have a full-text index created at load time and must be included in the CLI `--embeddings` label set. Override hazard for `Neo4jRDBMSLoader` subclasses is now explicit in the contract. (#211)
 

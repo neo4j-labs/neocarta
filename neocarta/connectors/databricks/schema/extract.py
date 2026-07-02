@@ -516,10 +516,23 @@ ORDER BY fk.table_name, fk.constraint_name, fk.ordinal_position
             return _empty_value_frame()
 
         column_info = column_info if column_info is not None else self._cache.get("column_info")
+        have_types = column_info is not None and not column_info.empty
+        if not have_types:
+            # Without column metadata the complex/non-sampleable types cannot be detected, so
+            # a complex column (ARRAY/MAP/STRUCT/BINARY/VARIANT) would be pushed into
+            # collect_set and fail the whole query. Warn rather than sample blindly; the
+            # normal pipeline always supplies column_info (extract_column_info runs first).
+            logger.warning(
+                "No column metadata for table %r; cannot skip non-sampleable types (%s) — the "
+                "sampling query may fail on complex columns. Call extract_column_info(schema=...) "
+                "first (or pass column_info=) to enable type-based skipping.",
+                table_name,
+                ", ".join(_NON_SAMPLEABLE_TYPES),
+            )
 
         select_clauses = []
         for col in column_names:
-            if column_info is not None and not column_info.empty:
+            if have_types:
                 col_data_type = column_info[
                     (column_info["table_name"] == table_name) & (column_info["column_name"] == col)
                 ]["data_type"]
@@ -556,9 +569,17 @@ ORDER BY fk.table_name, fk.constraint_name, fk.ordinal_position
             )
 
         if cache:
-            self._cache["column_unique_values"] = pd.concat(
+            # Append to the running cache, then drop rows that repeat a ``value_id`` — a
+            # value id fully identifies (catalog, schema, table, column, value), so a repeat
+            # is the *same* value re-sampled (e.g. this method called twice for one table),
+            # not a distinct one. Without this, a re-run would accumulate duplicate :Value
+            # nodes / HAS_VALUE edges.
+            combined = pd.concat(
                 [self._cache.get("column_unique_values", pd.DataFrame()), result],
                 ignore_index=True,
+            )
+            self._cache["column_unique_values"] = combined.drop_duplicates(
+                subset="value_id", ignore_index=True
             )
         return result
 

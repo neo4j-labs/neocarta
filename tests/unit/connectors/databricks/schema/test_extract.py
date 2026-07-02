@@ -435,6 +435,32 @@ def test_value_sampling_for_all_tables_requires_extracted_state():
         extractor.extract_column_unique_values_for_all_tables(SCHEMA)
 
 
+def test_value_sampling_cache_dedupes_on_repeated_calls():
+    """Re-sampling the same table with cache=True must not accumulate duplicate values."""
+    connection = _value_query_connection(pd.DataFrame({"customer_id": [[1, 2]]}))
+    extractor = DatabricksSchemaExtractor(connection=connection, catalog=CATALOG)
+
+    extractor.extract_column_unique_values_for_table("customers", ["customer_id"], SCHEMA)
+    extractor.extract_column_unique_values_for_table("customers", ["customer_id"], SCHEMA)
+
+    cached = extractor.column_unique_values
+    assert len(cached) == 2  # two distinct values, not four
+    assert cached["value_id"].is_unique
+
+
+def test_value_sampling_warns_when_no_column_metadata(caplog):
+    """Sampling without column metadata warns that complex types can't be skipped."""
+    connection = _value_query_connection(pd.DataFrame({"customer_id": [[1]]}))
+    extractor = DatabricksSchemaExtractor(connection=connection, catalog=CATALOG)
+
+    with caplog.at_level(logging.WARNING):
+        extractor.extract_column_unique_values_for_table(
+            "customers", ["customer_id"], SCHEMA, cache=False
+        )
+
+    assert any("No column metadata for table" in rec.message for rec in caplog.records)
+
+
 # --- error mapping --------------------------------------------------------------
 #
 # `_classify` is tested directly (no dependency on whether the optional extra is

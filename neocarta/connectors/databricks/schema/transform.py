@@ -406,10 +406,12 @@ class DatabricksSchemaTransformer:
         list[References]
             The references relationships.
         """
-        fk_rows = column_references_info[column_references_info["constraint_type"] == "FOREIGN KEY"]
-
+        # ``extract_column_references_info`` already emits FOREIGN KEY rows exclusively
+        # (the constraint type is a SQL literal in its SELECT), so every row here is a
+        # foreign key — iterate directly rather than re-filtering, which also tolerates an
+        # empty frame that carries no ``constraint_type`` column.
         references_relationships = []
-        for _, row in fk_rows.iterrows():
+        for _, row in column_references_info.iterrows():
             # Source uses the foreign key's own catalog/schema; target uses the *referenced*
             # table's catalog/schema, so cross-schema/catalog foreign keys resolve correctly.
             source_column_id = generate_column_id(
