@@ -105,11 +105,10 @@ def test_quote_identifier_rejects_backtick():
         _quote_identifier("evil`catalog")
 
 
-def test_qualify_rejects_backtick_catalog():
-    """_qualify rejects a catalog name containing a backtick."""
-    extractor = DatabricksSchemaExtractor(connection=MagicMock(), catalog="evil`catalog")
+def test_constructor_rejects_backtick_catalog():
+    """A catalog name containing a backtick is rejected up front, at construction."""
     with pytest.raises(ConfigError):
-        extractor._qualify()
+        DatabricksSchemaExtractor(connection=MagicMock(), catalog="evil`catalog")
 
 
 # --- construction guards --------------------------------------------------------

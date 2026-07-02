@@ -110,6 +110,14 @@ class DatabricksSchemaExtractor:
                 "catalog is required for the Databricks schema extractor.",
                 suggestion="Pass catalog=... (the Unity Catalog catalog name).",
             )
+        # Reject a malformed catalog identifier at construction so it fails fast and
+        # uniformly with the schema check (which validates up front in the connector),
+        # rather than only when the first query reaches _quote_identifier.
+        if "`" in catalog:
+            raise ConfigError(
+                f"Invalid catalog identifier {catalog!r}: backticks are not allowed.",
+                suggestion="Pass a catalog name without backtick characters.",
+            )
         if (
             not isinstance(value_sample_limit, int)
             or isinstance(value_sample_limit, bool)
