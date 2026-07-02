@@ -48,6 +48,8 @@ _MANAGED_ATTR = "_neocarta_managed"
 # that can carry data values or SQL (e.g. ``column_names``, ``query``).
 _SAFE_TARGET_KEYS: tuple[str, ...] = (
     "dataset_id",
+    "catalog",
+    "schema",
     "table_name",
     "region",
     "filename",

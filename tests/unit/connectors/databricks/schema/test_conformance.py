@@ -1,0 +1,194 @@
+"""Conformance tests for DatabricksSchemaConnector.
+
+Asserts conformance with the public connector standard defined in
+``.claude/skills/neocarta-add-source-connector/connector-contract.md`` and codified in
+``neocarta.connectors._base``.
+"""
+
+import importlib
+import pathlib
+from unittest.mock import MagicMock
+
+import pytest
+
+from neocarta.connectors._base import SourceConnectorProtocol
+from neocarta.connectors.databricks import DatabricksSchemaConnector
+from neocarta.errors import ConfigError, StateError
+
+PACKAGE = "neocarta.connectors.databricks"
+SCHEMA_PACKAGE = "neocarta.connectors.databricks.schema"
+
+
+def _make_connector() -> DatabricksSchemaConnector:
+    """Construct a DatabricksSchemaConnector with mocked external dependencies."""
+    return DatabricksSchemaConnector(
+        connection=MagicMock(),
+        catalog="test_catalog",
+        neo4j_driver=MagicMock(),
+    )
+
+
+def test_conforms_to_source_connector_protocol():
+    """DatabricksSchemaConnector is a source connector."""
+    assert isinstance(_make_connector(), SourceConnectorProtocol)
+
+
+def test_has_public_stage_methods():
+    """The standard public API (extract / transform / load / ingest / run) exists."""
+    for name in ("extract", "transform", "load", "ingest", "run"):
+        assert callable(getattr(DatabricksSchemaConnector, name)), f"missing public method: {name}"
+
+
+def test_run_emits_deprecation_warning():
+    """run() must emit DeprecationWarning and delegate to ingest()."""
+    connector = _make_connector()
+    connector.ingest = MagicMock()
+    with pytest.warns(DeprecationWarning, match="run"):
+        connector.run("test_schema")
+    connector.ingest.assert_called_once_with("test_schema")
+
+
+def test_readme_present():
+    """Every connector ships a README.md at its package root."""
+    module = importlib.import_module(PACKAGE)
+    package_dir = pathlib.Path(module.__file__).parent
+    assert (package_dir / "README.md").exists()
+
+
+def test_init_exports_are_minimal():
+    """__init__.py exports only connector classes / warnings (no Extractor/Transformer/Loader)."""
+    module = importlib.import_module(PACKAGE)
+    exported = getattr(module, "__all__", None)
+    assert exported is not None, "__init__.py must define __all__"
+    for name in exported:
+        assert not name.endswith(("Extractor", "Transformer", "Loader")), (
+            f"{name} should not be re-exported from {PACKAGE}.__init__.py"
+        )
+
+
+def test_init_still_exports_tags_connector():
+    """Adding the schema connector must not drop the existing tags exports."""
+    module = importlib.import_module(PACKAGE)
+    assert "DatabricksSchemaConnector" in module.__all__
+    assert "DatabricksTagsConnector" in module.__all__
+    assert "DatabricksTagsWarning" in module.__all__
+
+
+def test_schema_subpackage_exports_are_minimal():
+    """The schema sub-package's own __init__.py exports only its connector class.
+
+    The parent-package checks above cover the source-package contract (README +
+    __all__ at neocarta.connectors.databricks); this verifies the schema
+    sub-package root independently so a broken schema/__init__.py can't slip
+    through.
+    """
+    module = importlib.import_module(SCHEMA_PACKAGE)
+    exported = getattr(module, "__all__", None)
+    assert exported is not None, "schema/__init__.py must define __all__"
+    assert "DatabricksSchemaConnector" in exported
+    for name in exported:
+        assert not name.endswith(("Extractor", "Transformer", "Loader")), (
+            f"{name} should not be re-exported from {SCHEMA_PACKAGE}.__init__.py"
+        )
+
+
+def test_transform_before_extract_raises_state_error():
+    """Calling transform() without a prior extract() raises StateError."""
+    connector = _make_connector()
+    with pytest.raises(StateError):
+        connector.transform()
+
+
+def test_load_before_transform_raises_state_error():
+    """Calling load() without a prior transform() raises StateError."""
+    connector = _make_connector()
+    with pytest.raises(StateError):
+        connector.load()
+
+
+def test_context_manager_returns_self():
+    """The connector is usable as a context manager and yields itself."""
+    connector = _make_connector()
+    with connector as ctx:
+        assert ctx is connector
+
+
+def test_close_leaves_injected_driver_open():
+    """close() must not close the caller-owned Neo4j driver."""
+    connector = _make_connector()
+    connector.close()
+    connector.neo4j_driver.close.assert_not_called()
+
+
+def test_close_leaves_injected_connection_open():
+    """close() must not close the caller-owned databricks.sql connection."""
+    connector = _make_connector()
+    connector.close()
+    connector.connection.close.assert_not_called()
+
+
+def test_context_manager_exit_leaves_injected_driver_open():
+    """Exiting the context manager must not close the caller-owned Neo4j driver."""
+    connector = _make_connector()
+    with connector:
+        pass
+    connector.neo4j_driver.close.assert_not_called()
+
+
+def test_context_manager_exit_leaves_injected_connection_open():
+    """Exiting the context manager must not close the caller-owned connection."""
+    connector = _make_connector()
+    with connector:
+        pass
+    connector.connection.close.assert_not_called()
+
+
+def test_driver_usable_across_repeated_context_blocks():
+    """The caller's driver survives repeated context-managed use, ready for reuse."""
+    connector = _make_connector()
+    driver = connector.neo4j_driver
+    with connector:
+        pass
+    with connector:
+        pass
+    driver.close.assert_not_called()
+
+
+def test_context_manager_exit_on_exception_leaves_driver_open():
+    """An error inside the `with` block propagates and leaves the driver open."""
+    connector = _make_connector()
+    with pytest.raises(ValueError, match="boom"), connector:
+        raise ValueError("boom")
+    connector.neo4j_driver.close.assert_not_called()
+
+
+def test_missing_connection_raises_config_error():
+    """A missing connection is a configuration error."""
+    with pytest.raises(ConfigError):
+        DatabricksSchemaConnector(connection=None, catalog="test_catalog", neo4j_driver=MagicMock())
+
+
+def test_missing_catalog_raises_config_error():
+    """A missing catalog is a configuration error."""
+    with pytest.raises(ConfigError):
+        DatabricksSchemaConnector(connection=MagicMock(), catalog="", neo4j_driver=MagicMock())
+
+
+def test_missing_driver_raises_config_error():
+    """A missing Neo4j driver is a configuration error."""
+    with pytest.raises(ConfigError):
+        DatabricksSchemaConnector(connection=MagicMock(), catalog="test_catalog", neo4j_driver=None)
+
+
+def test_extract_rejects_empty_schema():
+    """extract() requires a schema name."""
+    connector = _make_connector()
+    with pytest.raises(ConfigError):
+        connector.extract("")
+
+
+def test_extract_rejects_backtick_schema():
+    """A malformed schema identifier fails fast and uniformly (any value_sample_limit)."""
+    connector = _make_connector()
+    with pytest.raises(ConfigError):
+        connector.extract("bad`schema")
