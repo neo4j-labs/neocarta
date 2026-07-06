@@ -566,16 +566,23 @@ class OsiIngestTransformer:
         Tries, in order: an exact dataset-name match; a normalized dataset-name match
         (case/separator-insensitive via :func:`_normalize`, since ids are normalized
         everywhere else); and — for a 3-part ``database.schema.table`` source path — the
-        corresponding table id. Returns ``None`` when nothing matches.
+        corresponding table id. Returns ``None`` when nothing matches or when the normalized
+        match is ambiguous (two datasets normalizing to the same id).
         """
         owner_id = self._dataset_name_to_owner_id.get(qualifier)
         if owner_id is not None:
             return owner_id, self._dataset_name_to_owner_label.get(qualifier, "Table")
 
+        # Normalized match, guarded against ambiguity: if more than one distinct dataset
+        # normalizes to the qualifier (e.g. ``Order Items`` and ``order-items``), don't guess.
         normalized = _normalize(qualifier)
-        for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items():
-            if _normalize(ds_name) == normalized:
-                return ds_owner_id, self._dataset_name_to_owner_label.get(ds_name, "Table")
+        norm_matches = {
+            (ds_owner_id, self._dataset_name_to_owner_label.get(ds_name, "Table"))
+            for ds_name, ds_owner_id in self._dataset_name_to_owner_id.items()
+            if _normalize(ds_name) == normalized
+        }
+        if len(norm_matches) == 1:
+            return next(iter(norm_matches))
 
         parts = qualifier.split(".")
         if len(parts) == 3:  # a database.schema.table source-path reference

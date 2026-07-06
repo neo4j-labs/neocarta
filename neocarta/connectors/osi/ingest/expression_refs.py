@@ -9,11 +9,20 @@ names against the semantic model's datasets to the caller
 """
 
 import logging
-import re
 from typing import NamedTuple
 
 import sqlglot
-from sqlglot.expressions import CTE, Column, Subquery, Table
+from sqlglot.expressions import (
+    CTE,
+    Column,
+    Lateral,
+    Paren,
+    Select,
+    SetOperation,
+    Subquery,
+    Table,
+    Values,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +39,6 @@ _OSI_TO_SQLGLOT_DIALECT: dict[str, str | None] = {
 #: OSI dialects that are NOT SQL — sqlglot cannot parse them, so expressions in these
 #: dialects yield no backing references and are skipped.
 _NON_SQL_OSI_DIALECTS = frozenset({"mdx", "tableau", "maql"})
-
-#: An expression that already forms a statement (starts with SELECT or WITH) is parsed
-#: as-is; a bare scalar expression is wrapped in ``SELECT`` so sqlglot can parse it.
-_STATEMENT_START_RE = re.compile(r"^\s*(?:select|with)\b", re.IGNORECASE)
 
 
 class MetricExpressionRefs(NamedTuple):
@@ -75,14 +80,44 @@ def osi_dialect_to_sqlglot(dialect: str | None) -> str | None:
     return _OSI_TO_SQLGLOT_DIALECT.get(dialect.strip().lower())
 
 
+def _statement_root(node: object) -> Select | SetOperation | None:
+    """Unwrap enclosing parens/subqueries to the underlying ``SELECT`` or set operation.
+
+    Returns ``None`` for anything that isn't a statement (e.g. a bare ``SUM(...)`` scalar),
+    which signals that the expression must be wrapped in ``SELECT`` before parsing.
+    """
+    while isinstance(node, (Paren, Subquery)):
+        node = node.this
+    return node if isinstance(node, (Select, SetOperation)) else None
+
+
+def _outer_select_ids(node: Select | SetOperation) -> set[int]:
+    """Ids of the outer-scope ``SELECT`` nodes.
+
+    A plain statement contributes its own ``SELECT``; a set operation
+    (``UNION``/``INTERSECT``/``EXCEPT``) contributes every top-level branch, since all
+    branches are equally the metric's own scope. Nested subqueries/CTEs are excluded (their
+    ``SELECT`` is not collected here).
+    """
+    if isinstance(node, Select):
+        return {id(node)}
+    if isinstance(node, SetOperation):
+        return _outer_select_ids(node.left) | _outer_select_ids(node.right)
+    return set()
+
+
 def extract_references(expression: str, dialect: str | None) -> MetricExpressionRefs | None:
     """
     Parse an OSI metric expression and return the tables/columns it references.
 
-    The expression is parsed as-is when it already begins with ``SELECT``/``WITH``, otherwise
-    it is wrapped in ``SELECT`` so sqlglot can parse a bare scalar expression. Table aliases
-    from ``FROM`` clauses are resolved to their real names, CTE-local names are ignored, and
-    star (``t.*``) qualifiers still contribute their table.
+    A full statement (``SELECT``/``WITH``/set operation), even when parenthesized, is parsed
+    directly; a bare scalar expression is wrapped in ``SELECT`` so sqlglot can parse it. Only
+    references in the metric's own (outer) scope are returned — tables/columns inside a nested
+    subquery or CTE, and derived-table aliases (subquery/``LATERAL``/``VALUES``), are
+    query-local implementation detail, not the metric's dataset dependencies. Outer ``FROM``
+    aliases resolve to real names; an unqualified column is attributed to the outer scope's
+    single ``FROM`` table (if there is exactly one) or, for a bare scalar expression, left for
+    dataset name-matching; star (``t.*``) qualifiers still contribute their table.
 
     Parameters
     ----------
@@ -106,69 +141,77 @@ def extract_references(expression: str, dialect: str | None) -> MetricExpression
         return None
 
     read = osi_dialect_to_sqlglot(dialect)
-    statement = expression if _STATEMENT_START_RE.match(expression) else f"SELECT {expression}"
+    # Parse as-is first so a full statement (possibly parenthesized) is used directly; only a
+    # bare scalar expression (not a statement) is wrapped in SELECT so sqlglot can parse it.
     try:
-        tree = sqlglot.parse_one(statement, read=read)
-    except Exception as e:  # sqlglot raises a variety of parse errors
-        # Log only the exception *type* — a parse error message can echo the offending
-        # expression (potential schema/PII leakage), which we never log.
-        logger.warning(
-            "Could not parse OSI metric expression (%s); skipping its reference extraction",
-            type(e).__name__,
-        )
-        return None
+        stmt = _statement_root(sqlglot.parse_one(expression, read=read))
+    except Exception:
+        stmt = None
+    if stmt is None:
+        try:
+            stmt = sqlglot.parse_one(f"SELECT {expression}", read=read)
+        except Exception as e:  # sqlglot raises a variety of parse errors
+            # Log only the exception *type* — a parse error message can echo the offending
+            # expression (potential schema/PII leakage), which we never log.
+            logger.warning(
+                "Could not parse OSI metric expression (%s); skipping its reference extraction",
+                type(e).__name__,
+            )
+            return None
 
-    # Query-local names (CTE aliases and derived-table/subquery aliases) are query-scoped,
-    # not datasets — never treat them as tables, and skip columns qualified by them.
-    local_names = {cte.alias for cte in tree.find_all(CTE) if cte.alias}
-    local_names |= {sq.alias for sq in tree.find_all(Subquery) if sq.alias}
+    # The metric's own (outer) scope: the statement's SELECT, or every branch of a set
+    # operation. References whose nearest enclosing SELECT is not one of these live in a nested
+    # subquery/CTE and are query-local, not dataset-level dependencies of the metric.
+    outer_selects = _outer_select_ids(stmt)
+    if not outer_selects:
+        return MetricExpressionRefs(tables=set(), columns=set())
 
-    # Resolve FROM-clause aliases to their real table names. An alias bound to more than one
-    # distinct table (the same alias reused across sibling/nested scopes) is ambiguous, so it
-    # is treated as query-local: its columns are skipped rather than mis-attributed to a
-    # single arbitrary table. The real tables themselves are still captured below.
+    # Query-local names — CTE, subquery, and LATERAL/VALUES derived-table aliases: columns
+    # qualified by these reference a query-local result, not a dataset.
+    local_names = {node.alias for node in stmt.find_all(CTE) if node.alias}
+    local_names |= {node.alias for node in stmt.find_all(Subquery) if node.alias}
+    local_names |= {node.alias for node in stmt.find_all(Lateral) if node.alias}
+    local_names |= {node.alias for node in stmt.find_all(Values) if node.alias}
+
+    # Real FROM tables in the outer scope(s), with their aliases. (A single scope cannot bind
+    # the same alias to two tables, so no collision handling is needed here.)
     tables: set[str] = set()
     alias_to_name: dict[str, str] = {}
-    ambiguous_aliases: set[str] = set()
-    for table in tree.find_all(Table):
+    for table in stmt.find_all(Table):
+        anc = table.find_ancestor(Select)
+        if anc is None or id(anc) not in outer_selects:
+            continue
         name = ".".join(part for part in (table.catalog, table.db, table.name) if part)
         if not name or name in local_names:
             continue
         tables.add(name)
-        alias = table.alias
-        if alias:
-            bound = alias_to_name.get(alias)
-            if bound is not None and bound != name:
-                ambiguous_aliases.add(alias)
-            else:
-                alias_to_name[alias] = name
-    for alias in ambiguous_aliases:
-        alias_to_name.pop(alias, None)
-    local_names |= ambiguous_aliases
-
-    # An unqualified column only denotes a dataset column in a bare expression (no FROM). In a
-    # full statement it resolves against the query's own FROM sources, not the model's
-    # datasets, so unqualified columns are ignored once any FROM table is present.
-    has_from_tables = tree.find(Table) is not None
+        if table.alias:
+            alias_to_name[table.alias] = name
+    outer_from = set(tables)
 
     columns: set[tuple[str | None, str]] = set()
-    for column in tree.find_all(Column):
+    for column in stmt.find_all(Column):
+        anc = column.find_ancestor(Select)
+        if anc is None or id(anc) not in outer_selects:
+            continue
         # Reconstruct the full multi-part qualifier as written (catalog.db.table), then
-        # resolve a single-token alias to its real table name.
+        # resolve a FROM alias to its real table name.
         raw_qualifier = ".".join(part for part in (column.catalog, column.db, column.table) if part)
         if raw_qualifier in local_names:
             continue
-        qualifier = alias_to_name.get(raw_qualifier, raw_qualifier) if raw_qualifier else None
-        if qualifier is None:
-            if not has_from_tables:
-                name = column.name
-                if name and name != "*":
-                    columns.add((None, name))
-            continue
-        # Capture the table even for a star reference (`t.*`), which has no real column.
-        tables.add(qualifier)
         name = column.name
-        if name and name != "*":
-            columns.add((qualifier, name))
+        if raw_qualifier:
+            qualifier = alias_to_name.get(raw_qualifier, raw_qualifier)
+            tables.add(qualifier)  # capture the table even for a star (`t.*`) reference
+            if name and name != "*":
+                columns.add((qualifier, name))
+        elif name and name != "*":
+            # Unqualified: attribute to the outer scope's single FROM table when there is
+            # exactly one; for a bare scalar expression (no FROM) leave it for dataset
+            # name-matching; with several FROM tables it is ambiguous, so skip it.
+            if len(outer_from) == 1:
+                columns.add((next(iter(outer_from)), name))
+            elif not outer_from:
+                columns.add((None, name))
 
     return MetricExpressionRefs(tables=tables, columns=columns)

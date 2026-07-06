@@ -46,12 +46,17 @@ RETURN {
     },
     backing_columns: COLLECT {
         MATCH (metric)-[:USES_COLUMN]->(bc:Column)
-        // A column id is `<owner_id>.<column>`, so the owning Table/Query id is the id with
-        // its trailing segment removed — look the owner up by that id (indexed) instead of
-        // traversing the ownership relationship.
+        // Fast path: a column id is `<owner_id>.<column>`, so the owner id is the id minus its
+        // last dotted segment — an indexed lookup. Fall back to the ownership edge only when
+        // that misses (e.g. a column name containing a "."), so the common path stays
+        // scan-free while remaining correct for any column name.
         WITH bc, left(bc.id, size(bc.id) - size(last(split(bc.id, "."))) - 1) AS ownerId
-        OPTIONAL MATCH (bco:Table|Query {id: ownerId})
-        RETURN CASE WHEN bco IS NULL THEN bc.name ELSE bco.name + "." + bc.name END
+        OPTIONAL MATCH (byId:Table|Query {id: ownerId})
+        WITH bc, CASE
+            WHEN byId IS NOT NULL THEN byId
+            ELSE head([(o:Table|Query)-[:HAS_COLUMN|USES_COLUMN]->(bc) | o])
+        END AS colOwner
+        RETURN CASE WHEN colOwner IS NULL THEN bc.name ELSE colOwner.name + "." + bc.name END
     },
     metric_score: score
 } AS result

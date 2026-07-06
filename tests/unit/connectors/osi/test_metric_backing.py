@@ -214,24 +214,50 @@ def test_subquery_alias_matching_dataset_name_creates_no_spurious_edge():
     assert t.metric_uses_column_rels == []
 
 
-def test_reused_alias_links_both_tables_without_wrong_column():
-    """A reused alias across subqueries links both real tables but no mis-attributed column."""
+def test_subquery_internal_tables_are_not_linked():
+    """Tables that appear only inside a nested subquery are not metric-level dependencies."""
     spec = _sm(
         datasets=[
-            _dataset("revenue", "w.c.revenue", ["value"]),
-            _dataset("costs", "w.c.costs", ["value"]),
+            _dataset("sales", "w.c.sales", ["amt"]),
+            _dataset("audit_log", "w.c.audit_log", ["x"]),
         ],
-        metrics=[
-            _metric("net", "SUM((SELECT t.value FROM revenue t) - (SELECT t.value FROM costs t))")
-        ],
+        metrics=[_metric("m", "SUM(sales.amt) - (SELECT AVG(x) FROM audit_log a)")],
     )
     t = _run(spec)
-    metric_id = generate_metric_id("m", "net")
-    assert _table_edges(t) == {
-        (metric_id, generate_table_id("w", "c", "revenue")),
-        (metric_id, generate_table_id("w", "c", "costs")),
+    metric_id = generate_metric_id("m", "m")
+    # Only the outer-scope `sales` reference is linked; `audit_log` (subquery-only) is not.
+    assert _table_edges(t) == {(metric_id, generate_table_id("w", "c", "sales"))}
+    assert _column_edges(t) == {(metric_id, generate_column_id("w", "c", "sales", "amt"))}
+
+
+def test_unqualified_column_attributed_to_single_from_dataset():
+    """`SELECT SUM(arr_usd) FROM subscriptions` links the single FROM dataset + its column."""
+    spec = _sm(
+        datasets=[_dataset("subscriptions", "w.c.subscriptions", ["arr_usd"])],
+        metrics=[_metric("arr", "SELECT SUM(arr_usd) FROM subscriptions")],
+    )
+    t = _run(spec)
+    metric_id = generate_metric_id("m", "arr")
+    assert _table_edges(t) == {(metric_id, generate_table_id("w", "c", "subscriptions"))}
+    assert _column_edges(t) == {
+        (metric_id, generate_column_id("w", "c", "subscriptions", "arr_usd"))
     }
-    assert t.metric_uses_column_rels == []  # ambiguous alias -> no wrong-table column edge
+
+
+def test_ambiguous_normalized_qualifier_is_skipped():
+    """A qualifier that normalizes to two different datasets is ambiguous -> no edges."""
+    spec = _sm(
+        datasets=[
+            _dataset("Order Items", "w.c.order_items_a", ["x"]),
+            _dataset("order-items", "w.c.order_items_b", ["x"]),
+        ],
+        metrics=[_metric("m", "SUM(order_items.x)")],
+    )
+    t = _run(spec)
+    # Both dataset names normalize to `order_items`; the qualified ref is not attributed to
+    # an arbitrary one.
+    assert t.metric_uses_table_rels == []
+    assert t.metric_uses_column_rels == []
 
 
 def test_query_backed_dataset_links_by_id():

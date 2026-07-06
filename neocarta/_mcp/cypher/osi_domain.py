@@ -121,9 +121,15 @@ RETURN {
             },
             backing_columns: COLLECT {
                 MATCH (m)-[:USES_COLUMN]->(mc:Column)
+                // Indexed owner lookup by id (see osi_metric_search), with a fallback to the
+                // ownership edge for column names containing a "." that break the id split.
                 WITH mc, left(mc.id, size(mc.id) - size(last(split(mc.id, "."))) - 1) AS ownerId
-                OPTIONAL MATCH (mco:Table|Query {id: ownerId})
-                RETURN CASE WHEN mco IS NULL THEN mc.name ELSE mco.name + "." + mc.name END
+                OPTIONAL MATCH (byId:Table|Query {id: ownerId})
+                WITH mc, CASE
+                    WHEN byId IS NOT NULL THEN byId
+                    ELSE head([(o:Table|Query)-[:HAS_COLUMN|USES_COLUMN]->(mc) | o])
+                END AS colOwner
+                RETURN CASE WHEN colOwner IS NULL THEN mc.name ELSE colOwner.name + "." + mc.name END
             }
         }
     },
