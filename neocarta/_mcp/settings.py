@@ -1,6 +1,7 @@
 """Settings for the MCP server loaded from environment variables."""
 
 from dotenv import load_dotenv
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 load_dotenv()
@@ -26,7 +27,10 @@ class Settings(BaseSettings):
     embedding_dimensions: int | None = None
     neo4j_uri: str
     neo4j_username: str
-    neo4j_password: str
+    # Wrapped in pydantic.SecretStr so accidental serialization (repr, log
+    # statements, model_dump) emits "**********" instead of the real password.
+    # Unwrap inline at the point of use with .get_secret_value() (see server.py).
+    neo4j_password: SecretStr
     neo4j_database: str = "neo4j"
 
 

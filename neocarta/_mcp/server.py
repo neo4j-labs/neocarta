@@ -204,7 +204,11 @@ async def main() -> None:
     """Initialize drivers, create the MCP server, and run it over stdio."""
     neo4j_driver = AsyncGraphDatabase.driver(
         uri=mcp_server_settings.neo4j_uri,
-        auth=(mcp_server_settings.neo4j_username, mcp_server_settings.neo4j_password),
+        auth=(
+            mcp_server_settings.neo4j_username,
+            # Unwrap the secret inline so the raw password never lives in a named local.
+            mcp_server_settings.neo4j_password.get_secret_value(),
+        ),
     )
     neo4j_database = mcp_server_settings.neo4j_database
     embedder = create_embedder(

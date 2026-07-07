@@ -14,6 +14,7 @@ from neocarta.enums import NodeLabel
 _BASE_LOGGER = "neocarta.enrichment.embeddings.base"
 _UTILS_LOGGER = "neocarta.enrichment.embeddings.utils"
 _OPENAI_LOGGER = "neocarta.enrichment.embeddings.openai_embeddings"
+_LITELLM_LOGGER = "neocarta.enrichment.embeddings.litellm_embeddings"
 
 
 def _fake_embeddings_response(**kwargs):
@@ -87,6 +88,25 @@ def test_provider_error_logs_type_only_without_leak(caplog):
     assert "RuntimeError" in msg
     assert "super secret" not in msg
     assert "sk-proj-LEAKED" not in msg
+
+
+def test_litellm_provider_error_logs_type_only_without_leak(caplog):
+    """LiteLLM path also logs only the exception type — a deliberate anti-leak
+    control (provider error bodies echo the input description and API key). The
+    triage report's RT-04 suggestion to log the full message is intentionally
+    NOT applied here."""
+    connector = LiteLLMEmbeddingsConnector(
+        neo4j_driver=MagicMock(), embedding_model="text-embedding-3-small"
+    )
+    with patch("neocarta.enrichment.embeddings.litellm_embeddings.litellm") as mock_litellm:
+        mock_litellm.embedding.side_effect = _LEAKY_ERROR
+        with caplog.at_level(logging.WARNING, logger=_LITELLM_LOGGER):
+            result = connector._create_embedding_sync("super secret table description")
+
+    assert result is None
+    msgs = [r.getMessage() for r in caplog.records if r.name == _LITELLM_LOGGER]
+    assert any("RuntimeError" in m for m in msgs)
+    assert all("super secret" not in m and "sk-proj-LEAKED" not in m for m in msgs)
 
 
 def test_provider_error_async_logs_type_only_without_leak(caplog):

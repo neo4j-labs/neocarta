@@ -252,7 +252,7 @@ def _run_search(
     ``lucene`` whether the sanitised text is passed as ``queryText`` (full-text /
     hybrid tools), matching each tool's parameter set.
     """
-    from ..._mcp.utils import remove_lucene_chars  # noqa: PLC0415
+    from ..._mcp.utils import escape_lucene_query  # noqa: PLC0415
 
     text_content = require("--text-content", text_content)
     settings = load_settings()
@@ -263,7 +263,7 @@ def _run_search(
             with cli_status(stderr, "Embedding query text..."):
                 params["queryEmbedding"] = _embed_query(settings, driver, text_content)
         if lucene:
-            query_text = remove_lucene_chars(text_content)
+            query_text = escape_lucene_query(text_content)
             if not query_text:
                 raise CLIError(
                     "usage_error",

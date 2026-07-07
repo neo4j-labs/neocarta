@@ -3,6 +3,12 @@
 
 ## Upcoming
 
+### Security
+- Hardened three findings from the `security-patch-1.0.0` triage of two automated security reports; the full disposition (including findings consciously not changed, and one report suggestion rejected because it would have *regressed* a control) is in [`docs/security-triage-1.0.0.md`](docs/security-triage-1.0.0.md).
+  - **MCP server password (V-04):** `Settings.neo4j_password` (`neocarta/_mcp/settings.py`) is now a `pydantic.SecretStr`, unwrapped inline with `.get_secret_value()` at the driver-auth site in `neocarta/_mcp/server.py`, so the Neo4j password is masked in `repr` / `str` / `model_dump_json` — matching the CLI's existing discipline.
+  - **Lucene query sanitiser (V-03):** the MCP full-text/hybrid search helper now **escapes** Lucene special characters and neutralises the bare boolean operators (`AND`/`OR`/`NOT`) instead of stripping them (renamed `remove_lucene_chars` → `escape_lucene_query` in `neocarta/_mcp/utils.py`). This prevents an untrusted `text_content` from injecting Lucene query syntax or triggering a parser error (a per-call DoS), and stops the old behaviour of silently dropping content such as `C++`. Search values were already passed as a query **parameter**, so there was never a Cypher-injection surface.
+  - **OSI spec-URL SSRF (V-02):** `OsiSpecExtractor` now refuses to fetch a `spec_source` URL that resolves to a loopback, link-local (incl. the cloud-metadata address `169.254.169.254`), private, reserved, multicast, or unspecified address, and no longer follows redirects (so an open redirect on an allowed host cannot pivot to an internal endpoint). Blocked targets raise a `ConfigError`.
+
 ### Fixed
 - `DatabricksSchemaExtractor.extract_column_unique_values_for_table` no longer accumulates duplicate sampled values in its cache when called more than once for the same table with `cache=True`; the cached values frame is now de-duplicated by `value_id`, so repeated calls can't produce duplicate `:Value` nodes / `HAS_VALUE` edges. It also now warns when no column metadata is available (so non-sampleable complex types can't be detected), instead of silently pushing a complex column into a `collect_set` query that Databricks would reject.
 - `DatabricksSchemaExtractor` now rejects a `catalog` containing a backtick at construction (a `ConfigError`), matching the up-front `schema` validation, instead of only failing when the first query reaches identifier-quoting.
