@@ -1,0 +1,44 @@
+diff --git a/tests/unit/enrichment/embeddings/test_utils.py b/tests/unit/enrichment/embeddings/test_utils.py
+index e1003bc..768d9b0 100644
+--- a/tests/unit/enrichment/embeddings/test_utils.py
++++ b/tests/unit/enrichment/embeddings/test_utils.py
+@@ -3,6 +3,7 @@
+ from unittest.mock import MagicMock
+ 
+ import pandas as pd
++import pytest
+ 
+ from neocarta.enrichment.embeddings.utils import get_nodes_to_embed
+ from neocarta.enums import NodeLabel
+@@ -10,9 +11,7 @@ from neocarta.enums import NodeLabel
+ 
+ def test_get_nodes_to_embed_applies_min_length_in_query():
+     driver = MagicMock()
+-    driver.execute_query.return_value = pd.DataFrame(
+-        columns=["id", "node_label", "description"]
+-    )
++    driver.execute_query.return_value = pd.DataFrame(columns=["id", "node_label", "description"])
+ 
+     get_nodes_to_embed(driver, NodeLabel.COLUMN, min_length=20)
+ 
+@@ -29,9 +28,7 @@ def test_get_nodes_to_embed_applies_min_length_in_query():
+ 
+ def test_get_nodes_to_embed_uses_inclusive_threshold():
+     driver = MagicMock()
+-    driver.execute_query.return_value = pd.DataFrame(
+-        columns=["id", "node_label", "description"]
+-    )
++    driver.execute_query.return_value = pd.DataFrame(columns=["id", "node_label", "description"])
+ 
+     get_nodes_to_embed(driver, NodeLabel.COLUMN, min_length=20)
+ 
+@@ -47,8 +44,5 @@ def test_get_nodes_to_embed_rejects_non_positive_min_length():
+     driver = MagicMock()
+ 
+     for bad_value in (0, -1):
+-        try:
++        with pytest.raises(Exception, match="greater than 0"):
+             get_nodes_to_embed(driver, NodeLabel.COLUMN, min_length=bad_value)
+-            raise AssertionError("expected ConfigError")
+-        except Exception as exc:
+-            assert "greater than 0" in str(exc)
