@@ -42,3 +42,38 @@ def escape_lucene_query(text: str | None) -> str | None:
             "".join(f"\\{ch}" if ch in _LUCENE_SPECIAL_CHARS else ch for ch in neutralized)
         )
     return " ".join(escaped_tokens)
+
+
+def escape_lucene_query_or_error(text: str | None) -> str:
+    """Escape ``text`` for Lucene, raising if it has no searchable content.
+
+    Wraps :func:`escape_lucene_query` for the MCP full-text/hybrid search tools,
+    which pass the result straight to ``db.index.fulltext.queryNodes`` — a
+    procedure whose ``queryString`` argument must be a ``STRING``. Blank or
+    whitespace-only ``text_content`` escapes to ``None``; without this guard that
+    ``None`` would reach Cypher and surface as an opaque Neo4j type error instead
+    of a clear validation message. Raises ``ValueError`` (FastMCP relays the
+    message to the client) rather than returning ``None``.
+
+    Parameters
+    ----------
+    text : str | None
+        The raw, possibly untrusted, search text.
+
+    Returns:
+    -------
+    str
+        The escaped, non-empty query.
+
+    Raises:
+    ------
+    ValueError
+        If ``text`` is empty or contains only whitespace / Lucene syntax that
+        reduces to nothing searchable.
+    """
+    query = escape_lucene_query(text)
+    if not query:
+        raise ValueError(
+            "text_content must contain at least one searchable, non-whitespace character."
+        )
+    return query

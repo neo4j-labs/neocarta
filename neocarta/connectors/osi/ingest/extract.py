@@ -51,8 +51,18 @@ def _assert_public_url(url: str) -> None:
     for *_, sockaddr in addrinfo:
         # sockaddr[0] is the numeric address; IPv6 link-local may carry a %zone.
         ip = ipaddress.ip_address(sockaddr[0].split("%", 1)[0])
+        # Unwrap IPv4-mapped IPv6 (e.g. ::ffff:169.254.169.254) so the embedded
+        # IPv4 is classified: is_private/is_global do not delegate to the mapped
+        # address on Python 3.10/3.11, which would otherwise let it slip through.
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        # Reject anything that is not globally routable — `not is_global` also
+        # covers ranges the explicit list misses (CGNAT 100.64/10, TEST-NET) —
+        # OR that falls in a non-global special range `is_global` misses (notably
+        # multicast, which reports is_global=True on some Python versions).
         if (
-            ip.is_private
+            not ip.is_global
+            or ip.is_private
             or ip.is_loopback
             or ip.is_link_local
             or ip.is_reserved

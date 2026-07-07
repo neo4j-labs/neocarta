@@ -8,7 +8,7 @@ strip-based helper that silently dropped content and left AND/OR/NOT live.
 
 import pytest
 
-from neocarta._mcp.utils import escape_lucene_query
+from neocarta._mcp.utils import escape_lucene_query, escape_lucene_query_or_error
 
 
 @pytest.mark.parametrize("blank", [None, "", "   ", "\n\t"])
@@ -69,3 +69,19 @@ def test_boolean_and_special_injection_combined():
     """A crafted operator+wildcard payload is fully neutralised."""
     # Would be an OR of everything under the old strip helper; now inert.
     assert escape_lucene_query("orders OR *") == "orders or \\*"
+
+
+# --- escape_lucene_query_or_error (guards the MCP queryText param) ----------
+
+
+@pytest.mark.parametrize("blank", [None, "", "   ", "\n\t"])
+def test_or_error_raises_on_blank(blank):
+    """Blank/whitespace input raises instead of yielding a None queryText."""
+    with pytest.raises(ValueError, match="searchable"):
+        escape_lucene_query_or_error(blank)
+
+
+def test_or_error_returns_escaped_for_valid_input():
+    """Valid input returns the same escaped string as escape_lucene_query."""
+    assert escape_lucene_query_or_error("orders OR *") == escape_lucene_query("orders OR *")
+    assert escape_lucene_query_or_error("orders OR *") == "orders or \\*"

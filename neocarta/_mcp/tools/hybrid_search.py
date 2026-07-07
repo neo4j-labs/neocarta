@@ -11,7 +11,7 @@ from ..cypher import (
     get_context_by_table_hybrid_search_cypher,
 )
 from ..models import MetricContext, TableContext
-from ..utils import escape_lucene_query
+from ..utils import escape_lucene_query_or_error
 
 
 def register_table_tool(
@@ -58,7 +58,7 @@ def register_table_tool(
             query_=cypher,
             parameters_={
                 "queryEmbedding": embedding,
-                "queryText": escape_lucene_query(text_content),
+                "queryText": escape_lucene_query_or_error(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
@@ -115,7 +115,7 @@ def register_column_tool(
             query_=cypher,
             parameters_={
                 "queryEmbedding": embedding,
-                "queryText": escape_lucene_query(text_content),
+                "queryText": escape_lucene_query_or_error(text_content),
                 "searchTopK": search_top_k,
                 "maxTables": max_tables,
             },
@@ -172,7 +172,7 @@ def register_metric_tool(
             query_=cypher,
             parameters_={
                 "queryEmbedding": embedding,
-                "queryText": escape_lucene_query(text_content),
+                "queryText": escape_lucene_query_or_error(text_content),
                 "searchTopK": search_top_k,
                 "maxMetrics": max_metrics,
                 "domainId": generate_osi_semantic_model_id(domain_name) if domain_name else None,

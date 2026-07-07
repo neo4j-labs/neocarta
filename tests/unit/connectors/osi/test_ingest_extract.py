@@ -150,10 +150,17 @@ def test_extract_url_http_error_propagates():
         "http://127.0.0.1/spec.yaml",  # loopback
         "http://10.0.0.5/spec.yaml",  # RFC-1918 private
         "http://[::1]/spec.yaml",  # IPv6 loopback
+        "http://100.64.0.1/spec.yaml",  # CGNAT (not is_global; missed by is_private)
+        "http://224.0.0.1/spec.yaml",  # multicast (is_global=True on some Pythons)
+        "http://[::ffff:169.254.169.254]/x",  # IPv4-mapped IPv6 -> link-local
     ],
 )
 def test_url_resolving_to_non_public_address_is_rejected(url):
-    """Literal internal addresses are refused before any request is made."""
+    """Literal internal addresses are refused before any request is made.
+
+    Covers CGNAT, multicast, and IPv4-mapped IPv6 in addition to the obvious
+    loopback/link-local/private ranges.
+    """
     with patch("neocarta.connectors.osi.ingest.extract.httpx.get") as mock_get:
         with pytest.raises(ConfigError, match=r"non-public|SSRF"):
             OsiSpecExtractor().extract(url)
