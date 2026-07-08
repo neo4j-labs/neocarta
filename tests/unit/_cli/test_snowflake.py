@@ -419,3 +419,32 @@ def test_connection_failure_maps_to_clean_cli_error(monkeypatch, tmp_path):
     assert result.exit_code == EXIT_CODES["auth_error"]["code"], result.output
     assert json.loads(result.stdout)["error"]["code"] == "auth_error"
     mock_connector.return_value.ingest.assert_not_called()
+
+
+def test_multiple_auth_methods_warns(caplog, tmp_path):
+    """When >1 auth method is configured, precedence picks one and a warning is logged."""
+    import logging
+
+    from neocarta._cli.commands.snowflake import _auth_method, _resolve_connection_settings
+    from neocarta._cli.config import CLISettings
+
+    key = tmp_path / "rsa_key.p8"
+    key.write_text("-----BEGIN PRIVATE KEY-----\ndummy\n-----END PRIVATE KEY-----\n")
+    # Both key-pair AND password configured (e.g. a stale leftover SNOWFLAKE_PASSWORD).
+    settings = CLISettings(
+        snowflake_account="a",
+        snowflake_user="u",
+        snowflake_warehouse="w",
+        snowflake_private_key_path=str(key),
+        snowflake_password="leftover",  # noqa: S106
+    )
+    with caplog.at_level(logging.WARNING, logger="neocarta._cli.commands.snowflake"):
+        _resolve_connection_settings(settings, account=None, user=None, warehouse=None, role=None)
+
+    assert _auth_method(settings) == "key_pair"  # precedence: key-pair wins
+    warnings = [
+        r.getMessage() for r in caplog.records if "Multiple Snowflake auth" in r.getMessage()
+    ]
+    assert warnings, "expected a warning naming the overridden methods"
+    assert "SNOWFLAKE_PASSWORD" in warnings[0]
+    assert "SNOWFLAKE_PRIVATE_KEY_PATH" in warnings[0]

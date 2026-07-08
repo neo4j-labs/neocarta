@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,6 +44,8 @@ if TYPE_CHECKING:
     from snowflake.connector import SnowflakeConnection
 
     from ..config import CLISettings
+
+logger = logging.getLogger(__name__)
 
 # Import name the optional ``snowflake`` extra provides.
 # Reaching this command already implies the ``cli`` extra is installed.
@@ -205,9 +208,12 @@ def _resolve_connection_settings(
 ) -> None:
     """Fold the ``SNOWFLAKE_*`` connection flags onto ``settings`` and validate them.
 
-    Exactly one auth method must be configured (key-pair / authenticator / password);
-    secrets are validated for presence but never bound to a local — they are
-    unwrapped inline in :func:`_snowflake_connection`.
+    At least one auth method must be configured (key-pair / authenticator / password).
+    When more than one is set, the highest-precedence one wins (key-pair >
+    authenticator > password) and a warning is logged, so a stale/leftover env var
+    silently overriding the intended method is surfaced rather than hidden. Secrets
+    are validated for presence but never bound to a local — they are unwrapped inline
+    in :func:`_snowflake_connection`.
     """
     settings.snowflake_account = require(
         "--account", resolve(account, settings.snowflake_account), env_var="SNOWFLAKE_ACCOUNT"
@@ -243,6 +249,30 @@ def _resolve_connection_settings(
             "usage_error",
             f"SNOWFLAKE_PRIVATE_KEY_PATH is not a readable file: {settings.snowflake_private_key_path}",
             suggestion="Point SNOWFLAKE_PRIVATE_KEY_PATH at your PEM private key file.",
+        )
+
+    # Precedence picks exactly one method, but silently ignoring the others is
+    # confusing (e.g. a stale SNOWFLAKE_PASSWORD when the user meant key-pair). Warn —
+    # don't fail — when more than one is configured, naming the one actually used.
+    configured = [
+        env
+        for env, present in (
+            ("SNOWFLAKE_PRIVATE_KEY_PATH", bool(settings.snowflake_private_key_path)),
+            ("SNOWFLAKE_AUTHENTICATOR", bool(settings.snowflake_authenticator)),
+            (
+                "SNOWFLAKE_PASSWORD",
+                settings.snowflake_password is not None
+                and settings.snowflake_password.get_secret_value() != "",
+            ),
+        )
+        if present
+    ]
+    if len(configured) > 1:
+        logger.warning(
+            "Multiple Snowflake auth methods configured (%s); using %s by precedence "
+            "(key-pair > authenticator > password). Unset the others to silence this.",
+            ", ".join(configured),
+            _auth_method(settings),
         )
 
 
