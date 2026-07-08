@@ -32,7 +32,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --dev --extra cli --extra databricks
+        run: uv sync --dev --extra cli --extra databricks --extra snowflake
       
       - name: Run format
         run: make fmt

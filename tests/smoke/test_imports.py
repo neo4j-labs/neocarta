@@ -15,6 +15,13 @@ def test_bigquery_connector_imports():
     assert BigQuerySchemaConnector
 
 
+def test_snowflake_connector_imports():
+    from neocarta.connectors.snowflake import SnowflakeLogsConnector, SnowflakeSchemaConnector
+
+    assert SnowflakeLogsConnector
+    assert SnowflakeSchemaConnector
+
+
 def test_csv_connector_imports():
     from neocarta.connectors.csv import CSVConnector
 

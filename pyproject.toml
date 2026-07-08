@@ -66,6 +66,14 @@ databricks = [
     "databricks-sdk>=0.118.0",
     "databricks-sql-connector>=3.0.0",
 ]
+# Snowflake connectors. Covers the schema connector (INFORMATION_SCHEMA over the
+# official pure-Python snowflake-connector-python, in-process DB-API) and the
+# query-logs connector (ACCOUNT_USAGE.QUERY_HISTORY). The [pandas] extra pulls
+# pyarrow so the extractor can fetch results with cursor.fetch_pandas_all().
+# Install with: pip install neocarta[snowflake]
+snowflake = [
+    "snowflake-connector-python[pandas]>=3.12.0",
+]
 
 [project.scripts]
 neocarta = "neocarta._cli:main"

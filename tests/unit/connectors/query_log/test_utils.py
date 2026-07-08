@@ -1,4 +1,7 @@
+import pytest
+
 from neocarta.connectors.query_log.utils import parse_bigquery_query_log_json, parse_sql_query
+from neocarta.errors import ConfigError
 
 
 def test_parse_bigquery_query_log_json():
@@ -27,6 +30,31 @@ def test_parse_sql_query_bigquery():
     assert len(parsed["table_info"]) == 3
     assert len(parsed["column_info"]) == 9
     assert len(parsed["references_info"]) == 2
+
+
+def test_parse_sql_query_snowflake_simple():
+    query = "SELECT * FROM mydb.public.orders"
+    parsed = parse_sql_query(query, "q1", "snowflake")
+    assert len(parsed["table_info"]) == 1
+    assert parsed["table_info"][0]["platform"] == "SNOWFLAKE"
+    assert parsed["table_info"][0]["service"] == "SNOWFLAKE"
+
+
+def test_parse_sql_query_snowflake_join():
+    query = (
+        "SELECT o.order_id, c.customer_name "
+        "FROM mydb.public.orders AS o "
+        "JOIN mydb.public.customers AS c ON o.customer_id = c.customer_id"
+    )
+    parsed = parse_sql_query(query, "q2", "snowflake")
+    assert len(parsed["table_info"]) == 2
+    assert all(t["platform"] == "SNOWFLAKE" for t in parsed["table_info"])
+    assert len(parsed["references_info"]) == 1
+
+
+def test_parse_sql_query_unsupported_read_raises():
+    with pytest.raises(ConfigError):
+        parse_sql_query("SELECT 1", "q3", "postgres")
 
 
 def test_parse_sql_query_filters_invalid_references_with_unnest():
