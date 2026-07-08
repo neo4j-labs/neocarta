@@ -220,6 +220,14 @@ def run() -> None:
     """Load environment variables and run the MCP server."""
     load_dotenv()
     logger.setLevel(logging.INFO)
+    # FastMCP(log_level=...) is not reliably respected in all invocation
+    # paths (see https://github.com/jlowin/fastmcp/issues/1825). Silence
+    # the underlying loggers explicitly so startup/per-request messages
+    # from FastMCP internals, the MCP protocol layer, and any ASGI
+    # transport (e.g. uvicorn) do not leak into CLI agent output.
+    logging.getLogger("FastMCP").setLevel(logging.WARNING)
+    logging.getLogger("mcp").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
     asyncio.run(main())
 
 
