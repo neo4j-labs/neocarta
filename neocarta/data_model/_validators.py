@@ -65,3 +65,40 @@ def coerce_str(value: Any) -> str:
         return ""
 
     return str(value)
+
+
+def coerce_yes_no_to_bool(value: Any, default: bool = True) -> bool:
+    """Coerce a yes/no-style value to ``bool``.
+
+    Real booleans pass through unchanged. ``None`` and NaN-like values yield
+    ``default``. Strings are matched case-insensitively after trimming, as are
+    the string forms of other scalars (e.g. ``1``/``0``). Unrecognised strings
+    also yield ``default``.
+
+    Parameters
+    ----------
+    value : Any
+        The raw field value.
+    default : bool
+        The value returned for ``None``/NaN and unrecognised strings.
+
+    Returns:
+    -------
+    bool
+        ``False`` for ``NO``/``FALSE``/``0``; ``True`` for
+        ``YES``/``TRUE``/``NULLABLE``/``1``; ``default`` otherwise.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None or isna(value):
+        return default
+
+    # Normalise integral floats ("1.0" -> "1", "0.0" -> "0") so numeric flags
+    # (e.g. a pandas column promoted to float64 by a NaN) match the token sets.
+    text = str(value).strip().upper().removesuffix(".0")
+    if text in {"NO", "FALSE", "0"}:
+        return False
+    if text in {"YES", "TRUE", "NULLABLE", "1"}:
+        return True
+
+    return default
