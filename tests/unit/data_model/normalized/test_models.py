@@ -49,6 +49,14 @@ def test_coerce_yes_no_false_strings():
     assert coerce_yes_no_to_bool("0") is False
 
 
+def test_coerce_yes_no_integral_floats():
+    """Integral floats (e.g. a pandas float64 flag column) coerce like their int form."""
+    assert coerce_yes_no_to_bool(0.0) is False
+    assert coerce_yes_no_to_bool(1.0) is True
+    assert coerce_yes_no_to_bool(np.float64(0.0)) is False
+    assert coerce_yes_no_to_bool(np.float64(1.0)) is True
+
+
 def test_coerce_yes_no_real_bools_passthrough():
     """Real booleans pass through unchanged."""
     assert coerce_yes_no_to_bool(True) is True
