@@ -1,11 +1,10 @@
-"""Provisional flat OSI container for normalized semantic-model metadata.
+"""Provisional flat OSI container for normalized semantic-model metadata."""
 
-TODO: This module is provisional. Its sole purpose is to prove that the
-:class:`NormalizedMetadata` marker base generalizes to a non-relational source.
-The placeholder record shapes are intentionally lean and are expected to be
-reshaped when the full OSI normalization mapping lands. Do not depend on these
-fields, and do not import the OSI graph models here.
-"""
+# TODO: This module is provisional. Its sole purpose is to prove that the
+# NormalizedMetadata marker base generalizes to a non-relational source. The
+# placeholder record shapes are intentionally lean and are expected to be
+# reshaped when the full OSI normalization mapping lands. Do not depend on these
+# fields, and do not import the OSI graph models here.
 
 from typing import ClassVar
 

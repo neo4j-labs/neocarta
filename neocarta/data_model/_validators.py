@@ -93,7 +93,9 @@ def coerce_yes_no_to_bool(value: Any, default: bool = True) -> bool:
     if value is None or isna(value):
         return default
 
-    text = str(value).strip().upper()
+    # Normalise integral floats ("1.0" -> "1", "0.0" -> "0") so numeric flags
+    # (e.g. a pandas column promoted to float64 by a NaN) match the token sets.
+    text = str(value).strip().upper().removesuffix(".0")
     if text in {"NO", "FALSE", "0"}:
         return False
     if text in {"YES", "TRUE", "NULLABLE", "1"}:
