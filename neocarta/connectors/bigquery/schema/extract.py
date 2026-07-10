@@ -346,8 +346,9 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
         Returns:
         -------
         pd.DataFrame
-            A Pandas DataFrame with columns: column_name, unique_value.
-            Each row represents one unique value for a column.
+            A Pandas DataFrame with columns: column_name, unique_value, column_id,
+            value_id, project_id, dataset_id, table_name. Each row represents one
+            unique value for a column, carrying the table's name-parts.
         """
         dataset_id = self._get_dataset_id(dataset_id)
 
@@ -376,7 +377,17 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
 
         # If all columns are arrays, return an empty DataFrame with expected structure
         if not select_clauses:
-            return pd.DataFrame(columns=["column_name", "unique_value", "column_id", "value_id"])
+            return pd.DataFrame(
+                columns=[
+                    "column_name",
+                    "unique_value",
+                    "column_id",
+                    "value_id",
+                    "project_id",
+                    "dataset_id",
+                    "table_name",
+                ]
+            )
 
         query = f"""
         SELECT {", ".join(select_clauses)}
@@ -408,6 +419,13 @@ ORDER BY tc.table_name, tc.constraint_type, kcu.ordinal_position
                 ),
                 axis=1,
             )
+
+        # Carry the table's name-parts so downstream normalization can build value
+        # records without re-deriving them. Additive: existing consumers read only
+        # column_name/unique_value/column_id/value_id.
+        result["project_id"] = self.project_id
+        result["dataset_id"] = dataset_id
+        result["table_name"] = table_name
 
         # TODO: Handle caching duplicate column information if method run multiple times for same table and columns.
         if cache:
