@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - Enterprise-Knowledge-Layer
 
 jobs:
   formatting-and-linting:
