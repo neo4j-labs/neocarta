@@ -3,6 +3,9 @@
 
 ## Upcoming
 
+### Documentation
+- `CLAUDE.md` now documents the **Google** docstring convention (matching the Ruff `pydocstyle` config that CI enforces) instead of numpy, which `make lint` actually rejects. (#276)
+
 ### Fixed
 - `DatabricksSchemaExtractor.extract_column_unique_values_for_table` no longer accumulates duplicate sampled values in its cache when called more than once for the same table with `cache=True`; the cached values frame is now de-duplicated by `value_id`, so repeated calls can't produce duplicate `:Value` nodes / `HAS_VALUE` edges. It also now warns when no column metadata is available (so non-sampleable complex types can't be detected), instead of silently pushing a complex column into a `collect_set` query that Databricks would reject.
 - `DatabricksSchemaExtractor` now rejects a `catalog` containing a backtick at construction (a `ConfigError`), matching the up-front `schema` validation, instead of only failing when the first query reaches identifier-quoting.
