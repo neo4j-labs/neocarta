@@ -10,14 +10,13 @@ Snowflake's ``INFORMATION_SCHEMA`` has no ``KEY_COLUMN_USAGE`` view, so primary 
 foreign keys come from ``SHOW PRIMARY KEYS`` / ``SHOW IMPORTED KEYS`` instead of a
 constraint-view join.
 
-Identifiers (database / schema / table / column names) are matched in the case
-Snowflake stores them: objects created with unquoted DDL are upper-cased, so pass
-upper-case names unless the objects were created with quoted, case-sensitive names.
+Caller-supplied ``database`` / ``schema`` names are resolved to Snowflake's stored case via
+:func:`~neocarta.connectors.snowflake._identifiers.normalize_identifier` (unquoted -> upper-case,
+``"quoted"`` preserved). Table / column names come back from the catalog already in stored case.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +26,7 @@ from ...._logging import log_stage
 from ....errors import ConfigError, StateError
 from ...utils.generate_id import generate_column_id, generate_value_id
 from .._errors import wrap_snowflake_errors
+from .._identifiers import normalize_identifier, quote_identifier
 from .models import SchemaExtractorCache
 
 if TYPE_CHECKING:
@@ -34,11 +34,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Snowflake column types that cannot be passed to ``ARRAY_AGG(DISTINCT ...)`` /
-# sampled with a distinct aggregate (semi-structured, structured, geospatial, and
-# vector types are non-groupable — Snowflake aborts the aggregate). ``VECTOR`` in
-# particular (used for embeddings) fails with an internal 300010 error, so it must
-# be skipped or it poisons value sampling for the whole table. Compared against an
+# Snowflake column types that cannot be sampled with ``SELECT DISTINCT`` (semi-structured,
+# structured, geospatial, and vector types are non-groupable — Snowflake aborts a DISTINCT
+# over them). ``VECTOR`` in particular (used for embeddings) fails with an internal 300010
+# error, so it must be skipped or it fails that column's sampling query. Compared against an
 # upper-cased ``data_type``.
 _NON_SAMPLEABLE_TYPES = ("VARIANT", "OBJECT", "ARRAY", "MAP", "GEOGRAPHY", "GEOMETRY", "VECTOR")
 
@@ -59,61 +58,9 @@ _REFERENCE_COLUMNS = [
 ]
 
 
-def _quote_identifier(identifier: str) -> str:
-    """Double-quote a SQL identifier, rejecting embedded double-quotes.
-
-    Identifiers (database / schema / table / column names) cannot be passed as
-    bound parameters, so they are interpolated into the query — double-quoted
-    (Snowflake's identifier quoting) after rejecting any name that itself contains
-    a double-quote (which could break out of the quoting). Value literals use
-    bound parameters instead.
-
-    Parameters
-    ----------
-    identifier : str
-        The identifier to quote.
-
-    Returns:
-    -------
-    str
-        The double-quoted identifier.
-
-    Raises:
-    ------
-    ConfigError
-        If ``identifier`` contains a double-quote.
-    """
-    if '"' in identifier:
-        raise ConfigError(
-            f"Invalid Snowflake identifier {identifier!r}: double-quotes are not allowed.",
-            suggestion="Pass a database/schema name without double-quote characters.",
-        )
-    return f'"{identifier}"'
-
-
 def _empty_value_frame() -> pd.DataFrame:
     """Return an empty column-unique-values frame with the expected columns."""
     return pd.DataFrame(columns=_VALUE_COLUMNS)
-
-
-def _parse_array_cell(cell: Any) -> list[Any]:
-    """Parse one ``ARRAY_AGG`` result cell into a Python list.
-
-    Snowflake returns an ``ARRAY`` column through ``fetch_pandas_all()`` as a
-    JSON-formatted string (or ``None``); normalise it to a list so the sampled
-    values can be exploded into rows. Anything unparseable becomes an empty list.
-    """
-    if cell is None:
-        return []
-    if isinstance(cell, list):
-        return cell
-    if isinstance(cell, str):
-        try:
-            parsed = json.loads(cell)
-        except (ValueError, TypeError):
-            return []
-        return parsed if isinstance(parsed, list) else []
-    return []
 
 
 class SnowflakeSchemaExtractor:
@@ -156,14 +103,6 @@ class SnowflakeSchemaExtractor:
                 "database is required for the Snowflake schema extractor.",
                 suggestion="Pass database=... (the Snowflake database name).",
             )
-        # Reject a malformed database identifier at construction so it fails fast and
-        # uniformly with the schema check (which validates up front in the connector),
-        # rather than only when the first query reaches _quote_identifier.
-        if '"' in database:
-            raise ConfigError(
-                f"Invalid database identifier {database!r}: double-quotes are not allowed.",
-                suggestion="Pass a database name without double-quote characters.",
-            )
         if (
             not isinstance(value_sample_limit, int)
             or isinstance(value_sample_limit, bool)
@@ -174,9 +113,13 @@ class SnowflakeSchemaExtractor:
                 suggestion="Pass value_sample_limit=0 to disable value sampling.",
             )
         self.connection = connection
-        self.database = database
+        # Resolve to stored case up front; also validates, raising ConfigError on a malformed
+        # name so it fails fast at construction.
+        self.database = normalize_identifier(database)
         self.value_sample_limit = value_sample_limit
         self._cache: SchemaExtractorCache = SchemaExtractorCache()
+        # Per-schema ``SHOW IMPORTED KEYS`` cache (see _imported_keys).
+        self._imported_keys_cache: dict[str, pd.DataFrame] = {}
 
     @property
     def database_info(self) -> pd.DataFrame:
@@ -210,11 +153,15 @@ class SnowflakeSchemaExtractor:
 
     def _qualify(self) -> str:
         """Return the double-quoted ``<database>.INFORMATION_SCHEMA`` prefix."""
-        return f"{_quote_identifier(self.database)}.INFORMATION_SCHEMA"
+        return f"{quote_identifier(self.database)}.INFORMATION_SCHEMA"
 
     def _qualified_schema(self, schema: str) -> str:
-        """Return the double-quoted ``<database>.<schema>`` reference."""
-        return f"{_quote_identifier(self.database)}.{_quote_identifier(schema)}"
+        """Return the double-quoted ``<database>.<schema>`` reference.
+
+        ``schema`` is expected already resolved to stored case (the connector calls
+        :func:`normalize_identifier` before handing it to the extractor).
+        """
+        return f"{quote_identifier(self.database)}.{quote_identifier(schema)}"
 
     def _run_query(self, sql: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
         """Execute a read query on a fresh cursor and return a pandas DataFrame.
@@ -433,17 +380,33 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
             self._cache["column_info"] = df
         return df
 
+    def _imported_keys(self, schema: str) -> pd.DataFrame:
+        """Return the raw ``SHOW IMPORTED KEYS`` frame for ``schema``, fetched once.
+
+        Both the foreign-key column flags (:meth:`extract_column_info`) and the
+        references frame (:meth:`extract_column_references_info`) derive from the same
+        imported-keys listing, so it is cached per schema to issue the ``SHOW`` only once.
+        """
+        cached = self._imported_keys_cache.get(schema)
+        if cached is None:
+            cached = self._run_show(
+                f"SHOW IMPORTED KEYS IN SCHEMA {self._qualified_schema(schema)}"
+            )
+            self._imported_keys_cache[schema] = cached
+        return cached
+
     def _extract_key_columns(
         self, schema: str
     ) -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
         """Return the (table, column) pairs that are primary keys and foreign keys.
 
         Snowflake exposes key columns only through ``SHOW PRIMARY KEYS`` / ``SHOW
-        IMPORTED KEYS`` (there is no ``key_column_usage`` view), so this runs both
-        and reads the foreign-key side from ``fk_table_name`` / ``fk_column_name``.
+        IMPORTED KEYS`` (there is no ``key_column_usage`` view), so this reads primary
+        keys directly and the foreign-key side from the shared imported-keys frame
+        (``fk_table_name`` / ``fk_column_name``).
         """
         pk_df = self._run_show(f"SHOW PRIMARY KEYS IN SCHEMA {self._qualified_schema(schema)}")
-        fk_df = self._run_show(f"SHOW IMPORTED KEYS IN SCHEMA {self._qualified_schema(schema)}")
+        fk_df = self._imported_keys(schema)
         pk = (
             {(row.table_name, row.column_name) for row in pk_df.itertuples()}
             if not pk_df.empty
@@ -479,7 +442,7 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
             ``referenced_schema``, ``referenced_table``, ``referenced_column``. The
             ``referenced_*`` fields describe the table the foreign key points at.
         """
-        show_df = self._run_show(f"SHOW IMPORTED KEYS IN SCHEMA {self._qualified_schema(schema)}")
+        show_df = self._imported_keys(schema)
 
         if show_df.empty:
             df = pd.DataFrame(columns=_REFERENCE_COLUMNS)
@@ -560,8 +523,8 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
             Columns ``column_name``, ``unique_value``, ``column_id``, ``value_id``.
         """
         limit = self.value_sample_limit if limit is None else limit
-        # ``limit`` is interpolated into the SQL (ARRAY_SLICE(..., 0, {limit})), so it must be
-        # a plain non-negative int — never a bool or arbitrary value that could break/inject.
+        # ``limit`` is interpolated into the SQL (``LIMIT {limit}``), so it must be a plain
+        # non-negative int — never a bool or arbitrary value that could break the query / inject.
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
             raise ConfigError(
                 "limit must be a non-negative integer.",
@@ -573,10 +536,10 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
         column_info = column_info if column_info is not None else self._cache.get("column_info")
         have_types = column_info is not None and not column_info.empty
         if not have_types:
-            # Without column metadata the complex/non-sampleable types cannot be detected, so
-            # a complex column (VARIANT/OBJECT/ARRAY/MAP/GEOGRAPHY/GEOMETRY/VECTOR) would be pushed into
-            # ARRAY_AGG and fail the whole query. Warn rather than sample blindly; the normal
-            # pipeline always supplies column_info (extract_column_info runs first).
+            # Without column metadata the complex/non-sampleable types cannot be detected, so a
+            # complex column (VARIANT/OBJECT/ARRAY/MAP/GEOGRAPHY/GEOMETRY/VECTOR) would be pushed
+            # into a DISTINCT query and fail on that column. Warn rather than sample blindly; the
+            # normal pipeline always supplies column_info (extract_column_info runs first).
             logger.warning(
                 "No column metadata for table %r; cannot skip non-sampleable types (%s) — the "
                 "sampling query may fail on complex columns. Call extract_column_info(schema=...) "
@@ -585,32 +548,50 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
                 ", ".join(_NON_SAMPLEABLE_TYPES),
             )
 
-        select_clauses = []
+        sampleable = []
         for col in column_names:
             if have_types:
                 col_data_type = column_info[
                     (column_info["table_name"] == table_name) & (column_info["column_name"] == col)
                 ]["data_type"]
                 if not col_data_type.empty:
-                    data_type = str(col_data_type.iloc[0]).upper()
-                    if data_type.startswith(_NON_SAMPLEABLE_TYPES):
+                    # DATA_TYPE may carry parameters (``VECTOR(FLOAT, 256)``, ``NUMBER(38,0)``);
+                    # strip them and match the base type by exact membership (exact avoids a prefix
+                    # collision with a future groupable type; stripping still catches VECTOR).
+                    base_type = str(col_data_type.iloc[0]).split("(", 1)[0].strip().upper()
+                    if base_type in _NON_SAMPLEABLE_TYPES:
                         continue
-            quoted = _quote_identifier(col)
-            select_clauses.append(
-                f"ARRAY_SLICE(ARRAY_AGG(DISTINCT {quoted}), 0, {limit}) AS {quoted}"
-            )
+            sampleable.append(col)
 
-        if not select_clauses:
+        if not sampleable:
             return _empty_value_frame()
 
-        relation = f"{self._qualified_schema(schema)}.{_quote_identifier(table_name)}"
-        df = self._run_query(f"SELECT {', '.join(select_clauses)} FROM {relation}")
+        relation = f"{self._qualified_schema(schema)}.{quote_identifier(table_name)}"
+        # One bounded query per column: DISTINCT ... ORDER BY ... LIMIT pushes the cap into the
+        # scan (vs materialising the full distinct set an ARRAY_AGG(DISTINCT) would) and makes the
+        # sampled subset deterministic, so a re-sample under cache=True stays capped at ``limit``
+        # and the value-id dedup below collapses repeats. TO_VARCHAR casts server-side so
+        # :Value.value gets Snowflake's canonical text: full precision on large NUMBER ids (an
+        # Arrow float64 would round/collapse them), preserved scale, and no fetch_pandas_all
+        # overflow on out-of-range TIMESTAMP. Ordering by the alias keeps DISTINCT + ORDER BY valid.
+        frames = []
+        for col in sampleable:
+            quoted = quote_identifier(col)
+            col_df = self._run_query(
+                f'SELECT DISTINCT TO_VARCHAR({quoted}) AS "unique_value" '
+                f'FROM {relation} WHERE {quoted} IS NOT NULL ORDER BY "unique_value" LIMIT {limit}'
+            )
+            if col_df.empty:
+                continue
+            col_df = col_df[["unique_value"]].copy()
+            col_df.insert(0, "column_name", col)
+            frames.append(col_df)
 
-        # Each aggregate cell is a JSON-array string (Snowflake ARRAY over fetch_pandas_all);
-        # parse to a list, explode to one row per value, and drop the NULLs ARRAY_AGG keeps.
-        result = df.melt(var_name="column_name", value_name="unique_value")
-        result["unique_value"] = result["unique_value"].apply(_parse_array_cell)
-        result = result.explode("unique_value").dropna().reset_index(drop=True)
+        if not frames:
+            return _empty_value_frame()
+
+        result = pd.concat(frames, ignore_index=True)
+        result = result.dropna(subset=["unique_value"]).reset_index(drop=True)
         result["unique_value"] = result["unique_value"].astype(str)
         result["column_id"] = result["column_name"].apply(
             lambda col: generate_column_id(self.database, schema, table_name, col)

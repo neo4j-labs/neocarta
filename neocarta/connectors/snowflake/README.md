@@ -27,10 +27,12 @@ pip install neocarta[snowflake]
 The caller constructs and owns the `snowflake.connector` connection (mirroring how
 the BigQuery connector takes a `client`); `close()` is a no-op and never closes it.
 
-> **Identifier case.** Snowflake stores unquoted identifiers upper-cased. Pass
-> `database` / `schema` names in the case Snowflake stores them (upper-case unless
-> the objects were created with quoted, case-sensitive names). Generated node ids
-> are normalized (lower-cased) so they stay consistent regardless of source case.
+> **Identifier case.** `database` / `schema` names are resolved the way Snowflake
+> resolves identifiers: an unquoted name is folded to upper-case (so `analytics`
+> finds the stored `ANALYTICS`), and a name wrapped in double-quotes is treated as a
+> case-sensitive literal (e.g. pass `'"MixedCase"'` to target a quoted-DDL object).
+> Generated node ids are normalized (lower-cased) so they stay consistent regardless
+> of source case.
 
 ## Connector type
 
@@ -148,7 +150,7 @@ All scoped to the target `<database>`:
 | table info | `INFORMATION_SCHEMA.TABLES` (base tables + views) |
 | column info | `INFORMATION_SCHEMA.COLUMNS`, plus `SHOW PRIMARY KEYS` / `SHOW IMPORTED KEYS` for PK/FK flags |
 | references | `SHOW IMPORTED KEYS IN SCHEMA` (FK → referenced PK) |
-| value samples | `SELECT ARRAY_SLICE(ARRAY_AGG(DISTINCT "col"), 0, n)` per groupable column |
+| value samples | `SELECT DISTINCT TO_VARCHAR("col") FROM … WHERE "col" IS NOT NULL ORDER BY 1 LIMIT n` per groupable column |
 
 Snowflake's `INFORMATION_SCHEMA` does **not** expose a `KEY_COLUMN_USAGE` view, so
 primary- and foreign-key *columns* come from the `SHOW PRIMARY KEYS` /
@@ -178,7 +180,8 @@ data-read cost/PII control, not a graph-entity filter).
   the metadata, and can surface PII. Pass `value_sample_limit=0` to skip it (no
   `:Value` nodes / `HAS_VALUE` edges). Complex/non-groupable column types
   (VARIANT/OBJECT/ARRAY/MAP/GEOGRAPHY/GEOMETRY/VECTOR) are skipped automatically —
-  these are non-groupable, so `ARRAY_AGG(DISTINCT …)` on them would fail.
+  these are non-groupable, so a `SELECT DISTINCT` over them would fail. Sampling issues
+  one bounded `SELECT DISTINCT … LIMIT n` per column, so the cap bounds warehouse compute.
 - **Re-ingest is additive.** Re-running against the same schema adds newly-created
   tables/columns/values, but does **not** refresh changed metadata (e.g. an edited
   comment or type) and does **not** remove dropped objects — the shared

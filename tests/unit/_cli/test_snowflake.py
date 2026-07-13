@@ -357,6 +357,32 @@ def test_authenticator_auth_builds_connection(monkeypatch):
 
 
 @pytest.mark.usefixtures("_kp_env")
+def test_authenticator_auth_never_forwards_stale_password(monkeypatch):
+    """A leftover SNOWFLAKE_PASSWORD must NOT be sent on an authenticator (SSO/OAuth) connect."""
+    pytest.importorskip("snowflake.connector")
+    monkeypatch.setenv("SNOWFLAKE_AUTHENTICATOR", "externalbrowser")
+    monkeypatch.setenv("SNOWFLAKE_TOKEN", "tok")
+    monkeypatch.setenv("SNOWFLAKE_PASSWORD", "stale-leftover")
+    runner = CliRunner()
+    with (
+        patch(_EXTRA_CHECK, return_value=True),
+        patch(_DRIVER_CTX) as mock_driver_ctx,
+        patch("snowflake.connector.connect", return_value=MagicMock()) as mock_connect,
+        patch("neocarta.connectors.snowflake.SnowflakeSchemaConnector", return_value=MagicMock()),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+        result = runner.invoke(cli, ["--json", "snowflake", "schema", "--no-embeddings"])
+
+    assert result.exit_code == 0, result.output
+    kwargs = mock_connect.call_args.kwargs
+    assert kwargs["authenticator"] == "externalbrowser"
+    assert kwargs["token"] == "tok"  # noqa: S105
+    assert "password" not in kwargs, "stale password must not leak into an authenticator connect"
+    assert "stale-leftover" not in result.output
+
+
+@pytest.mark.usefixtures("_kp_env")
 def test_no_auth_configured_fails_usage_error():
     """No password / key-pair / authenticator -> clean usage_error, connector not built."""
     runner = CliRunner()
@@ -419,6 +445,34 @@ def test_connection_failure_maps_to_clean_cli_error(monkeypatch, tmp_path):
     assert result.exit_code == EXIT_CODES["auth_error"]["code"], result.output
     assert json.loads(result.stdout)["error"]["code"] == "auth_error"
     mock_connector.return_value.ingest.assert_not_called()
+
+
+@pytest.mark.usefixtures("_kp_env")
+@pytest.mark.parametrize("exc_name", ["BadGatewayError", "GatewayTimeoutError", "TooManyRequests"])
+def test_transient_connection_failure_maps_to_retryable_upstream_error(
+    monkeypatch, tmp_path, exc_name
+):
+    """A transient network/gateway failure (502/504/429) routes to a retryable upstream_error."""
+    sferr = pytest.importorskip("snowflake.connector.errors")
+    exc_cls = getattr(sferr, exc_name)
+    key = tmp_path / "rsa_key.p8"
+    key.write_text("-----BEGIN PRIVATE KEY-----\ndummy\n-----END PRIVATE KEY-----\n")
+    monkeypatch.setenv("SNOWFLAKE_PRIVATE_KEY_PATH", str(key))
+    runner = CliRunner()
+    with (
+        patch(_EXTRA_CHECK, return_value=True),
+        patch(_DRIVER_CTX) as mock_driver_ctx,
+        patch("snowflake.connector.connect", side_effect=exc_cls()),
+        patch("neocarta.connectors.snowflake.SnowflakeSchemaConnector"),
+    ):
+        mock_driver_ctx.return_value.__enter__.return_value = MagicMock()
+        mock_driver_ctx.return_value.__exit__.return_value = False
+        result = runner.invoke(cli, ["--json", "snowflake", "schema", "--no-embeddings"])
+
+    assert result.exit_code == EXIT_CODES["upstream_error"]["code"], result.output
+    payload = json.loads(result.stdout)["error"]
+    assert payload["code"] == "upstream_error"
+    assert payload.get("retryable") is True
 
 
 def test_multiple_auth_methods_warns(caplog, tmp_path):

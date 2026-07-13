@@ -6,11 +6,8 @@ import pytest
 
 from neocarta.connectors.snowflake import _errors
 from neocarta.connectors.snowflake._errors import _classify, wrap_snowflake_errors
-from neocarta.connectors.snowflake.schema.extract import (
-    SnowflakeSchemaExtractor,
-    _parse_array_cell,
-    _quote_identifier,
-)
+from neocarta.connectors.snowflake._identifiers import normalize_identifier, quote_identifier
+from neocarta.connectors.snowflake.schema.extract import SnowflakeSchemaExtractor
 from neocarta.connectors.utils.generate_id import generate_column_id, generate_value_id
 from neocarta.errors import ConfigError, ExtractionError, StateError
 
@@ -130,18 +127,49 @@ def test_run_show_builds_dataframe_with_lowercased_headers():
 
 
 def test_quote_identifier_wraps_in_double_quotes():
-    """Identifiers are double-quoted (Snowflake quoting)."""
-    assert _quote_identifier("my_database") == '"my_database"'
+    """A resolved identifier is double-quoted (Snowflake quoting)."""
+    assert quote_identifier("MY_DATABASE") == '"MY_DATABASE"'
 
 
-def test_quote_identifier_rejects_double_quote():
-    """An identifier containing a double-quote is a configuration error."""
+def test_quote_identifier_escapes_embedded_double_quote():
+    """quote_identifier escapes an embedded double-quote by doubling it (no break-out)."""
+    assert quote_identifier('a"b') == '"a""b"'
+
+
+def test_normalize_identifier_upper_cases_unquoted():
+    """An unquoted name resolves to Snowflake's stored (upper-cased) form."""
+    assert normalize_identifier("analytics") == "ANALYTICS"
+    assert normalize_identifier("Analytics") == "ANALYTICS"
+
+
+def test_normalize_identifier_preserves_quoted_literal():
+    """A double-quoted name is a case-sensitive literal (quotes stripped, "" collapsed)."""
+    assert normalize_identifier('"MixedCase"') == "MixedCase"
+    assert normalize_identifier('"a""b"') == 'a"b'
+
+
+def test_normalize_identifier_rejects_unquoted_embedded_quote():
+    """An unquoted name containing a stray double-quote is a configuration error."""
     with pytest.raises(ConfigError):
-        _quote_identifier('evil"database')
+        normalize_identifier('evil"database')
 
 
-def test_constructor_rejects_double_quote_database():
-    """A database name containing a double-quote is rejected up front, at construction."""
+def test_normalize_identifier_rejects_malformed_quoted():
+    """A quoted name with an undoubled inner quote is a configuration error."""
+    with pytest.raises(ConfigError):
+        normalize_identifier('"a"b"')
+
+
+def test_normalize_identifier_rejects_empty_quoted():
+    """An empty quoted identifier ('""') is still empty and is rejected, not silently ''."""
+    with pytest.raises(ConfigError):
+        normalize_identifier('""')
+
+
+def test_constructor_folds_and_rejects_database():
+    """The constructor resolves the database (upper-cases) and rejects a malformed name."""
+    ex = SnowflakeSchemaExtractor(connection=MagicMock(), database="analytics")
+    assert ex.database == "ANALYTICS"
     with pytest.raises(ConfigError):
         SnowflakeSchemaExtractor(connection=MagicMock(), database='evil"database')
 
@@ -169,12 +197,14 @@ def test_extract_schema_info_is_database_scoped():
     conn = _capture_connection(
         pd.DataFrame([{"catalog_name": "db", "schema_name": "sch", "description": None}])
     )
+    # Lower-case ``db`` is folded to the stored ``DB`` at construction; the extractor
+    # receives an already-resolved schema from the connector (here ``SCH``).
     ex = SnowflakeSchemaExtractor(connection=conn, database="db")
-    ex.extract_schema_info("sch")
+    ex.extract_schema_info("SCH")
     sql, params = conn.cursor.return_value.execute.call_args[0]
     assert "INFORMATION_SCHEMA.SCHEMATA" in sql
     assert "CATALOG_NAME = %(database)s" in sql
-    assert params == {"database": "db", "schema": "sch"}
+    assert params == {"database": "DB", "schema": "SCH"}
 
 
 def test_extract_schema_info_missing_schema_raises_config_error():
@@ -201,11 +231,11 @@ def test_extract_table_info_is_database_scoped():
         )
     )
     ex = SnowflakeSchemaExtractor(connection=conn, database="db")
-    ex.extract_table_info("sch")
+    ex.extract_table_info("SCH")
     sql, params = conn.cursor.return_value.execute.call_args[0]
     assert "INFORMATION_SCHEMA.TABLES" in sql
     assert "TABLE_CATALOG = %(database)s" in sql
-    assert params == {"database": "db", "schema": "sch"}
+    assert params == {"database": "DB", "schema": "SCH"}
 
 
 def test_extract_column_info_columns_query_is_database_scoped():
@@ -227,12 +257,12 @@ def test_extract_column_info_columns_query_is_database_scoped():
     cursor.fetchall.return_value = []
     cursor.description = [("table_name",), ("column_name",)]
     ex = SnowflakeSchemaExtractor(connection=conn, database="db")
-    ex.extract_column_info("sch")
+    ex.extract_column_info("SCH")
 
     columns_sql, columns_params = cursor.execute.call_args_list[0][0]
     assert "INFORMATION_SCHEMA.COLUMNS" in columns_sql
     assert "TABLE_CATALOG = %(database)s" in columns_sql
-    assert columns_params == {"database": "db", "schema": "sch"}
+    assert columns_params == {"database": "DB", "schema": "SCH"}
     show_sqls = [call[0][0] for call in cursor.execute.call_args_list[1:]]
     assert any("SHOW PRIMARY KEYS" in s for s in show_sqls)
     assert any("SHOW IMPORTED KEYS" in s for s in show_sqls)
@@ -297,24 +327,31 @@ def test_extract_column_info_empty_schema_yields_empty_key_flags():
 
 
 def test_extract_column_info_normalizes_is_nullable_to_bool():
-    """The 'YES'/'NO' nullability flag is normalized to a real boolean."""
+    """The raw INFORMATION_SCHEMA 'YES'/'NO' string is coerced to a real boolean.
+
+    Exercises the real coercion path in extract_column_info (``.astype(str).str.strip()
+    .str.upper().ne("NO")``): only an explicit 'NO' (any case / surrounding whitespace)
+    is not-nullable; 'YES', a lower-case 'no' mismatch is impossible (case-folded), an
+    empty string, and anything else default to nullable (True).
+    """
     conn = _capture_connection(
         pd.DataFrame(
             {
-                "table_catalog": ["db", "db"],
-                "table_schema": ["sch", "sch"],
-                "table_name": ["t", "t"],
-                "column_name": ["a", "b"],
-                "is_nullable": ["NO", "YES"],
-                "data_type": ["NUMBER", "TEXT"],
-                "description": [None, None],
+                "table_catalog": ["db"] * 5,
+                "table_schema": ["sch"] * 5,
+                "table_name": ["t"] * 5,
+                "column_name": ["a", "b", "c", "d", "e"],
+                "is_nullable": ["NO", "YES", "no", " NO ", ""],
+                "data_type": ["NUMBER"] * 5,
+                "description": [None] * 5,
             }
         )
     )
     ex = SnowflakeSchemaExtractor(connection=conn, database="db")
     ex._extract_key_columns = lambda _schema: (set(), set())
-    df = ex.extract_column_info("sch")
-    assert df["is_nullable"].tolist() == [False, True]
+    df = ex.extract_column_info("SCH")
+    # 'NO' / 'no' / ' NO ' -> not-nullable (False); 'YES' / '' -> nullable (True).
+    assert df["is_nullable"].tolist() == [False, True, False, False, True]
     assert df["is_nullable"].dtype == bool
 
 
@@ -347,6 +384,40 @@ def test_extract_references_empty_when_no_foreign_keys():
     assert "referenced_table" in out.columns
 
 
+def test_imported_keys_fetched_once_across_column_and_references(monkeypatch):
+    """SHOW IMPORTED KEYS is issued once per schema, shared by FK flags + references.
+
+    Regression: extract_column_info (via _extract_key_columns) and
+    extract_column_references_info both need the imported keys; the frame is fetched
+    once and cached, not re-queried.
+    """
+    ex = SnowflakeSchemaExtractor(connection=MagicMock(), database="db")
+    ex._run_query = lambda _sql, _params=None: pd.DataFrame(
+        {
+            "table_catalog": ["db"],
+            "table_schema": ["sch"],
+            "table_name": ["t"],
+            "column_name": ["a"],
+            "is_nullable": ["NO"],
+            "data_type": ["NUMBER"],
+            "description": [None],
+        }
+    )
+    show_calls: list[str] = []
+
+    def fake_run_show(sql: str) -> pd.DataFrame:
+        show_calls.append(sql)
+        if "IMPORTED" in sql:
+            return pd.DataFrame(columns=_IMPORTED_KEYS_COLUMNS)
+        return pd.DataFrame(columns=["table_name", "column_name"])  # PRIMARY KEYS
+
+    ex._run_show = fake_run_show
+    ex.extract_column_info("SCH")
+    ex.extract_column_references_info("SCH")
+    imported = [s for s in show_calls if "IMPORTED KEYS" in s]
+    assert len(imported) == 1, f"SHOW IMPORTED KEYS should run once, ran {len(imported)}x"
+
+
 def test_extract_references_drops_cross_database_fk_and_warns(caplog):
     """A foreign key whose referenced table lives in another database is dropped, with a warning."""
     rows = [
@@ -374,9 +445,9 @@ def test_extractor_rejects_invalid_value_sample_limit(bad):
 # --- value sampling -------------------------------------------------------------
 
 
-def test_value_sampling_parses_json_array_and_uses_generate_value_id():
-    """Sampled JSON-array cells are parsed and value ids come from generate_value_id."""
-    connection = _capture_connection(pd.DataFrame({"customer_id": ['["1", "2"]']}))
+def test_value_sampling_reads_distinct_values_and_uses_generate_value_id():
+    """Distinct sample rows become Value rows; value ids come from generate_value_id."""
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     result = extractor.extract_column_unique_values_for_table(
@@ -392,9 +463,9 @@ def test_value_sampling_parses_json_array_and_uses_generate_value_id():
     )
 
 
-def test_value_sampling_uses_array_agg_and_skips_complex_types():
-    """VARIANT/OBJECT/ARRAY columns are excluded from the ARRAY_AGG sampling query."""
-    connection = _capture_connection(pd.DataFrame({"customer_id": ['["1"]']}))
+def test_value_sampling_uses_bounded_select_distinct_and_skips_complex_types():
+    """Sampling is a per-column ``SELECT DISTINCT ... LIMIT``; complex types are skipped."""
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(
         [
@@ -407,21 +478,26 @@ def test_value_sampling_uses_array_agg_and_skips_complex_types():
         "customers", ["customer_id", "attrs"], SCHEMA, cache=False, column_info=column_info
     )
 
-    executed_sql = connection.cursor.return_value.execute.call_args[0][0]
-    assert "ARRAY_AGG" in executed_sql
-    assert '"customer_id"' in executed_sql
-    assert '"attrs"' not in executed_sql
+    all_sql = [call[0][0] for call in connection.cursor.return_value.execute.call_args_list]
+    # The cap is pushed into the scan (LIMIT), the subset is deterministic (ORDER BY) so a
+    # repeated cache=True sample stays capped at `limit`, and the value is stringified
+    # server-side (TO_VARCHAR) for exact, driver-independent representation. Only the
+    # sampleable column is queried.
+    assert all(
+        "SELECT DISTINCT TO_VARCHAR(" in s and "ORDER BY" in s and "LIMIT" in s for s in all_sql
+    )
+    assert any('"customer_id"' in s for s in all_sql)
+    assert all('"attrs"' not in s for s in all_sql)
 
 
 def test_value_sampling_skips_vector_and_structured_types():
-    """VECTOR / MAP / OBJECT / GEOGRAPHY columns are excluded from the ARRAY_AGG query.
+    """VECTOR / MAP / OBJECT / GEOGRAPHY columns are excluded from sampling.
 
     Regression for a live-confirmed bug: a Snowflake VECTOR column (embeddings) is
-    non-groupable, so ``ARRAY_AGG(DISTINCT <vector>)`` aborts the whole query with an
-    internal 300010 error — which would poison value sampling for the entire table.
-    Only the sampleable scalar column must appear in the generated SELECT.
+    non-groupable, so a ``DISTINCT`` over it aborts that column's query. Only the
+    sampleable scalar column must be queried.
     """
-    connection = _capture_connection(pd.DataFrame({"nodeid": ['["1", "2"]']}))
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(
         [
@@ -439,10 +515,33 @@ def test_value_sampling_skips_vector_and_structured_types():
         cache=False,
         column_info=column_info,
     )
-    sql = connection.cursor.return_value.execute.call_args[0][0]
-    assert '"nodeid"' in sql  # sampleable scalar still sampled
+    all_sql = " ".join(call[0][0] for call in connection.cursor.return_value.execute.call_args_list)
+    assert '"nodeid"' in all_sql  # sampleable scalar still sampled
     for skipped in ('"vec"', '"attrs"', '"tags"', '"geo"'):
-        assert skipped not in sql, f"{skipped} (non-groupable) must be skipped"
+        assert skipped not in all_sql, f"{skipped} (non-groupable) must be skipped"
+
+
+def test_value_sampling_skips_parameterized_non_sampleable_types():
+    """A parameterized non-sampleable type (e.g. ``VECTOR(FLOAT, 256)``) is still skipped.
+
+    DATA_TYPE can carry parameters; the base type is matched by exact membership after
+    stripping the ``(...)`` so a parameterized VECTOR/etc. is dropped, while a scalar
+    (``NUMBER(38,0)``) is still sampled.
+    """
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
+    extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
+    column_info = pd.DataFrame(
+        [
+            {"table_name": "t", "column_name": "nodeid", "data_type": "NUMBER(38,0)"},
+            {"table_name": "t", "column_name": "vec", "data_type": "VECTOR(FLOAT, 256)"},
+        ]
+    )
+    extractor.extract_column_unique_values_for_table(
+        "t", ["nodeid", "vec"], SCHEMA, cache=False, column_info=column_info
+    )
+    all_sql = " ".join(call[0][0] for call in connection.cursor.return_value.execute.call_args_list)
+    assert '"nodeid"' in all_sql  # parameterized scalar still sampled
+    assert '"vec"' not in all_sql  # parameterized VECTOR skipped
 
 
 def test_value_sampling_disabled_skips_query():
@@ -481,7 +580,7 @@ def test_value_sampling_for_all_tables_requires_extracted_state():
 
 def test_value_sampling_cache_dedupes_on_repeated_calls():
     """Re-sampling the same table with cache=True must not accumulate duplicate values."""
-    connection = _capture_connection(pd.DataFrame({"customer_id": ['["1", "2"]']}))
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     extractor.extract_column_unique_values_for_table("customers", ["customer_id"], SCHEMA)
@@ -494,7 +593,7 @@ def test_value_sampling_cache_dedupes_on_repeated_calls():
 
 def test_value_sampling_warns_when_no_column_metadata(caplog):
     """Sampling without column metadata warns that complex types can't be skipped."""
-    connection = _capture_connection(pd.DataFrame({"customer_id": ['["1"]']}))
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     with caplog.at_level(logging.WARNING):
@@ -505,26 +604,20 @@ def test_value_sampling_warns_when_no_column_metadata(caplog):
     assert any("No column metadata for table" in rec.message for rec in caplog.records)
 
 
-@pytest.mark.parametrize(
-    ("cell", "expected"),
-    [
-        ('["1", "2"]', ["1", "2"]),  # JSON-array string (the Snowflake fetch shape)
-        ('["a", null, "b"]', ["a", None, "b"]),  # JSON null preserved (dropna handles it later)
-        (["x", "y"], ["x", "y"]),  # already a Python list
-        (None, []),  # NULL cell
-        (123, []),  # unexpected scalar -> empty
-        ("not json", []),  # unparseable -> empty (no raise)
-        ("{}", []),  # valid JSON but not a list -> empty
-    ],
-)
-def test_parse_array_cell(cell, expected):
-    """_parse_array_cell normalizes Snowflake ARRAY_AGG cells (str/list/None/junk) to a list."""
-    assert _parse_array_cell(cell) == expected
+def test_value_sampling_excludes_nulls_via_where_clause():
+    """Each sampling query filters NULLs in SQL (WHERE ... IS NOT NULL), not just in pandas."""
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
+    extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
+    extractor.extract_column_unique_values_for_table(
+        "customers", ["customer_id"], SCHEMA, cache=False
+    )
+    sql = connection.cursor.return_value.execute.call_args[0][0]
+    assert '"customer_id" IS NOT NULL' in sql
 
 
-def test_value_sampling_drops_null_array_elements():
-    """A JSON array containing null yields only the non-null values as Value rows."""
-    connection = _capture_connection(pd.DataFrame({"customer_id": ['["1", null, "2"]']}))
+def test_value_sampling_drops_null_values():
+    """Any NULL row that slips through (e.g. a NaN from the driver) is dropped, not stringified."""
+    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", None, "2"]}))
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     result = extractor.extract_column_unique_values_for_table(
         "customers", ["customer_id"], SCHEMA, cache=False
@@ -533,7 +626,7 @@ def test_value_sampling_drops_null_array_elements():
 
 
 def test_value_sampling_all_complex_columns_issues_no_query():
-    """When every candidate column is non-sampleable, no ARRAY_AGG query is issued."""
+    """When every candidate column is non-sampleable, no sampling query is issued."""
     connection = MagicMock()
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(

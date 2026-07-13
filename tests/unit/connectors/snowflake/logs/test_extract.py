@@ -1,8 +1,10 @@
 from unittest.mock import MagicMock
 
 import pandas as pd
+import pytest
 
 from neocarta.connectors.snowflake.logs.extract import SnowflakeLogsExtractor
+from neocarta.errors import ConfigError
 
 DATABASE = "MYDB"
 SCHEMA = "PUBLIC"
@@ -21,6 +23,20 @@ def test_extractor_initialization():
     extractor = SnowflakeLogsExtractor(connection=connection, database=DATABASE)
     assert extractor.database == DATABASE
     assert extractor.connection is connection
+
+
+def test_extractor_folds_lowercase_database():
+    """A lower-case database is resolved to Snowflake's stored (upper) case."""
+    extractor = SnowflakeLogsExtractor(connection=MagicMock(), database="mydb")
+    assert extractor.database == "MYDB"
+
+
+@pytest.mark.parametrize("bad", [-1, True, 2.5, "10"])
+def test_extract_query_logs_rejects_invalid_limit(bad):
+    """A non-(plain-int) / negative limit is rejected with a ConfigError naming limit."""
+    extractor = SnowflakeLogsExtractor(connection=MagicMock(), database=DATABASE)
+    with pytest.raises(ConfigError, match="limit"):
+        extractor.extract_query_logs(schema=SCHEMA, limit=bad, cache=False)
 
 
 def test_extract_query_logs_calls_account_usage_query():

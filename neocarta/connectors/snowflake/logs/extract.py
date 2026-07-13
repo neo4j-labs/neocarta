@@ -16,8 +16,10 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 from ...._logging import log_stage
+from ....errors import ConfigError
 from ...query_log.utils import create_query_id, parse_sql_query
 from .._errors import wrap_snowflake_errors
+from .._identifiers import normalize_identifier
 from .models import LogsExtractorCache
 
 if TYPE_CHECKING:
@@ -54,7 +56,9 @@ class SnowflakeLogsExtractor:
             ``QUERY_HISTORY`` and as the default project when resolving table names).
         """
         self.connection = connection
-        self.database = database
+        # Resolve to Snowflake's stored case so the QUERY_HISTORY.DATABASE_NAME filter matches
+        # (unquoted names are upper-cased; wrap a case-sensitive name in double-quotes).
+        self.database = normalize_identifier(database)
         self._cache: LogsExtractorCache = LogsExtractorCache()
 
     @property
@@ -190,9 +194,20 @@ class SnowflakeLogsExtractor:
         pd.DataFrame
             A Pandas DataFrame containing the query log information.
         """
+        # ``limit`` is interpolated into the SQL (LIMIT {limit}), so it must be a plain
+        # non-negative int — never a bool or negative value that would produce invalid SQL
+        # surfaced as an opaque error. Mirror the schema extractor's value_sample_limit guard.
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
+            raise ConfigError(
+                "limit must be a non-negative integer.",
+                suggestion="Pass a limit >= 0 (0 returns no rows).",
+            )
+
         params: dict[str, Any] = {"database": self.database}
         schema_condition = ""
         if schema:
+            # Resolve to stored case so the SCHEMA_NAME filter matches (see self.database).
+            schema = normalize_identifier(schema)
             schema_condition = "AND SCHEMA_NAME = %(schema)s"
             params["schema"] = schema
 

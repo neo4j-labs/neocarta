@@ -130,16 +130,13 @@ def _snowflake_connection(settings: CLISettings) -> Iterator[SnowflakeConnection
             )
         elif method == "authenticator":
             connect_kwargs["authenticator"] = settings.snowflake_authenticator
+            # Send only the authenticator's optional token, never a password: forwarding a stale
+            # SNOWFLAKE_PASSWORD would transmit a second credential on an SSO/OAuth connect.
             connection = snowflake_connector.connect(
                 **connect_kwargs,
                 **(
                     {"token": settings.snowflake_token.get_secret_value()}
                     if settings.snowflake_token is not None
-                    else {}
-                ),
-                **(
-                    {"password": settings.snowflake_password.get_secret_value()}
-                    if settings.snowflake_password is not None
                     else {}
                 ),
             )
@@ -152,9 +149,12 @@ def _snowflake_connection(settings: CLISettings) -> Iterator[SnowflakeConnection
         # A failed connection (bad key / account / token / MFA policy / network) must
         # surface as a clean CLIError, not a raw snowflake.connector traceback. Classify
         # by exception class only (never message text, which may contain sensitive detail).
+        # Reuse the connector's retryable-class set so transient failures route to a retryable
+        # upstream_error (not auth_error) and the two classifications can't drift.
+        from neocarta.connectors.snowflake._errors import _RETRYABLE_NAMES  # noqa: PLC0415
+
         names = {klass.__name__ for klass in type(exc).__mro__}
-        transient = {"OperationalError", "InternalError", "ServiceUnavailableError"}
-        is_transient = bool(names & transient)
+        is_transient = bool(names & _RETRYABLE_NAMES)
         raise CLIError(
             "upstream_error" if is_transient else "auth_error",
             "Failed to connect to Snowflake.",

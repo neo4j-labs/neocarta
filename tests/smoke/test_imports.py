@@ -22,6 +22,16 @@ def test_snowflake_connector_imports():
     assert SnowflakeSchemaConnector
 
 
+def test_databricks_connector_imports():
+    # Must import cleanly WITHOUT the optional `databricks` extra installed — guards against an
+    # accidental top-level `import databricks.sql`/`databricks.sdk` that would break
+    # neocarta[cli] / neocarta[snowflake] users who don't install the databricks driver.
+    from neocarta.connectors.databricks import DatabricksSchemaConnector, DatabricksTagsConnector
+
+    assert DatabricksSchemaConnector
+    assert DatabricksTagsConnector
+
+
 def test_csv_connector_imports():
     from neocarta.connectors.csv import CSVConnector
 

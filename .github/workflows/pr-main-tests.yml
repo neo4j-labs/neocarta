@@ -48,6 +48,31 @@ jobs:
 
       - name: Run integration tests
         run: make test-it
-      
+
+  smoke-no-extras:
+    name: Smoke Tests (no optional connector extras)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Deliberately WITHOUT --extra databricks / --extra snowflake: the smoke tests assert
+      # the package (and every connector) imports cleanly when the optional connector extras
+      # are absent. Installing an extra here would mask an accidental top-level
+      # `import snowflake.connector` that breaks neocarta[cli] users who don't install it.
+      - name: Install dependencies (no connector extras)
+        run: uv sync --dev --extra cli
+
       - name: Run smoke tests
         run: make test-smoke
