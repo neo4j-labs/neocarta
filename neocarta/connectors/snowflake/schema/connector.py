@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from ....errors import ConfigError
 from ...utils.rdbms_schema_connector import RdbmsSchemaConnector
 from .._identifiers import normalize_identifier
-from .extract import SnowflakeSchemaExtractor
+from .extract import _VALUE_SAMPLE_BATCH_SIZE, SnowflakeSchemaExtractor
 from .transform import SnowflakeSchemaTransformer
 
 if TYPE_CHECKING:
@@ -51,6 +51,9 @@ class SnowflakeSchemaConnector(RdbmsSchemaConnector):
     value_sample_limit : int, default 10
         Distinct sample values to read per groupable column. ``0`` disables value
         sampling (no table-data reads, so no ``:Value`` nodes / ``HAS_VALUE`` edges).
+    value_sample_query_batch_size : int, default 50
+        Number of per-column value-sampling subqueries to UNION ALL into one statement,
+        bounding round trips on wide tables.
     """
 
     _DISPLAY_NAME = "Snowflake"
@@ -63,6 +66,7 @@ class SnowflakeSchemaConnector(RdbmsSchemaConnector):
         database_name: str = "neo4j",
         *,
         value_sample_limit: int = 10,
+        value_sample_query_batch_size: int = _VALUE_SAMPLE_BATCH_SIZE,
     ) -> None:
         """Initialize the Snowflake schema connector."""
         if connection is None:
@@ -87,7 +91,10 @@ class SnowflakeSchemaConnector(RdbmsSchemaConnector):
             neo4j_driver=neo4j_driver,
             database_name=database_name,
             extractor=SnowflakeSchemaExtractor(
-                connection, database, value_sample_limit=value_sample_limit
+                connection,
+                database,
+                value_sample_limit=value_sample_limit,
+                value_sample_query_batch_size=value_sample_query_batch_size,
             ),
             transformer=SnowflakeSchemaTransformer(),
         )

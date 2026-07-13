@@ -181,7 +181,9 @@ data-read cost/PII control, not a graph-entity filter).
   `:Value` nodes / `HAS_VALUE` edges). Complex/non-groupable column types
   (VARIANT/OBJECT/ARRAY/MAP/GEOGRAPHY/GEOMETRY/VECTOR) are skipped automatically —
   these are non-groupable, so a `SELECT DISTINCT` over them would fail. Sampling issues
-  one bounded `SELECT DISTINCT … LIMIT n` per column, so the cap bounds warehouse compute.
+  a bounded `SELECT DISTINCT … LIMIT n` per column, UNION ALL-batched
+  (`value_sample_query_batch_size`, default 50) so a wide table costs a few round trips
+  rather than one per column; the cap bounds warehouse compute.
 - **Re-ingest is additive.** Re-running against the same schema adds newly-created
   tables/columns/values, but does **not** refresh changed metadata (e.g. an edited
   comment or type) and does **not** remove dropped objects — the shared

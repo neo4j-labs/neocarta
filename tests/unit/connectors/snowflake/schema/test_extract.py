@@ -7,7 +7,7 @@ import pytest
 from neocarta.connectors.snowflake import _errors
 from neocarta.connectors.snowflake._errors import _classify, wrap_snowflake_errors
 from neocarta.connectors.snowflake._identifiers import normalize_identifier, quote_identifier
-from neocarta.connectors.snowflake.schema.extract import SnowflakeSchemaExtractor
+from neocarta.connectors.snowflake.schema.extract import SnowflakeSchemaExtractor, _string_literal
 from neocarta.connectors.utils.generate_id import generate_column_id, generate_value_id
 from neocarta.errors import ConfigError, ExtractionError, StateError
 
@@ -136,6 +136,20 @@ def test_quote_identifier_escapes_embedded_double_quote():
     assert quote_identifier('a"b') == '"a""b"'
 
 
+def test_string_literal_escapes_backslashes_and_quotes():
+    """A string literal doubles both backslashes and apostrophes.
+
+    Snowflake honours backslash escapes in single-quoted strings, so a column name with a
+    backslash must be escaped or it would render as a different literal (a trailing one could
+    even break out of the quote), corrupting the derived column_id / value_id.
+    """
+    bs = "\\"  # a single backslash
+    assert _string_literal("plain") == "'plain'"
+    assert _string_literal("a'b") == "'a''b'"
+    assert _string_literal(f"col{bs}n") == f"'col{bs}{bs}n'"  # backslash doubled, not an escape
+    assert _string_literal(f"trail{bs}") == f"'trail{bs}{bs}'"  # trailing backslash can't break out
+
+
 def test_normalize_identifier_upper_cases_unquoted():
     """An unquoted name resolves to Snowflake's stored (upper-cased) form."""
     assert normalize_identifier("analytics") == "ANALYTICS"
@@ -164,6 +178,23 @@ def test_normalize_identifier_rejects_empty_quoted():
     """An empty quoted identifier ('""') is still empty and is rejected, not silently ''."""
     with pytest.raises(ConfigError):
         normalize_identifier('""')
+
+
+@pytest.mark.parametrize("bad", ["123", "sales-prod", "a b", "1abc", " x"])
+def test_normalize_identifier_rejects_invalid_unquoted(bad):
+    """An unquoted name that isn't a valid Snowflake identifier is rejected, not upper-cased.
+
+    Otherwise ``123`` / ``sales-prod`` / whitespace would be silently turned into a different
+    valid quoted uppercase name, changing the caller's intended identifier.
+    """
+    with pytest.raises(ConfigError):
+        normalize_identifier(bad)
+
+
+def test_normalize_identifier_allows_valid_unquoted_specials():
+    """Underscore-leading and ``$``-containing unquoted names are valid and fold to upper."""
+    assert normalize_identifier("_stage") == "_STAGE"
+    assert normalize_identifier("tbl$1") == "TBL$1"
 
 
 def test_constructor_folds_and_rejects_database():
@@ -277,6 +308,44 @@ def test_extract_key_columns_reads_show_output():
     pk, fk = ex._extract_key_columns("sch")
     assert ("customers", "customer_id") in pk
     assert ("orders", "customer_id") in fk
+
+
+def test_imported_keys_cache_scoped_to_one_extraction_pass():
+    """SHOW IMPORTED KEYS runs once per pass (reused by both key stages) and re-runs on re-ingest.
+
+    The memo must not outlive one extraction pass: extract_column_info clears it, so a re-ingest
+    reads current constraints instead of serving stale foreign keys.
+    """
+    conn = _capture_connection(
+        pd.DataFrame(
+            {
+                "table_catalog": ["db"],
+                "table_schema": ["sch"],
+                "table_name": ["t"],
+                "column_name": ["a"],
+                "is_nullable": ["NO"],
+                "data_type": ["NUMBER"],
+                "description": [None],
+            }
+        )
+    )
+    ex = SnowflakeSchemaExtractor(connection=conn, database="db")
+    calls: list[str] = []
+
+    def fake_show(sql: str) -> pd.DataFrame:
+        calls.append(sql)
+        return pd.DataFrame()
+
+    ex._run_show = fake_show
+
+    # pass 1: column_info fetches IMPORTED KEYS; references reuses it (no second SHOW)
+    ex.extract_column_info("sch")
+    ex.extract_column_references_info("sch")
+    assert sum("IMPORTED KEYS" in s for s in calls) == 1
+
+    # pass 2: re-running column_info clears the memo -> IMPORTED KEYS is fetched afresh
+    ex.extract_column_info("sch")
+    assert sum("IMPORTED KEYS" in s for s in calls) == 2
 
 
 def test_extract_column_info_derives_key_flags():
@@ -442,12 +511,23 @@ def test_extractor_rejects_invalid_value_sample_limit(bad):
         SnowflakeSchemaExtractor(connection=MagicMock(), database="db", value_sample_limit=bad)
 
 
+@pytest.mark.parametrize("bad", [0, -1, True, 2.5])
+def test_extractor_rejects_invalid_value_sample_query_batch_size(bad):
+    """A non-(plain-int) / non-positive value_sample_query_batch_size is rejected."""
+    with pytest.raises(ConfigError):
+        SnowflakeSchemaExtractor(
+            connection=MagicMock(), database="db", value_sample_query_batch_size=bad
+        )
+
+
 # --- value sampling -------------------------------------------------------------
 
 
 def test_value_sampling_reads_distinct_values_and_uses_generate_value_id():
     """Distinct sample rows become Value rows; value ids come from generate_value_id."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["customer_id", "customer_id"], "unique_value": ["1", "2"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     result = extractor.extract_column_unique_values_for_table(
@@ -464,8 +544,10 @@ def test_value_sampling_reads_distinct_values_and_uses_generate_value_id():
 
 
 def test_value_sampling_uses_bounded_select_distinct_and_skips_complex_types():
-    """Sampling is a per-column ``SELECT DISTINCT ... LIMIT``; complex types are skipped."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
+    """Sampling uses a bounded ``SELECT DISTINCT TO_VARCHAR(...) ... LIMIT``; complex types skip."""
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["customer_id"], "unique_value": ["1"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(
         [
@@ -479,10 +561,9 @@ def test_value_sampling_uses_bounded_select_distinct_and_skips_complex_types():
     )
 
     all_sql = [call[0][0] for call in connection.cursor.return_value.execute.call_args_list]
-    # The cap is pushed into the scan (LIMIT), the subset is deterministic (ORDER BY) so a
-    # repeated cache=True sample stays capped at `limit`, and the value is stringified
-    # server-side (TO_VARCHAR) for exact, driver-independent representation. Only the
-    # sampleable column is queried.
+    # The cap is pushed into the scan (LIMIT), the subset is deterministic (ORDER BY), and the
+    # value is stringified server-side (TO_VARCHAR) for exact representation. Only the sampleable
+    # column is queried.
     assert all(
         "SELECT DISTINCT TO_VARCHAR(" in s and "ORDER BY" in s and "LIMIT" in s for s in all_sql
     )
@@ -497,7 +578,9 @@ def test_value_sampling_skips_vector_and_structured_types():
     non-groupable, so a ``DISTINCT`` over it aborts that column's query. Only the
     sampleable scalar column must be queried.
     """
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["nodeid", "nodeid"], "unique_value": ["1", "2"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(
         [
@@ -528,7 +611,9 @@ def test_value_sampling_skips_parameterized_non_sampleable_types():
     stripping the ``(...)`` so a parameterized VECTOR/etc. is dropped, while a scalar
     (``NUMBER(38,0)``) is still sampled.
     """
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["nodeid"], "unique_value": ["1"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     column_info = pd.DataFrame(
         [
@@ -542,6 +627,28 @@ def test_value_sampling_skips_parameterized_non_sampleable_types():
     all_sql = " ".join(call[0][0] for call in connection.cursor.return_value.execute.call_args_list)
     assert '"nodeid"' in all_sql  # parameterized scalar still sampled
     assert '"vec"' not in all_sql  # parameterized VECTOR skipped
+
+
+def test_value_sampling_batches_columns_into_union_all_chunks():
+    """A wide table is sampled in UNION ALL chunks of value_sample_query_batch_size, not 1/col."""
+    connection = _capture_connection(pd.DataFrame({"column_name": ["c0"], "unique_value": ["x"]}))
+    extractor = SnowflakeSchemaExtractor(
+        connection=connection, database=DATABASE, value_sample_query_batch_size=2
+    )
+    cols = [f"c{i}" for i in range(5)]  # 5 sampleable columns, batch 2 -> ceil(5/2)=3 statements
+    column_info = pd.DataFrame(
+        [{"table_name": "wide", "column_name": c, "data_type": "NUMBER"} for c in cols]
+    )
+    extractor.extract_column_unique_values_for_table(
+        "wide", cols, SCHEMA, cache=False, column_info=column_info
+    )
+
+    sqls = [call[0][0] for call in connection.cursor.return_value.execute.call_args_list]
+    assert len(sqls) == 3, f"expected 3 batched statements, got {len(sqls)}"
+    # the full-size chunks UNION ALL two per-column subqueries; each keeps its own LIMIT
+    assert sum(s.count("UNION ALL") for s in sqls) == 2  # (2+2+1) -> two UNION ALL joins
+    assert all(s.count("LIMIT") == s.count("SELECT DISTINCT TO_VARCHAR(") for s in sqls)
+    assert {c for c in cols if f'"{c}"' in " ".join(sqls)} == set(cols)  # every column sampled
 
 
 def test_value_sampling_disabled_skips_query():
@@ -580,7 +687,9 @@ def test_value_sampling_for_all_tables_requires_extracted_state():
 
 def test_value_sampling_cache_dedupes_on_repeated_calls():
     """Re-sampling the same table with cache=True must not accumulate duplicate values."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["customer_id", "customer_id"], "unique_value": ["1", "2"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     extractor.extract_column_unique_values_for_table("customers", ["customer_id"], SCHEMA)
@@ -593,7 +702,9 @@ def test_value_sampling_cache_dedupes_on_repeated_calls():
 
 def test_value_sampling_warns_when_no_column_metadata(caplog):
     """Sampling without column metadata warns that complex types can't be skipped."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["customer_id"], "unique_value": ["1"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
 
     with caplog.at_level(logging.WARNING):
@@ -606,7 +717,9 @@ def test_value_sampling_warns_when_no_column_metadata(caplog):
 
 def test_value_sampling_excludes_nulls_via_where_clause():
     """Each sampling query filters NULLs in SQL (WHERE ... IS NOT NULL), not just in pandas."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", "2"]}))
+    connection = _capture_connection(
+        pd.DataFrame({"column_name": ["customer_id", "customer_id"], "unique_value": ["1", "2"]})
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     extractor.extract_column_unique_values_for_table(
         "customers", ["customer_id"], SCHEMA, cache=False
@@ -617,7 +730,14 @@ def test_value_sampling_excludes_nulls_via_where_clause():
 
 def test_value_sampling_drops_null_values():
     """Any NULL row that slips through (e.g. a NaN from the driver) is dropped, not stringified."""
-    connection = _capture_connection(pd.DataFrame({"unique_value": ["1", None, "2"]}))
+    connection = _capture_connection(
+        pd.DataFrame(
+            {
+                "column_name": ["customer_id", "customer_id", "customer_id"],
+                "unique_value": ["1", None, "2"],
+            }
+        )
+    )
     extractor = SnowflakeSchemaExtractor(connection=connection, database=DATABASE)
     result = extractor.extract_column_unique_values_for_table(
         "customers", ["customer_id"], SCHEMA, cache=False

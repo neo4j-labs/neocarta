@@ -41,6 +41,11 @@ logger = logging.getLogger(__name__)
 # upper-cased ``data_type``.
 _NON_SAMPLEABLE_TYPES = ("VARIANT", "OBJECT", "ARRAY", "MAP", "GEOGRAPHY", "GEOMETRY", "VECTOR")
 
+# Default number of per-column value-sampling subqueries to UNION ALL into a single statement,
+# so a wide table costs a handful of round trips instead of one per column. Configurable via the
+# ``value_sample_query_batch_size`` constructor argument.
+_VALUE_SAMPLE_BATCH_SIZE = 50
+
 # Column layout of the (possibly empty) column-unique-values frame.
 _VALUE_COLUMNS = ["column_name", "unique_value", "column_id", "value_id"]
 
@@ -63,6 +68,17 @@ def _empty_value_frame() -> pd.DataFrame:
     return pd.DataFrame(columns=_VALUE_COLUMNS)
 
 
+def _string_literal(value: str) -> str:
+    r"""Return ``value`` as a single-quoted SQL string literal.
+
+    Doubles backslashes *and* apostrophes: Snowflake interprets backslash escape
+    sequences (e.g. ``\n``, ``\'``) inside single-quoted strings, so an un-escaped
+    backslash in a (quoted) column name would render a different literal — or, if
+    trailing, break out of the quote. Escape backslashes before quotes.
+    """
+    return "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
+
+
 class SnowflakeSchemaExtractor:
     """Extractor for Snowflake schema metadata.
 
@@ -83,6 +99,9 @@ class SnowflakeSchemaExtractor:
         Number of distinct sample values to read per groupable column. ``0``
         disables value sampling entirely (no table-data reads, so no ``:Value``
         nodes / ``HAS_VALUE`` edges).
+    value_sample_query_batch_size : int, default 50
+        Number of per-column value-sampling subqueries to UNION ALL into a single
+        statement, bounding round trips on wide tables.
     """
 
     def __init__(
@@ -91,6 +110,7 @@ class SnowflakeSchemaExtractor:
         database: str,
         *,
         value_sample_limit: int = 10,
+        value_sample_query_batch_size: int = _VALUE_SAMPLE_BATCH_SIZE,
     ) -> None:
         """Initialize the extractor with an injected connection and target database."""
         if connection is None:
@@ -112,13 +132,24 @@ class SnowflakeSchemaExtractor:
                 "value_sample_limit must be a non-negative integer.",
                 suggestion="Pass value_sample_limit=0 to disable value sampling.",
             )
+        if (
+            not isinstance(value_sample_query_batch_size, int)
+            or isinstance(value_sample_query_batch_size, bool)
+            or value_sample_query_batch_size < 1
+        ):
+            raise ConfigError(
+                "value_sample_query_batch_size must be a positive integer.",
+                suggestion="Pass value_sample_query_batch_size>=1 (columns sampled per query).",
+            )
         self.connection = connection
         # Resolve to stored case up front; also validates, raising ConfigError on a malformed
         # name so it fails fast at construction.
         self.database = normalize_identifier(database)
         self.value_sample_limit = value_sample_limit
+        self.value_sample_query_batch_size = value_sample_query_batch_size
         self._cache: SchemaExtractorCache = SchemaExtractorCache()
-        # Per-schema ``SHOW IMPORTED KEYS`` cache (see _imported_keys).
+        # ``SHOW IMPORTED KEYS`` memo, scoped to one extraction pass (cleared at the start of
+        # extract_column_info) and reused by the two key stages within it (see _imported_keys).
         self._imported_keys_cache: dict[str, pd.DataFrame] = {}
 
     @property
@@ -336,6 +367,10 @@ ORDER BY TABLE_NAME
             ``column_name``, ``is_nullable``, ``data_type``, ``description``,
             ``is_primary_key``, ``is_foreign_key``.
         """
+        # Scope the imported-keys memo to this extraction pass: clear it here (the first key
+        # stage) so a re-ingest picks up changed constraints, while extract_column_references_info
+        # — which runs next in the same pass — still reuses the frame this call fetches.
+        self._imported_keys_cache.clear()
         df = self._run_query(
             f"""
 SELECT
@@ -381,11 +416,13 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
         return df
 
     def _imported_keys(self, schema: str) -> pd.DataFrame:
-        """Return the raw ``SHOW IMPORTED KEYS`` frame for ``schema``, fetched once.
+        """Return the raw ``SHOW IMPORTED KEYS`` frame for ``schema``, fetched once per pass.
 
         Both the foreign-key column flags (:meth:`extract_column_info`) and the
         references frame (:meth:`extract_column_references_info`) derive from the same
-        imported-keys listing, so it is cached per schema to issue the ``SHOW`` only once.
+        imported-keys listing, so it is memoised to issue the ``SHOW`` once per extraction
+        pass. The memo is cleared at the start of :meth:`extract_column_info`, so a re-ingest
+        re-reads current constraints rather than serving stale keys.
         """
         cached = self._imported_keys_cache.get(schema)
         if cached is None:
@@ -567,25 +604,29 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION
             return _empty_value_frame()
 
         relation = f"{self._qualified_schema(schema)}.{quote_identifier(table_name)}"
-        # One bounded query per column: DISTINCT ... ORDER BY ... LIMIT pushes the cap into the
-        # scan (vs materialising the full distinct set an ARRAY_AGG(DISTINCT) would) and makes the
-        # sampled subset deterministic, so a re-sample under cache=True stays capped at ``limit``
-        # and the value-id dedup below collapses repeats. TO_VARCHAR casts server-side so
-        # :Value.value gets Snowflake's canonical text: full precision on large NUMBER ids (an
-        # Arrow float64 would round/collapse them), preserved scale, and no fetch_pandas_all
-        # overflow on out-of-range TIMESTAMP. Ordering by the alias keeps DISTINCT + ORDER BY valid.
+        # Each column is sampled by a bounded ``DISTINCT ... ORDER BY ... LIMIT`` subquery: the cap
+        # is pushed into the scan (vs materialising the full distinct set an ARRAY_AGG(DISTINCT)
+        # would), and ORDER BY makes the subset deterministic so a re-sample under cache=True stays
+        # capped at ``limit`` and the value-id dedup below collapses repeats. TO_VARCHAR renders
+        # server-side for exact text (full NUMBER precision — an Arrow float64 would round/collapse
+        # — preserved scale, no fetch_pandas_all overflow on out-of-range TIMESTAMP).
+        #
+        # The per-column subqueries are UNION ALL-ed in batches of ``value_sample_query_batch_size``
+        # so a wide table costs a few round trips, not one per column. Each branch tags its rows
+        # with a column-name literal and keeps its own LIMIT.
         frames = []
-        for col in sampleable:
-            quoted = quote_identifier(col)
-            col_df = self._run_query(
-                f'SELECT DISTINCT TO_VARCHAR({quoted}) AS "unique_value" '
-                f'FROM {relation} WHERE {quoted} IS NOT NULL ORDER BY "unique_value" LIMIT {limit}'
-            )
-            if col_df.empty:
-                continue
-            col_df = col_df[["unique_value"]].copy()
-            col_df.insert(0, "column_name", col)
-            frames.append(col_df)
+        batch_size = self.value_sample_query_batch_size
+        for start in range(0, len(sampleable), batch_size):
+            selects = [
+                f'SELECT {_string_literal(col)} AS "column_name", "unique_value" FROM '
+                f'(SELECT DISTINCT TO_VARCHAR({quote_identifier(col)}) AS "unique_value" '
+                f"FROM {relation} WHERE {quote_identifier(col)} IS NOT NULL "
+                f'ORDER BY "unique_value" LIMIT {limit})'
+                for col in sampleable[start : start + batch_size]
+            ]
+            chunk = self._run_query("\nUNION ALL\n".join(selects))
+            if not chunk.empty:
+                frames.append(chunk[["column_name", "unique_value"]])
 
         if not frames:
             return _empty_value_frame()

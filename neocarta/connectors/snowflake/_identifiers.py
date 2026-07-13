@@ -8,7 +8,14 @@ lower-case invocations (``--database analytics``) resolve to the stored object.
 
 from __future__ import annotations
 
+import re
+
 from ...errors import ConfigError
+
+# An unquoted Snowflake identifier must start with a letter or underscore and otherwise contain
+# only letters, digits, underscore, or ``$``. Anything else (``123``, ``sales-prod``, whitespace)
+# is only valid as a quoted identifier — upper-casing it would silently change its meaning.
+_UNQUOTED_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
 
 
 def normalize_identifier(name: str) -> str:
@@ -51,6 +58,13 @@ def normalize_identifier(name: str) -> str:
             f"Invalid Snowflake identifier {name!r}: double-quotes are not allowed in an "
             "unquoted name.",
             suggestion="Wrap a case-sensitive name in double-quotes, e.g. '\"MixedCase\"'.",
+        )
+    elif name and _UNQUOTED_IDENTIFIER.fullmatch(name) is None:
+        # e.g. '123', 'sales-prod', names with spaces — upper-casing these would fabricate a
+        # different valid identifier; require the caller to quote the exact name instead.
+        raise ConfigError(
+            f"Invalid unquoted Snowflake identifier {name!r}.",
+            suggestion="Use a valid unquoted name, or wrap the exact name in double-quotes.",
         )
     else:
         resolved = name.upper()
