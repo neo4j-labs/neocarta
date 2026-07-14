@@ -4,6 +4,7 @@
 ## Upcoming
 
 ### Documentation
+- `CLAUDE.md` now documents the **Google** docstring convention (matching the Ruff `pydocstyle` config that CI enforces) instead of numpy, which `make lint` actually rejects. (#276)
 - Added `REVIEW.md` (repo-root, review-only guidance encoding Neocarta's review uniques) and a `## Code Review` section in `CLAUDE.md` nudging contributors to the `/code-review` skill and the managed `@claude review` flow. (#278)
 
 ### Fixed

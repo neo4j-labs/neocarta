@@ -5,7 +5,7 @@ Use `uv` to manage this project.
 Always use `uv run` to execute code in the managed environment.
 
 ## Style
-Use [numpy style guidelines](https://numpydoc.readthedocs.io/en/latest/format.html#documenting-classes) for this project.
+Use the [Google docstring style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for this project. This is the convention enforced by Ruff (`[tool.ruff.lint.pydocstyle] convention = "google"` in `pyproject.toml`), so `make lint` will reject other styles (e.g. numpy section headers fail `D416`).
 
 ## Contributing
 To install the project in development mode, run the following `uv` command:
