@@ -34,12 +34,11 @@ RECORD_TYPES = [
 
 
 def test_coerce_yes_no_true_strings():
-    """YES/TRUE/1/NULLABLE (case-insensitive, trimmed) coerce to True."""
+    """YES/TRUE/1 (case-insensitive, trimmed) coerce to True."""
     assert coerce_yes_no_to_bool("YES") is True
     assert coerce_yes_no_to_bool(" Yes ") is True
     assert coerce_yes_no_to_bool("true") is True
     assert coerce_yes_no_to_bool("1") is True
-    assert coerce_yes_no_to_bool("NULLABLE") is True
 
 
 def test_coerce_yes_no_false_strings():
@@ -76,9 +75,16 @@ def test_coerce_yes_no_nan_uses_default():
 
 
 def test_coerce_yes_no_unrecognized_uses_default():
-    """Unrecognised strings yield the default."""
+    """Unrecognised strings yield the default.
+
+    Source-specific categorical nullability (e.g. column mode NULLABLE/REQUIRED)
+    is not a token here — it is decoded upstream in the retriever — so it falls
+    through to the default instead of being specially recognised.
+    """
     assert coerce_yes_no_to_bool("maybe") is True
     assert coerce_yes_no_to_bool("maybe", default=False) is False
+    assert coerce_yes_no_to_bool("NULLABLE", default=False) is False
+    assert coerce_yes_no_to_bool("REQUIRED", default=False) is False
 
 
 # --- records: construction + coercion ----------------------------------------
