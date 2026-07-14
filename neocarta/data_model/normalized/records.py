@@ -8,7 +8,7 @@ convention (``data_type``, ``is_nullable``) rather than the graph model's
 ("unknown") rather than ``False``.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .._validators import (
     coerce_str,
@@ -18,7 +18,19 @@ from .._validators import (
 )
 
 
-class DatabaseRecord(BaseModel):
+class _NormalizedRecord(BaseModel):
+    """Base for flat normalized records; forbids unknown fields.
+
+    ``extra="forbid"`` makes a mapping-spec typo (a rename whose *target* is not a
+    real record field) fail construction with a ``ValidationError`` rather than be
+    silently dropped — which would let the field fall back to its default and emit
+    incorrect graph metadata.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class DatabaseRecord(_NormalizedRecord):
     """A flat database (catalog) record identified by its name."""
 
     database_name: str = Field(..., description="The name of the database")
@@ -32,7 +44,7 @@ class DatabaseRecord(BaseModel):
     )
 
 
-class SchemaRecord(BaseModel):
+class SchemaRecord(_NormalizedRecord):
     """A flat schema (dataset) record identified by its database and schema names."""
 
     database_name: str = Field(..., description="The name of the parent database")
@@ -42,7 +54,7 @@ class SchemaRecord(BaseModel):
     _normalize = field_validator("description", mode="before")(coerce_str_or_none)
 
 
-class TableRecord(BaseModel):
+class TableRecord(_NormalizedRecord):
     """A flat table record identified by its database, schema and table names."""
 
     database_name: str = Field(..., description="The name of the parent database")
@@ -56,7 +68,7 @@ class TableRecord(BaseModel):
     _normalize = field_validator("table_type", "description", mode="before")(coerce_str_or_none)
 
 
-class ColumnRecord(BaseModel):
+class ColumnRecord(_NormalizedRecord):
     """A flat column record identified by its database, schema, table and column names."""
 
     database_name: str = Field(..., description="The name of the parent database")
@@ -82,7 +94,7 @@ class ColumnRecord(BaseModel):
     _coerce_nullable = field_validator("is_nullable", mode="before")(coerce_yes_no_to_bool)
 
 
-class ReferenceRecord(BaseModel):
+class ReferenceRecord(_NormalizedRecord):
     """A flat foreign-key row linking a source column to a target column by name-parts."""
 
     source_database_name: str = Field(..., description="The name of the source database")
@@ -100,7 +112,7 @@ class ReferenceRecord(BaseModel):
     _normalize = field_validator("criteria", mode="before")(coerce_str_or_none)
 
 
-class ValueRecord(BaseModel):
+class ValueRecord(_NormalizedRecord):
     """A flat sampled-value record for a column, identified by its name-parts."""
 
     database_name: str = Field(..., description="The name of the parent database")

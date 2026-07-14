@@ -87,6 +87,27 @@ def test_coerce_yes_no_unrecognized_uses_default():
     assert coerce_yes_no_to_bool("REQUIRED", default=False) is False
 
 
+# --- records forbid unknown fields ------------------------------------------
+
+
+@pytest.mark.parametrize("record_type", RECORD_TYPES)
+def test_records_forbid_unknown_fields(record_type):
+    """Every normalized record forbids unknown fields (catches mapping-spec typos)."""
+    assert record_type.model_config.get("extra") == "forbid"
+
+
+def test_column_record_rejects_typoed_field():
+    """A mistyped target field (e.g. ``is_nullabel``) fails loudly, not silently."""
+    with pytest.raises(ValidationError):
+        ColumnRecord(
+            database_name="db",
+            schema_name="schema",
+            table_name="table",
+            column_name="column",
+            is_nullabel="NO",
+        )
+
+
 # --- records: construction + coercion ----------------------------------------
 
 
