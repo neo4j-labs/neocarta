@@ -34,12 +34,11 @@ RECORD_TYPES = [
 
 
 def test_coerce_yes_no_true_strings():
-    """YES/TRUE/1/NULLABLE (case-insensitive, trimmed) coerce to True."""
+    """YES/TRUE/1 (case-insensitive, trimmed) coerce to True."""
     assert coerce_yes_no_to_bool("YES") is True
     assert coerce_yes_no_to_bool(" Yes ") is True
     assert coerce_yes_no_to_bool("true") is True
     assert coerce_yes_no_to_bool("1") is True
-    assert coerce_yes_no_to_bool("NULLABLE") is True
 
 
 def test_coerce_yes_no_false_strings():
@@ -76,9 +75,37 @@ def test_coerce_yes_no_nan_uses_default():
 
 
 def test_coerce_yes_no_unrecognized_uses_default():
-    """Unrecognised strings yield the default."""
+    """Unrecognised strings yield the default.
+
+    Source-specific categorical nullability (e.g. column mode NULLABLE/REQUIRED)
+    is not a token here — it is decoded upstream in the retriever — so it falls
+    through to the default instead of being specially recognised.
+    """
     assert coerce_yes_no_to_bool("maybe") is True
     assert coerce_yes_no_to_bool("maybe", default=False) is False
+    assert coerce_yes_no_to_bool("NULLABLE", default=False) is False
+    assert coerce_yes_no_to_bool("REQUIRED", default=False) is False
+
+
+# --- records forbid unknown fields ------------------------------------------
+
+
+@pytest.mark.parametrize("record_type", RECORD_TYPES)
+def test_records_forbid_unknown_fields(record_type):
+    """Every normalized record forbids unknown fields (catches mapping-spec typos)."""
+    assert record_type.model_config.get("extra") == "forbid"
+
+
+def test_column_record_rejects_typoed_field():
+    """A mistyped target field (e.g. ``is_nullabel``) fails loudly, not silently."""
+    with pytest.raises(ValidationError):
+        ColumnRecord(
+            database_name="db",
+            schema_name="schema",
+            table_name="table",
+            column_name="column",
+            is_nullabel="NO",
+        )
 
 
 # --- records: construction + coercion ----------------------------------------
