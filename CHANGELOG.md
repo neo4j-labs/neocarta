@@ -12,6 +12,7 @@
 
 ### Changed
 
+- `coerce_yes_no_to_bool` (`neocarta.data_model._validators`) is now a pure yes/no decoder: the speculative `NULLABLE` token was removed from its true-set, so it recognizes only `YES`/`TRUE`/`1` → `True` and `NO`/`FALSE`/`0` → `False` (unrecognized values still fall through to the caller-supplied default). Source-specific categorical nullability (e.g. BigQuery/Dataplex column `mode` `NULLABLE`/`REQUIRED`/`REPEATED`) is decoded upstream in each connector's retriever (layer 1), keeping source vocabulary out of the shared data model. No behavior change on the current path — the sole caller is `ColumnRecord.is_nullable`, fed by the BigQuery retriever from `INFORMATION_SCHEMA.COLUMNS.IS_NULLABLE` (`YES`/`NO`).
 - `is_primary_key` / `is_foreign_key` on `Column` class are now optional fields for connectors that don't provide these fields, such as the Unity Catalog connector.
 
 ### Added
