@@ -32,6 +32,18 @@ Use the following Make commands for Ruff formatting and linting:
 * Formatting -> `make fmt`
 * Linting -> `make lint`
 
+## Code Review
+Review PRs with the built-in **`/code-review`** skill rather than an ad-hoc,
+hand-rolled checklist — it runs the same multi-agent review Anthropic's managed
+Code Review uses. Locally, review a branch with
+`/code-review origin/main...<branch>` (add `--comment` to post findings inline
+on the PR). On GitHub, the managed reviewer can be triggered by commenting
+`@claude review` on a PR.
+
+Repo-specific review rules live in **[`REVIEW.md`](REVIEW.md)** at the repo
+root (secrets handling, connector-contract conformance, metadata-only-into-the-
+graph, etc.). Add Neocarta-specific review expectations there, not here.
+
 ## Project Architecture Overview
 
 Neocarta builds a semantic layer in Neo4j by integrating database metadata with business logic. It extracts schema and structural information from data sources, transforms it into a unified graph data model, and links it to business terminology — giving AI agents and users systemic familiarity with how data is organized and what it means. An optional MCP server exposes the graph to AI agents via tools.
