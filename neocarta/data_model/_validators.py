@@ -86,7 +86,7 @@ def coerce_yes_no_to_bool(value: Any, default: bool = True) -> bool:
     -------
     bool
         ``False`` for ``NO``/``FALSE``/``0``; ``True`` for
-        ``YES``/``TRUE``/``NULLABLE``/``1``; ``default`` otherwise.
+        ``YES``/``TRUE``/``1``; ``default`` otherwise.
     """
     if isinstance(value, bool):
         return value
@@ -96,9 +96,12 @@ def coerce_yes_no_to_bool(value: Any, default: bool = True) -> bool:
     # Normalise integral floats ("1.0" -> "1", "0.0" -> "0") so numeric flags
     # (e.g. a pandas column promoted to float64 by a NaN) match the token sets.
     text = str(value).strip().upper().removesuffix(".0")
+    # Only the generic yes/no idiom is decoded here. Source-specific categorical
+    # nullability (e.g. BigQuery/Dataplex column mode NULLABLE/REQUIRED/REPEATED)
+    # belongs in the connector's retriever (layer 1), not this shared coercer.
     if text in {"NO", "FALSE", "0"}:
         return False
-    if text in {"YES", "TRUE", "NULLABLE", "1"}:
+    if text in {"YES", "TRUE", "1"}:
         return True
 
     return default
