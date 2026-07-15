@@ -9,8 +9,11 @@ from typing import TYPE_CHECKING
 from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.rdbms import Neo4jRDBMSLoader
+from ....normalization.graph_transform import NormalizedGraphTransformer
+from ....normalization.information_schema.bigquery import (
+    build_bigquery_information_schema_normalizer,
+)
 from .extract import BigQuerySchemaExtractor
-from .transform import BigQuerySchemaTransformer
 
 if TYPE_CHECKING:
     from typing import Self
@@ -82,7 +85,7 @@ class BigQuerySchemaConnector:
         self.database_name = database_name
 
         self.extractor = BigQuerySchemaExtractor(client, project_id, dataset_id)
-        self.transformer = BigQuerySchemaTransformer()
+        self.transformer = NormalizedGraphTransformer()
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
         self._extracted = False
         self._transformed = False
@@ -136,19 +139,8 @@ class BigQuerySchemaConnector:
             )
         self._transformed = False
         logger.info("Transforming BigQuery schema metadata...")
-        self.transformer.transform_to_database_nodes(self.extractor.database_info)
-        self.transformer.transform_to_schema_nodes(self.extractor.schema_info)
-        self.transformer.transform_to_table_nodes(self.extractor.table_info)
-        self.transformer.transform_to_column_nodes(self.extractor.column_info)
-        self.transformer.transform_to_value_nodes(self.extractor.column_unique_values)
-
-        self.transformer.transform_to_has_schema_relationships(self.extractor.schema_info)
-        self.transformer.transform_to_has_table_relationships(self.extractor.table_info)
-        self.transformer.transform_to_has_column_relationships(self.extractor.column_info)
-        self.transformer.transform_to_references_relationships(
-            self.extractor.column_references_info
-        )
-        self.transformer.transform_to_has_value_relationships(self.extractor.column_unique_values)
+        normalizer = build_bigquery_information_schema_normalizer(self.extractor)
+        self.transformer.transform(normalizer.normalize())
         log_transform_counts(logger, self.transformer, _TRANSFORM_COUNTS)
         self._transformed = True
 

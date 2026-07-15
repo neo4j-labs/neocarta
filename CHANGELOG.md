@@ -12,6 +12,7 @@
 
 ### Changed
 
+- The BigQuery schema connector now routes through the shared metadata-normalizer pipeline (`Retriever → MetadataNormalizer → NormalizedGraphTransformer`) instead of a bespoke transformer; the emitted graph is unchanged. Removed `BigQuerySchemaTransformer`. (#271)
 - `is_primary_key` / `is_foreign_key` on `Column` class are now optional fields for connectors that don't provide these fields, such as the Unity Catalog connector.
 
 ### Added
