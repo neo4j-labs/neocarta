@@ -94,9 +94,12 @@ extensions/
   construct node IDs, replacing the ~15 hand-written `generate_*_id` functions.
 - **Central transform** — the single ontology-aware component that turns normalized schema (and the
   graph/semantic intermediate) into canonical ontology objects.
-- **import-spec** — Neo4j's native import configuration format; the whole normalized-schema→ingest stack
-  is expressed as one Neo4j-native JSON lineage. Treat the exact format as an **evolving external
-  dependency** — adapt behind our boundary, don't block on it.
+- **Graph Spec** (a.k.a. **import-spec**, the `neo4j/import-spec` artifact) — Neo4j's native import
+  configuration format (`sources → targets → actions`, with `SourceProvider`/`EntityTargetExtensionProvider`
+  SPIs). It is **mapping/ETL-shaped**, so the whole normalized-schema → ingest stack can be expressed as one
+  Neo4j-native Graph Spec JSON lineage, and its `SourceProvider` SPI is a leading candidate for the
+  connector-mapping mechanism. Treat the exact format as an **evolving external dependency** (it is RC) — adapt
+  behind our boundary, don't block on it.
 - **Characterization / golden-master** — a captured snapshot of current output used to prove a refactor
   didn't change behavior.
 
@@ -119,7 +122,9 @@ These are **settled** decisions. A ticket citing `D#` means "this constraint is 
   redesign is a later band.
 - **D13** — the Neo4j-native ontology format is an **evolving external dependency**; we keep an internal
   LPG model behind an adapter and adapt rather than block.
-- **D14** — the normalized-schema mapping and the ontology converge on **one Neo4j-native JSON lineage**.
+- **D14** — the normalized-schema mapping and the ontology converge on **one Neo4j-native Graph Spec
+  (import-spec) JSON lineage**; Graph Spec is a leading candidate for both the normalization intermediate
+  standard and the connector-mapping mechanism (see `S1-SPIKE-1`).
 - **D16** — the graph/semantic transform is built **OSI-minimal** now but the seam is designed to later
   accommodate other graph-shaped schema paradigms without rework.
 - **D17** — connectors are built as **spin-out-ready extension artifacts**: even our own connectors
