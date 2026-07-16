@@ -115,7 +115,7 @@ class EvalRunner:
         # Step 1: Agent retrieves relevant schema using MCP tool
         t_mcp_start = time.monotonic()
         result = await mcp_session.call_tool(
-            "get_metadata_schema_by_schema_and_table_semantic_similarity",
+            "get_context_by_schema_and_table_vector_search",
             arguments={"query": sample.nl_question, "max_tables": 2},
         )
         mcp_latency_ms = (time.monotonic() - t_mcp_start) * 1000

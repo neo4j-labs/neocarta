@@ -1,21 +1,64 @@
 """CSV Connector for loading metadata from CSV files into Neo4j."""
 
-from neo4j import Driver
+from __future__ import annotations
 
-from ...enums import NodeLabel, RelationshipType
+import logging
+import warnings
+from typing import TYPE_CHECKING
+
+from ..._logging import log_transform_counts
+from ...errors import StateError
 from ...ingest.rdbms import Neo4jRDBMSLoader
 from .extract import CSVExtractor
 from .transform import CSVTransformer
+
+if TYPE_CHECKING:
+    from typing import Self
+
+    from neo4j import Driver
+
+    from ...enums import NodeLabel, RelationshipType
+
+logger = logging.getLogger(__name__)
+
+# (human label, transformer attribute) pairs logged at the end of transform().
+_TRANSFORM_COUNTS = (
+    ("databases", "database_nodes"),
+    ("schemas", "schema_nodes"),
+    ("tables", "table_nodes"),
+    ("columns", "column_nodes"),
+    ("values", "value_nodes"),
+    ("queries", "query_nodes"),
+    ("glossaries", "glossary_nodes"),
+    ("categories", "category_nodes"),
+    ("business terms", "business_term_nodes"),
+)
 
 
 class CSVConnector:
     """
     Connector for loading metadata from CSV files into Neo4j.
 
-    Follows an Extract → Transform → Load pattern:
-    - Extract: CSVExtractor reads and validates CSV files into DataFrames.
-    - Transform: CSVTransformer converts DataFrames into typed data model objects.
-    - Load: Neo4jRDBMSLoader writes the objects to Neo4j.
+    Follows an Extract → Transform → Load pipeline:
+
+    - :meth:`extract` reads and validates CSV files into DataFrames.
+    - :meth:`transform` converts DataFrames into typed data model objects.
+    - :meth:`load` writes the objects to Neo4j.
+
+    :meth:`ingest` runs all three stages in order and records the neocarta graph
+    metadata node at the end.
+
+    Parameters
+    ----------
+    csv_directory : str
+        Path to directory containing CSV files.
+    neo4j_driver : Driver
+        Neo4j driver instance.
+    database_name : str, optional
+        Neo4j database name, by default "neo4j".
+    csv_file_map : dict[str, str], optional
+        Custom mapping of entity keys to CSV filenames.
+        Merges with CSVExtractor.DEFAULT_FILE_MAP, allowing partial overrides.
     """
 
     def __init__(
@@ -25,27 +68,28 @@ class CSVConnector:
         database_name: str = "neo4j",
         csv_file_map: dict[str, str] | None = None,
     ) -> None:
-        """
-        Initialize the CSV connector.
-
-        Parameters
-        ----------
-        csv_directory : str
-            Path to directory containing CSV files.
-        neo4j_driver : Driver
-            Neo4j driver instance.
-        database_name : str, optional
-            Neo4j database name, by default "neo4j".
-        csv_file_map : dict[str, str], optional
-            Custom mapping of entity keys to CSV filenames.
-            Merges with CSVExtractor.DEFAULT_FILE_MAP, allowing partial overrides.
-        """
+        """Initialize the CSV connector."""
         self.extractor = CSVExtractor(csv_directory, csv_file_map)
         self.transformer = CSVTransformer()
+        self.neo4j_driver = neo4j_driver
         self.loader = Neo4jRDBMSLoader(neo4j_driver, database_name)
+        self._extracted = False
+        self._transformed = False
 
-    def extract_metadata(
+    def close(self) -> None:
+        """No connector-owned resources to release; the injected Neo4j driver is the caller's."""
+
+    def __enter__(self) -> Self:
+        """Return self for use as a context manager."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Release owned resources on context-manager exit."""
+        self.close()
+
+    def extract(
         self,
+        *,
         include_nodes: list[NodeLabel] | None = None,
         include_relationships: list[RelationshipType] | None = None,
     ) -> None:
@@ -59,16 +103,32 @@ class CSVConnector:
         include_relationships : list[RelationshipType], optional
             Relationship types to extract. If None, all relationship CSVs are read.
         """
+        # Reset downstream lifecycle: any prior transform/load no longer
+        # corresponds to the new source.
+        self._extracted = False
+        self._transformed = False
         self.extractor.extract_all(include_nodes, include_relationships)
+        self._extracted = True
 
-    def transform_metadata(self) -> None:
+    def transform(self) -> None:
         """
         Convert extracted DataFrames into data model objects.
 
-        extract_metadata() must be called before this method.
+        Raises:
+        ------
+        StateError
+            If called before :meth:`extract`.
         """
+        if not self._extracted:
+            raise StateError(
+                "CSVConnector.transform() called before extract(); call .extract() first.",
+                suggestion="Call connector.extract() before connector.transform().",
+            )
+
         e = self.extractor
         t = self.transformer
+        self._transformed = False  # cleared until this transform completes
+        logger.info("Transforming CSV metadata...")
 
         t.transform_to_database_nodes(e.database_info)
         t.transform_to_schema_nodes(e.schema_info)
@@ -91,132 +151,94 @@ class CSVConnector:
         t.transform_to_uses_column_relationships(e.query_column_info)
         t.transform_to_column_tagged_with_relationships(e.column_tagged_with_info)
         t.transform_to_table_tagged_with_relationships(e.table_tagged_with_info)
+        log_transform_counts(logger, t, _TRANSFORM_COUNTS)
+        self._transformed = True
 
-    def load_metadata(self) -> None:
+    def load(self) -> None:
         """
         Write transformed data model objects into Neo4j.
 
-        transform_metadata() must be called before this method.
         Nodes are always loaded before relationships.
+
+        Raises:
+        ------
+        StateError
+            If called before :meth:`transform`.
         """
         t = self.transformer
+        if not self._transformed:
+            raise StateError(
+                "CSVConnector.load() called before transform(); call .transform() first.",
+                suggestion="Call connector.extract() and connector.transform() first.",
+            )
 
-        print("\n=== Loading Nodes ===")
+        logger.info("Loading CSV metadata into Neo4j...")
+        # Nodes (loaded before relationships). Empty lists are skipped so we
+        # don't issue no-op writes; per-pattern counts are logged by the loader.
         if t.database_nodes:
-            print(f"Loading {len(t.database_nodes)} database nodes...")
-            print(
-                self.loader.load_database_nodes(
-                    t.database_nodes, properties_list=t.get_properties("database_nodes")
-                )
+            self.loader.load_database_nodes(
+                t.database_nodes, properties_list=t.get_properties("database_nodes")
             )
         if t.schema_nodes:
-            print(f"Loading {len(t.schema_nodes)} schema nodes...")
-            print(
-                self.loader.load_schema_nodes(
-                    t.schema_nodes, properties_list=t.get_properties("schema_nodes")
-                )
+            self.loader.load_schema_nodes(
+                t.schema_nodes, properties_list=t.get_properties("schema_nodes")
             )
         if t.table_nodes:
-            print(f"Loading {len(t.table_nodes)} table nodes...")
-            print(
-                self.loader.load_table_nodes(
-                    t.table_nodes, properties_list=t.get_properties("table_nodes")
-                )
+            self.loader.load_table_nodes(
+                t.table_nodes, properties_list=t.get_properties("table_nodes")
             )
         if t.column_nodes:
-            print(f"Loading {len(t.column_nodes)} column nodes...")
-            print(
-                self.loader.load_column_nodes(
-                    t.column_nodes, properties_list=t.get_properties("column_nodes")
-                )
+            self.loader.load_column_nodes(
+                t.column_nodes, properties_list=t.get_properties("column_nodes")
             )
         if t.value_nodes:
-            print(f"Loading {len(t.value_nodes)} value nodes...")
-            print(
-                self.loader.load_value_nodes(
-                    t.value_nodes, properties_list=t.get_properties("value_nodes")
-                )
+            self.loader.load_value_nodes(
+                t.value_nodes, properties_list=t.get_properties("value_nodes")
             )
         if t.query_nodes:
-            print(f"Loading {len(t.query_nodes)} query nodes...")
-            print(
-                self.loader.load_query_nodes(
-                    t.query_nodes, properties_list=t.get_properties("query_nodes")
-                )
+            self.loader.load_query_nodes(
+                t.query_nodes, properties_list=t.get_properties("query_nodes")
             )
         if t.glossary_nodes:
-            print(f"Loading {len(t.glossary_nodes)} glossary nodes...")
-            print(
-                self.loader.load_glossary_nodes(
-                    t.glossary_nodes, properties_list=t.get_properties("glossary_nodes")
-                )
+            self.loader.load_glossary_nodes(
+                t.glossary_nodes, properties_list=t.get_properties("glossary_nodes")
             )
         if t.category_nodes:
-            print(f"Loading {len(t.category_nodes)} category nodes...")
-            print(
-                self.loader.load_category_nodes(
-                    t.category_nodes, properties_list=t.get_properties("category_nodes")
-                )
+            self.loader.load_category_nodes(
+                t.category_nodes, properties_list=t.get_properties("category_nodes")
             )
         if t.business_term_nodes:
-            print(f"Loading {len(t.business_term_nodes)} business term nodes...")
-            print(
-                self.loader.load_business_term_nodes(
-                    t.business_term_nodes, properties_list=t.get_properties("business_term_nodes")
-                )
+            self.loader.load_business_term_nodes(
+                t.business_term_nodes, properties_list=t.get_properties("business_term_nodes")
             )
 
-        print("\n=== Loading Relationships ===")
+        # Relationships
         if t.has_schema_relationships:
-            print(f"Loading {len(t.has_schema_relationships)} HAS_SCHEMA relationships...")
-            print(self.loader.load_has_schema_relationships(t.has_schema_relationships))
+            self.loader.load_has_schema_relationships(t.has_schema_relationships)
         if t.has_table_relationships:
-            print(f"Loading {len(t.has_table_relationships)} HAS_TABLE relationships...")
-            print(self.loader.load_has_table_relationships(t.has_table_relationships))
+            self.loader.load_has_table_relationships(t.has_table_relationships)
         if t.has_column_relationships:
-            print(f"Loading {len(t.has_column_relationships)} HAS_COLUMN relationships...")
-            print(self.loader.load_has_column_relationships(t.has_column_relationships))
+            self.loader.load_has_column_relationships(t.has_column_relationships)
         if t.has_value_relationships:
-            print(f"Loading {len(t.has_value_relationships)} HAS_VALUE relationships...")
-            print(self.loader.load_has_value_relationships(t.has_value_relationships))
+            self.loader.load_has_value_relationships(t.has_value_relationships)
         if t.has_category_relationships:
-            print(f"Loading {len(t.has_category_relationships)} HAS_CATEGORY relationships...")
-            print(self.loader.load_has_category_relationships(t.has_category_relationships))
+            self.loader.load_has_category_relationships(t.has_category_relationships)
         if t.has_business_term_relationships:
-            print(
-                f"Loading {len(t.has_business_term_relationships)} HAS_BUSINESS_TERM relationships..."
-            )
-            print(
-                self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
-            )
+            self.loader.load_has_business_term_relationships(t.has_business_term_relationships)
         if t.references_relationships:
-            print(f"Loading {len(t.references_relationships)} REFERENCES relationships...")
-            print(self.loader.load_references_relationships(t.references_relationships))
+            self.loader.load_references_relationships(t.references_relationships)
         if t.uses_table_relationships:
-            print(f"Loading {len(t.uses_table_relationships)} USES_TABLE relationships...")
-            print(self.loader.load_uses_table_relationships(t.uses_table_relationships))
+            self.loader.load_uses_table_relationships(t.uses_table_relationships)
         if t.uses_column_relationships:
-            print(f"Loading {len(t.uses_column_relationships)} USES_COLUMN relationships...")
-            print(self.loader.load_uses_column_relationships(t.uses_column_relationships))
+            self.loader.load_uses_column_relationships(t.uses_column_relationships)
         if t.column_tagged_with_relationships:
-            print(
-                f"Loading {len(t.column_tagged_with_relationships)} column TAGGED_WITH relationships..."
-            )
-            print(
-                self.loader.load_column_tagged_with_relationships(
-                    t.column_tagged_with_relationships
-                )
-            )
+            self.loader.load_column_tagged_with_relationships(t.column_tagged_with_relationships)
         if t.table_tagged_with_relationships:
-            print(
-                f"Loading {len(t.table_tagged_with_relationships)} table TAGGED_WITH relationships..."
-            )
-            print(
-                self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
-            )
+            self.loader.load_table_tagged_with_relationships(t.table_tagged_with_relationships)
 
-    def run(
+    def ingest(
         self,
+        *,
         include_nodes: list[NodeLabel] | None = None,
         include_relationships: list[RelationshipType] | None = None,
     ) -> None:
@@ -228,16 +250,16 @@ class CSVConnector:
         Parameters
         ----------
         include_nodes : list[NodeLabel], optional
-            Node types to load. If None, all available node CSVs are loaded. Allowed values are from the `NodeLabel` enum.
+            Node types to load. If None, all available node CSVs are loaded.
         include_relationships : list[RelationshipType], optional
             Relationship types to load. If None, all available relationship CSVs
-            are loaded. Allowed values are from the `RelationshipType` enum.
+            are loaded.
 
         Examples:
         --------
         Load only core schema entities:
 
-        >>> connector.run(
+        >>> connector.ingest(
         ...     include_nodes=[
         ...         NodeLabel.DATABASE,
         ...         NodeLabel.SCHEMA,
@@ -253,12 +275,29 @@ class CSVConnector:
 
         Load everything:
 
-        >>> connector.run()
+        >>> connector.ingest()
         """
-        print("Extracting metadata from CSV files...")
-        self.extract_metadata(include_nodes, include_relationships)
-        print("Transforming metadata...")
-        self.transform_metadata()
-        print("Loading metadata into Neo4j...")
-        self.load_metadata()
-        print("\nCSV connector completed successfully!")
+        self.extract(include_nodes=include_nodes, include_relationships=include_relationships)
+        self.transform()
+        self.load()
+        self.loader.upsert_neocarta_graph_node()
+        logger.info("Recorded neocarta graph metadata")
+        logger.info("CSV connector completed successfully")
+
+    def run(
+        self,
+        include_nodes: list[NodeLabel] | None = None,
+        include_relationships: list[RelationshipType] | None = None,
+    ) -> None:
+        """
+        Run the CSV connector.
+
+        .. deprecated::
+            Use :meth:`ingest` instead. ``run`` will be removed in a future release.
+        """
+        warnings.warn(
+            "CSVConnector.run() is deprecated; use CSVConnector.ingest() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.ingest(include_nodes=include_nodes, include_relationships=include_relationships)

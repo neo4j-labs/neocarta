@@ -1,0 +1,114 @@
+---
+config:
+    layout: elk
+---
+graph LR
+%% Core Data Nodes
+Database("Database<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>platform: STRING<br/>service: STRING")
+Schema("Schema<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+
+%% OSI Nodes
+OsiSemanticModel("OsiSemanticModel : Domain<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>osi_version: STRING")
+OsiTable("OsiTable : Table<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>source: STRING<br/>primary_key: LIST&lt;STRING&gt;<br/>unique_keys: LIST&lt;LIST&lt;STRING&gt;&gt;")
+OsiColumn("OsiColumn : Column<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>type: STRING<br/>nullable: BOOLEAN<br/>is_primary_key: BOOLEAN<br/>is_foreign_key: BOOLEAN<br/>label: STRING<br/>is_time_dimension: BOOLEAN")
+Metric("Metric<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR")
+Join("Join<br/>id: STRING | KEY<br/>name: STRING<br/>from_columns: LIST<br/>to_columns: LIST")
+Expression("Expression<br/>id: STRING | KEY<br/>dialect: STRING<br/>expression: STRING")
+
+%% Aspect Nodes
+OsiAiContext("OsiAiContext : Aspect<br/>id: STRING | KEY<br/>data: STRING")
+OsiCustomExtensions("OsiCustomExtensions : Aspect<br/>id: STRING | KEY<br/>data: STRING<br/>vendor_name: STRING")
+
+%% Query Nodes
+Query("Query<br/>id: STRING | KEY<br/>name: STRING<br/>content: STRING<br/>description: STRING<br/>embedding: VECTOR")
+
+%% Glossary Nodes
+BusinessTerm("BusinessTerm<br/>id: STRING | KEY<br/>name: STRING<br/>description: STRING<br/>embedding: VECTOR<br/>resourcePath: STRING")
+
+%% Core Relationships
+Database -->|HAS_SCHEMA| Schema
+Schema -->|HAS_TABLE| OsiTable
+OsiTable -->|HAS_COLUMN| OsiColumn
+OsiColumn -->|REFERENCES| OsiColumn
+
+%% OSI Semantic Model Relationships
+OsiSemanticModel -->|HAS_TABLE| OsiTable
+OsiSemanticModel -->|HAS_QUERY| Query
+OsiSemanticModel -->|HAS_METRIC| Metric
+Join -->|HAS_SOURCE_TABLE| OsiTable
+Join -->|HAS_TARGET_TABLE| OsiTable
+OsiColumn -->|USED_IN_JOIN| Join
+OsiColumn -->|HAS_EXPRESSION| Expression
+Metric -->|HAS_EXPRESSION| Expression
+
+%% Query Relationships
+%% Query -->|USES_TABLE| OsiTable
+Query -->|USES_COLUMN| OsiColumn
+
+%% HAS_ASPECT → OsiAiContext
+OsiSemanticModel -->|HAS_ASPECT| OsiAiContext
+OsiTable -->|HAS_ASPECT| OsiAiContext
+OsiColumn -->|HAS_ASPECT| OsiAiContext
+Query -->|HAS_ASPECT| OsiAiContext
+Metric -->|HAS_ASPECT| OsiAiContext
+Join -->|HAS_ASPECT| OsiAiContext
+
+%% HAS_ASPECT → OsiCustomExtensions
+OsiSemanticModel -->|HAS_ASPECT| OsiCustomExtensions
+OsiTable -->|HAS_ASPECT| OsiCustomExtensions
+OsiColumn -->|HAS_ASPECT| OsiCustomExtensions
+Query -->|HAS_ASPECT| OsiCustomExtensions
+Metric -->|HAS_ASPECT| OsiCustomExtensions
+Join -->|HAS_ASPECT| OsiCustomExtensions
+
+%% Glossary Relationships
+OsiColumn -->|TAGGED_WITH| BusinessTerm
+OsiTable -->|TAGGED_WITH| BusinessTerm
+Metric -->|TAGGED_WITH| BusinessTerm
+
+%% Styling — Core
+classDef node_db fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000,font-size:12px
+class Database node_db
+
+classDef node_schema fill:#fff9c4,stroke:#f57f17,stroke-width:3px,color:#000,font-size:12px
+class Schema node_schema
+
+classDef node_table fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000,font-size:12px
+class OsiTable node_table
+
+classDef node_col fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000,font-size:12px
+class OsiColumn node_col
+
+%% Styling — OSI
+classDef node_osi_model fill:#fce4ec,stroke:#c62828,stroke-width:3px,color:#000,font-size:12px
+class OsiSemanticModel node_osi_model
+
+classDef node_osi_table fill:#ede7f6,stroke:#4527a0,stroke-width:3px,color:#000,font-size:12px
+class OsiTable node_osi_table
+
+classDef node_osi_col fill:#e0f2f1,stroke:#00695c,stroke-width:3px,color:#000,font-size:12px
+class OsiColumn node_osi_col
+
+classDef node_metric fill:#fff3e0,stroke:#e65100,stroke-width:3px,color:#000,font-size:12px
+class Metric node_metric
+
+classDef node_join fill:#fafafa,stroke:#546e7a,stroke-width:3px,color:#000,font-size:12px
+class Join node_join
+
+classDef node_expr fill:#f9fbe7,stroke:#827717,stroke-width:3px,color:#000,font-size:12px
+class Expression node_expr
+
+%% Styling — Aspects
+classDef node_aicontext fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000,font-size:12px
+class OsiAiContext node_aicontext
+
+classDef node_customext fill:#ede7f6,stroke:#311b92,stroke-width:2px,color:#000,font-size:12px
+class OsiCustomExtensions node_customext
+
+%% Styling — Query
+classDef node_query fill:#e8eaf6,stroke:#283593,stroke-width:3px,color:#000,font-size:12px
+class Query node_query
+
+%% Styling — Glossary
+classDef node_glossary fill:#fff8e1,stroke:#f9a825,stroke-width:3px,color:#000,font-size:12px
+class BusinessTerm,Glossary,Category node_glossary

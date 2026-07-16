@@ -5,7 +5,7 @@ Use `uv` to manage this project.
 Always use `uv run` to execute code in the managed environment.
 
 ## Style
-Use [numpy style guidelines](https://numpydoc.readthedocs.io/en/latest/format.html#documenting-classes) for this project.
+Use the [Google docstring style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for this project. This is the convention enforced by Ruff (`[tool.ruff.lint.pydocstyle] convention = "google"` in `pyproject.toml`), so `make lint` will reject other styles (e.g. numpy section headers fail `D416`).
 
 ## Contributing
 To install the project in development mode, run the following `uv` command:
@@ -31,6 +31,18 @@ In order to run tests, use the following Make commands:
 Use the following Make commands for Ruff formatting and linting:
 * Formatting -> `make fmt`
 * Linting -> `make lint`
+
+## Code Review
+Review PRs with the built-in **`/code-review`** skill rather than an ad-hoc,
+hand-rolled checklist — it runs the same multi-agent review Anthropic's managed
+Code Review uses. Locally, review a branch with
+`/code-review origin/main...<branch>` (add `--comment` to post findings inline
+on the PR). On GitHub, the managed reviewer can be triggered by commenting
+`@claude review` on a PR.
+
+Repo-specific review rules live in **[`REVIEW.md`](REVIEW.md)** at the repo
+root (secrets handling, connector-contract conformance, metadata-only-into-the-
+graph, etc.). Add Neocarta-specific review expectations there, not here.
 
 ## Project Architecture Overview
 

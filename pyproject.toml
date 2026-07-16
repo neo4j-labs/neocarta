@@ -1,6 +1,6 @@
 [project]
 name = "neocarta"
-version = "0.3.0"
+version = "0.8.0"
 description = "Library that facilitates the creation of semantic layer metadata graph in Neo4j."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -29,6 +29,7 @@ classifiers = [
 
 dependencies = [
     "google-cloud-bigquery[pandas]>=3.40.0",
+    "litellm>=1.55.0",
     "openai>=2.15.0",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
@@ -37,16 +38,37 @@ dependencies = [
     "google-cloud-dataplex>=2.16.0",
     "sqlglot>=28.10.1",
     "google-cloud-bigquery-storage>=2.36.2",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
+# Rust-accelerated Neo4j driver — 60-90% faster serialisation for bulk loads.
+# Requires Python >=3.11 (compiled extension); install with: pip install neocarta[performance]
+performance = [
+    "neo4j-rust-ext>=6.2.0.0",
+]
 mcp = [
     "fastmcp>=2.14.4,<3",
     "mcp>=1.26.0",
     "pydantic-settings>=2.12.0",
 ]
+cli = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "pydantic-settings>=2.12.0",
+]
+# Managed-Databricks connectors (Unity Catalog). Covers the SQL-warehouse schema
+# connector (databricks-sql-connector, in-process DB-API) and the governance-tags
+# connector (databricks-sdk). A Spark-based variant would live in its own extra so
+# this warehouse-only group never pulls Spark.
+# Install with: pip install neocarta[databricks]
+databricks = [
+    "databricks-sdk>=0.118.0",
+    "databricks-sql-connector>=3.0.0",
+]
 
 [project.scripts]
+neocarta = "neocarta._cli:main"
 neocarta-mcp = "neocarta._mcp.server:run"
 
 [dependency-groups]
@@ -54,7 +76,7 @@ neocarta-mcp = "neocarta._mcp.server:run"
 dev = [
     "ipykernel>=7.1.0",
     "pytest>=9.0.2",
-    "testcontainers[neo4j]>=4.14.2",
+    "testcontainers[neo4j,postgres]>=4.14.2",
     "ruff>=0.15.10",
 ]
 
@@ -62,6 +84,7 @@ dev = [
 agent = [
     "google-cloud-bigquery>=3.40.0",
     "langchain>=1.2.7",
+    "langchain-litellm>=0.2.4",
     "langchain-mcp-adapters>=0.2.1",
     "langchain-openai>=1.1.7",
     "langgraph>=1.0.7",

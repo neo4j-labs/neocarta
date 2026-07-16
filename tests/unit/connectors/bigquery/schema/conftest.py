@@ -3,21 +3,18 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from neocarta.connectors.bigquery.schema import (
-    BigQuerySchemaExtractor,
-    BigQuerySchemaTransformer,
-)
-from neocarta.data_model.rdbms import (
+from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor
+from neocarta.connectors.bigquery.schema.transform import BigQuerySchemaTransformer
+from neocarta.data_model.instance import HasValue, Value
+from neocarta.data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,
     HasSchema,
     HasTable,
-    HasValue,
     References,
     Schema,
     Table,
-    Value,
 )
 
 

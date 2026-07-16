@@ -3,7 +3,10 @@
 import pandas as pd
 from google.cloud import bigquery
 
+from ...._logging import log_stage
+from ....errors import ConfigError
 from ...query_log.utils import create_query_id, parse_sql_query
+from .._errors import wrap_bigquery_errors
 from .models import LogsExtractorCache
 
 
@@ -28,7 +31,7 @@ class BigQueryLogsExtractor:
         self.project_id = client.project or project_id
 
         if self.project_id is None:
-            raise ValueError(
+            raise ConfigError(
                 "Project ID is required as argument in constructor or as attribute in BigQuery client."
             )
 
@@ -114,6 +117,8 @@ class BigQueryLogsExtractor:
             return pd.DataFrame()
         return column_info[["query_id", "column_id"]].drop_duplicates()
 
+    @wrap_bigquery_errors
+    @log_stage
     def extract_query_logs(
         self,
         dataset_id: str,

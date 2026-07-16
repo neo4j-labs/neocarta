@@ -11,7 +11,7 @@ def test_run_workflow_loads_all_nodes(neo4j_driver, temp_csv_dir, all_sample_csv
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
     )
 
-    workflow.run()
+    workflow.ingest()
 
     with neo4j_driver.session(database="neo4j") as session:
         # Verify Database node
@@ -77,7 +77,7 @@ def test_run_workflow_loads_all_relationships(neo4j_driver, temp_csv_dir, all_sa
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
     )
 
-    workflow.run()
+    workflow.ingest()
 
     with neo4j_driver.session(database="neo4j") as session:
         # Verify HAS_SCHEMA relationship
@@ -134,7 +134,7 @@ def test_include_nodes_core_only(neo4j_driver, temp_csv_dir, all_sample_csvs):
     )
 
     # Load only core entities
-    workflow.run(
+    workflow.ingest(
         include_nodes=[NodeLabel.DATABASE, NodeLabel.SCHEMA, NodeLabel.TABLE, NodeLabel.COLUMN],
         include_relationships=[
             RelationshipType.HAS_SCHEMA,
@@ -187,7 +187,7 @@ def test_include_nodes_queries_only(neo4j_driver, temp_csv_dir, all_sample_csvs)
     )
 
     # Load queries and their target nodes (tables/columns) for lineage relationships
-    workflow.run(
+    workflow.ingest(
         include_nodes=[NodeLabel.QUERY, NodeLabel.TABLE, NodeLabel.COLUMN],
         include_relationships=[RelationshipType.USES_TABLE, RelationshipType.USES_COLUMN],
     )
@@ -225,7 +225,7 @@ def test_verify_query_lineage(neo4j_driver, temp_csv_dir, all_sample_csvs):
         csv_directory=str(temp_csv_dir), neo4j_driver=neo4j_driver, database_name="neo4j"
     )
 
-    workflow.run()
+    workflow.ingest()
 
     with neo4j_driver.session(database="neo4j") as session:
         # Verify query q001 uses orders table

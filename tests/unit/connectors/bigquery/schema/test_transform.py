@@ -1,4 +1,5 @@
-from neocarta.connectors.bigquery import BigQuerySchemaExtractor, BigQuerySchemaTransformer
+from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor
+from neocarta.connectors.bigquery.schema.transform import BigQuerySchemaTransformer
 
 
 def test_transform_to_database_nodes(
@@ -14,6 +15,8 @@ def test_transform_to_database_nodes(
     assert bigquery_transformer.database_nodes[0].id == "test_project_id"
     assert bigquery_transformer.database_nodes[0].name == "test-project-id"
     assert bigquery_transformer.database_nodes[0].description is None
+    assert bigquery_transformer.database_nodes[0].platform == "GCP"
+    assert bigquery_transformer.database_nodes[0].service == "BIGQUERY"
 
 
 def test_transform_to_schema_nodes(

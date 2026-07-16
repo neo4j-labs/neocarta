@@ -2,17 +2,16 @@
 
 import pandas as pd
 
-from ....data_model.rdbms import (
+from ....data_model.instance import HasValue, Value
+from ....data_model.schema.rdbms import (
     Column,
     Database,
     HasColumn,
     HasSchema,
     HasTable,
-    HasValue,
     References,
     Schema,
     Table,
-    Value,
 )
 from ...models import NodesCache, RelationshipsCache
 from ...utils.generate_id import (
@@ -138,6 +137,8 @@ class BigQuerySchemaTransformer:
                 id=generate_database_id(row.project_id),
                 name=row.project_id,
                 description=None,
+                platform="GCP",
+                service="BIGQUERY",
             )
             for _, row in database_info.iterrows()
         ]

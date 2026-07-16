@@ -1,0 +1,2 @@
+database_name,schema_name,description
+MusicBrainz,musicbrainz,Core MusicBrainz schema containing the primary entity tables for artists areas releases recordings and labels

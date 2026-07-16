@@ -1,6 +1,6 @@
 # Neocarta
 
-An end-to-end library for generating metadata knowledge graphs in Neo4j for query generation and routing workflows.
+An end-to-end library for building a semantic layer in Neo4j — giving AI agents systemic understanding of how your data is organized, what it means, and where it lives.
 
 *Note: This library is not a Neo4j product. It is a Neo4j Labs project supported by the Neo4j field team.*
 
@@ -10,6 +10,127 @@ An end-to-end library for generating metadata knowledge graphs in Neo4j for quer
 [![PyPI version](https://badge.fury.io/py/neocarta.svg)](https://badge.fury.io/py/neocarta)
 [![Python versions](https://img.shields.io/pypi/pyversions/neocarta.svg)](https://pypi.org/project/neocarta/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+## What it is
+
+Neocarta builds a **semantic layer** in Neo4j from your data sources and serves it to your agents through an **MCP server**. The graph unifies more than raw schema — it brings together:
+
+- **Schema metadata** — tables, columns, foreign keys, and sample values
+- **Business glossary** — terms and categories linked to the columns and tables they describe
+- **Metrics** — governed metric definitions and their expressions
+- **Query history** — real queries and the tables and columns they touch
+
+…with more on the way. Across a growing set of database types, only the metadata crosses into Neo4j; your data stays in the source.
+
+This gives agents systemic familiarity with the data landscape — what data exists, what it means, how it joins, and which database holds it. Agents use the graph to **discover insights, ground their answers, and route queries to the right database**, making Text2Query, query routing, and data discovery reliable.
+
+![Neocarta builds a semantic layer in Neo4j from your data sources and serves it to your agents over MCP, so they can discover, understand, and query the underlying data](assets/images/architecture/quickstart-flow.png)
+
+## Quickstart
+
+**1. Ingest** — read your source's schema into the semantic graph (your data stays in the source). Use the Python library or the CLI.
+
+Python — this is the [BigQuery connector example](examples/bigquery.py):
+
+```python
+import os
+from google.cloud import bigquery
+from neo4j import GraphDatabase
+from neocarta import NodeLabel as nl
+from neocarta.connectors.bigquery import BigQuerySchemaConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
+
+driver = GraphDatabase.driver(
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
+)
+client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
+
+# Extract, transform, and load BigQuery schema metadata into Neo4j
+BigQuerySchemaConnector(
+    client=client,
+    project_id=os.getenv("GCP_PROJECT_ID"),
+    neo4j_driver=driver,
+).ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+
+# Optional: generate embeddings to turn on semantic table/column search
+LiteLLMEmbeddingsConnector(
+    neo4j_driver=driver,
+    embedding_model="text-embedding-3-small",
+).run(node_labels=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN])
+```
+
+CLI — the same ingest without writing Python (`--embeddings` is optional):
+
+```bash
+pip install "neocarta[cli]"
+# reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY from the environment or a .env file
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
+```
+
+See the [Neocarta CLI](#neocarta-cli) section for the full command set.
+
+**2. Serve** — expose the graph to your agent as tools:
+
+```bash
+pip install "neocarta[mcp]"
+# reads NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD from the environment or a .env file
+neocarta-mcp           # or, from the unified CLI: neocarta mcp serve
+```
+
+The server gives the agent retrieval tools — `list_schemas`, `list_tables_by_schema`, and full-text, vector, or hybrid search over tables, columns, and business terms — each returning a table with its columns, types, example values, and **foreign-key references**.
+
+**3. Use** — connect your agent to the `neocarta` MCP server plus a query-execution tool for your database. The agent searches the graph for relevant tables, follows the foreign keys to build the join, and runs the query:
+
+> *Which customers placed the largest orders last quarter?*
+> → the agent calls `get_context_by_table_hybrid_search`, finds `orders` and `customers`, sees `orders.customer_id → customers.id`, writes the join, and returns the results.
+
+A complete runnable agent (LangGraph + the MCP + a BigQuery query tool) is in [`run_agent.py`](run_agent.py).
+
+The above will result in an agent architecture like below:
+
+```mermaid
+---
+config:
+    layout: dagre
+---
+
+graph LR
+    
+    subgraph GCP["GCP Environment"]
+        BQMCP(BigQuery<br>MCP)
+
+        subgraph DataWarehouse["Data Warehouse"]
+            BQData[(BigQuery)]
+        end
+        
+        BQMCP <--> BQData
+    end
+
+    subgraph Local["Local Environment"]
+        Agent("Text2SQL Agent")
+        MetadataMCP("Neocarta<br/>MCP")
+        
+        subgraph Graph["Database"]
+            NEO[(Neo4j Graph)]
+        end
+        
+        Agent <--> MetadataMCP
+        MetadataMCP <--> NEO
+    end
+    
+    User("User")
+    
+    subgraph LLM["LLM Service"]
+        Model("LLM")
+    end
+    
+    User <--> Agent
+    Agent <--> Model
+    Agent <--> BQMCP
+```
+
+Embeddings are optional: catalog and full-text tools work from schema alone, and adding embeddings turns on semantic table and column search. See [Embeddings](#embeddings) and [Neocarta MCP](#neocarta-mcp).
 
 ## Installation
 
@@ -21,6 +142,15 @@ Requires Python 3.10 or higher and a running Neo4j instance. Options:
 - [Neo4j AuraDB](https://neo4j.com/product/auradb/) — managed cloud (free tier available)
 - [Neo4j Desktop](https://neo4j.com/download/) — local GUI-based instance
 - [Docker image](https://hub.docker.com/_/neo4j) — lightweight local instance
+
+### Performance Accelerator 
+
+Neocarta has an optional performance enhancement extra. neo4j-rust-ext replaces the pure-Python serialisation layer of the Neo4j Python Driver with a compiled Rust extension, delivering 60–90% faster throughput for bulk loads — relevant for any connector loading large schemas or datasets.
+
+*Note: This requires Python >=3.11*
+```bash
+pip install neocarta[performance]
+```
 
 ## Metadata Graph
 
@@ -87,40 +217,32 @@ This project provides connector classes that organize the ETL process into reusa
 * **Loaders** - Ingest transformed data into Neo4j
 * **Connectors** - Orchestrate the extract, transform, and load process
 
-Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for metadata ingestion.
-
-### Connector Class Architecture
-
-All connectors follow a consistent class-based architecture:
-
-```python
-class Connector:
-    def __init__(self, clients, config):
-        # Initialize with required clients and configuration
-        self.extractor = Extractor(...)
-        self.transformer = Transformer(...)
-        self.loader = Loader(...)
-
-    def extract_metadata(self):
-        # Extract data from source and cache
-        pass
-
-    def transform_metadata(self):
-        # Transform extracted data to graph schema and cache
-        pass
-
-    def load_metadata(self):
-        # Load transformed data into Neo4j
-        pass
-
-    def run(self):
-        # Orchestrate the full ETL pipeline
-        self.extract_metadata()
-        self.transform_metadata()
-        self.load_metadata()
-```
+Each connector is implemented as a class that encapsulates its extractor, transformer, and loader components, providing a clean interface for ingestion.
 
 ### Connectors
+
+#### **OSI Connector**
+
+Bidirectional connector for the [Open Semantic Interchange (OSI)](https://github.com/open-semantic-interchange/OSI) spec — a YAML-based interchange format for semantic models. Unlike the other connectors (which only ingest), OSI supports both directions: load an OSI YAML spec into Neo4j, and emit an `OsiSemanticModel` subgraph back out as an OSI YAML file. See the [OSI README](./neocarta/connectors/osi/README.md) for the full data model diagram and behavioral notes.
+
+**What it ingests** (from an OSI YAML at a local path or HTTP(S) URL):
+* `OsiSemanticModel` (a `Domain` subtype) — the top-level container
+* `OsiTable` / `OsiColumn` — datasets and their fields (with primary keys, unique keys, labels, time-dimension flags)
+* `Query` — datasets whose `source` is a SQL query rather than a 3-part identifier
+* `Metric` with dialect-specific `Expression` definitions
+* `Join` with ordered `from_columns` / `to_columns` for composite-key relationships
+* `OsiAiContext` / `OsiCustomExtensions` aspects, including synonyms-derived `BusinessTerm` upserts (MERGE on `name`, so they collide cleanly with catalog-derived BTs from Dataplex etc.)
+
+**What it exports** (from an `:OsiSemanticModel` subgraph, filtered by name):
+* A spec-compliant OSI YAML file with preserved column ordering, native `ai_context` structure, and literal-block JSON for custom extensions.
+
+This connector only requires Neo4j credentials in `.env`:
+* NEO4J_USERNAME=neo4j-username
+* NEO4J_PASSWORD=neo4j-password
+* NEO4J_URI=neo4j-uri
+* NEO4J_DATABASE=neo4j-database
+
+Sample dataset: [`datasets/osi/acme_semantic_model.yaml`](./datasets/osi/acme_semantic_model.yaml) (the full 33-table ACME warehouse modeled as OSI). Runnable example: [`examples/osi_connector.py`](./examples/osi_connector.py).
 
 #### **BigQuery Schema Connector**
 
@@ -220,13 +342,12 @@ bigquery_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
 connector = BigQuerySchemaConnector(
     client=bigquery_client,
     project_id=os.getenv("GCP_PROJECT_ID"),
-    dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
 
 # Run the connector to extract, transform, and load BigQuery schema metadata into Neo4j
-connector.run()
+connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 ##### Code Example - Logs Connector
@@ -254,7 +375,7 @@ connector = BigQueryLogsConnector(
 )
 
 # Run the connector to extract query logs, parse SQL, and load into Neo4j
-connector.run(
+connector.ingest(
     dataset_id=os.getenv("BIGQUERY_DATASET_ID"),
     region="region-us",
     start_timestamp="2024-01-01 00:00:00",  # Optional
@@ -271,11 +392,11 @@ For the most complete picture, run both connectors:
 ```python
 # 1. Extract schema metadata
 schema_connector = BigQuerySchemaConnector(...)
-schema_connector.run()
+schema_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 
 # 2. Extract query logs
 logs_connector = BigQueryLogsConnector(...)
-logs_connector.run(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
+logs_connector.ingest(dataset_id=os.getenv("BIGQUERY_DATASET_ID"))
 ```
 
 This allows you to compare declared schema vs. actual usage patterns.
@@ -490,11 +611,11 @@ connector = CSVConnector(
 )
 
 # Run the connector to load all CSV files into Neo4j
-connector.run()
+connector.ingest()
 
 # Alternatively, load specific nodes and relationships
 # Enum members are recommended, but exact string values (e.g. "Database", "HAS_SCHEMA") also work.
-connector.run(
+connector.ingest(
     include_nodes=[nl.DATABASE, nl.SCHEMA, nl.TABLE, nl.COLUMN, nl.VALUE],
     include_relationships=[rt.HAS_SCHEMA, rt.HAS_TABLE, rt.HAS_COLUMN, rt.HAS_VALUE, rt.REFERENCES]
 )
@@ -511,7 +632,7 @@ connector = CSVConnector(
     database_name=neo4j_database,
     csv_file_map=custom_file_map,
 )
-connector.run()
+connector.ingest()
 ```
 
 ##### Sample Dataset
@@ -528,11 +649,15 @@ Embeddings may be generated for the `description` fields of the following nodes:
 * `Column`
 * `BusinessTerm`
 
-This project currently supports the following embeddings Providers:
-* OpenAI
+Two embedding connectors are available:
 
-This connector requires the following variables to be set in the `.env` file:
-* OPENAI_API_KEY=sk-...
+* **`LiteLLMEmbeddingsConnector`** — multi-provider via [LiteLLM](https://docs.litellm.ai/). Routes to OpenAI, Azure OpenAI, Gemini, Cohere, Bedrock, Vertex AI, Ollama, HuggingFace, and others based on the `embedding_model` string. Vector dimension is auto-detected from the model on first use. Use this when you want provider flexibility or are not on OpenAI.
+* **`OpenAIEmbeddingsConnector`** — direct OpenAI SDK. Takes a pre-built `OpenAI` / `AsyncOpenAI` client and an explicit `dimensions` value. Use this when you want full control over the OpenAI client (custom base URL, retry policy, proxies) or already have one wired up elsewhere in your app.
+
+Authentication is read from provider-specific environment variables (`.env` file). For OpenAI:
+* `OPENAI_API_KEY=sk-...`
+
+For other providers via LiteLLM, set the matching env var (e.g. `GEMINI_API_KEY`, `COHERE_API_KEY`, `AZURE_API_KEY` + `AZURE_API_BASE`, `AWS_*`). For LiteLLM Proxy or custom endpoints, pass `api_key` / `api_base` in `litellm_kwargs`.
 
 #### Connector Architecture
 
@@ -547,8 +672,8 @@ graph LR
         VI(Create Vector Index)
     end
 
-    subgraph ES["Embedding Service"]
-        E(OpenAI Embeddings)
+    subgraph ES["Embedding Provider"]
+        E(OpenAI / LiteLLM)
     end
 
     subgraph Graph["Database"]
@@ -567,29 +692,26 @@ graph LR
     C-->|Embeddings|NEO
 ```
 
-#### Code Example
+#### Code Example — LiteLLM (multi-provider)
 
 ```python
 import asyncio
 import os
 from neo4j import GraphDatabase
-from openai import AsyncOpenAI
 from neocarta import NodeLabel as nl
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
-# Initialize clients
+# Initialize Neo4j driver. The embedding provider is configured via env vars
+# (e.g. OPENAI_API_KEY, GEMINI_API_KEY) consumed by LiteLLM at call time.
 neo4j_driver = GraphDatabase.driver(
     uri=os.getenv("NEO4J_URI"),
     auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
 )
 neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-embedding_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Create connector instance
-connector = OpenAIEmbeddingsConnector(
-    async_embedding_client=embedding_client,
+# Create connector instance. Vector dimension is auto-detected from the model.
+connector = LiteLLMEmbeddingsConnector(
     embedding_model="text-embedding-3-small",
-    dimensions=768,
     neo4j_driver=neo4j_driver,
     database_name=neo4j_database,
 )
@@ -600,6 +722,35 @@ node_labels = [nl.DATABASE, nl.TABLE, nl.COLUMN]
 
 # Run the connector to create embeddings for the nodes
 await connector.arun(node_labels=node_labels)
+```
+
+#### Code Example — OpenAI (direct SDK)
+
+```python
+import os
+from neo4j import GraphDatabase
+from openai import AsyncOpenAI
+from neocarta import NodeLabel as nl
+from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+
+neo4j_driver = GraphDatabase.driver(
+    uri=os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")),
+)
+
+# Bring your own OpenAI client — useful when you need a custom base URL,
+# retry policy, or proxy configuration.
+async_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+connector = OpenAIEmbeddingsConnector(
+    neo4j_driver=neo4j_driver,
+    async_client=async_client,
+    embedding_model="text-embedding-3-small",
+    dimensions=768,
+    database_name=os.getenv("NEO4J_DATABASE", "neo4j"),
+)
+
+await connector.arun(node_labels=[nl.DATABASE, nl.TABLE, nl.COLUMN])
 ```
 
 ### Full Pipeline
@@ -642,8 +793,8 @@ flowchart LR
         VI(Create Vector Index)
     end
 
-    subgraph ES["Embedding Service"]
-        E(OpenAI Embeddings)
+    subgraph ES["Embedding Provider"]
+        E(OpenAI / LiteLLM)
     end
 
     subgraph EP["Embedding Workflow"]
@@ -674,9 +825,74 @@ make create-graph
 
 ---
 
+## Neocarta CLI
+
+The Neocarta CLI is available via the optional `[cli]` add-on. It wraps the same connector classes covered above behind a noun-verb command grammar so you can drive ingestion without writing Python.
+
+```bash
+pip install "neocarta[cli]"
+```
+
+Today the CLI ships these connector commands:
+
+| Command | Wraps |
+|---|---|
+| `neocarta bigquery schema` | `BigQuerySchemaConnector` — load `Database`, `Schema`, `Table`, `Column` nodes |
+| `neocarta bigquery logs` | `BigQueryLogsConnector` — load `Query`, `CTE`, and reference relationships from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` |
+| `neocarta csv ingest` | `CSVConnector` — load metadata from a directory of CSV files |
+| `neocarta dataplex schema` | `DataplexSchemaConnector` — load BigQuery schema (`Database`, `Schema`, `Table`, `Column`) from the Dataplex catalog |
+| `neocarta dataplex glossary` | `DataplexGlossaryConnector` — load the Dataplex business glossary (`Glossary`, `Category`, `BusinessTerm`) and `TAGGED_WITH` entry links |
+| `neocarta osi ingest` | `OsiConnector` — load an OSI YAML semantic model from a local path or HTTP(S) URL |
+| `neocarta osi export` | `OsiConnector` — export an OSI semantic model from Neo4j back to an OSI YAML file |
+| `neocarta query-log ingest` | `QueryLogConnector` — parse a local query-log JSON file into `Query`, `CTE`, and reference relationships (distinct from `bigquery logs`, which reads the Cloud Logging API live) |
+
+Plus the [MCP server](#neocarta-mcp) tools, mirrored under `neocarta tool <tool>` so the graph can be queried straight from the shell or a non-MCP agent (read-only; need only the `[cli]` install):
+
+| Command | Mirrors MCP tool |
+|---|---|
+| `neocarta tool list-schemas` | `list_schemas` — list every schema and its database |
+| `neocarta tool list-tables-by-schema --schema-name S` | `list_tables_by_schema` — list the tables in schema `S` |
+| `neocarta tool get-full-metadata-schema` | `get_full_metadata_schema` — dump full table/column metadata (large) |
+| `neocarta tool get-context-by-{table,column}-vector-search --text-content "..."` | semantic (embedding) search over table/column descriptions |
+| `neocarta tool get-context-by-schema-and-table-vector-search --text-content "..."` | semantic search across schema + table embeddings |
+| `neocarta tool get-context-by-{table,column}-full-text-search --text-content "..."` | full-text search over table/column name + description |
+| `neocarta tool get-context-by-{table,column}-hybrid-search --text-content "..."` | hybrid vector + full-text search |
+| `neocarta tool get-context-by-{table,column}-business-term-hybrid-search --text-content "..."` | hybrid search bridged through `:BusinessTerm` tags |
+
+Each `neocarta tool` command mirrors its tool's name, `--text-content` / `--max-tables` / `--search-top-k` arguments (and per-tool defaults), and help text. The catalog commands work from schema alone; the search commands need the matching vector/full-text indexes (build them with an ingest `--embeddings`) and, where they embed the query, an embedding-provider key (e.g. `OPENAI_API_KEY`). A search command run against a graph missing the required index exits `3` (`not_found`).
+
+Plus one introspection verb:
+
+| Command | Purpose |
+|---|---|
+| `neocarta agent-context` | Emits the full CLI shape (commands, flags, exit codes, env vars) as JSON for AI agents to read |
+
+### Example
+
+```bash
+# Set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / OPENAI_API_KEY in your shell or .env
+neocarta bigquery schema --project-id my-proj --dataset-id sales
+neocarta bigquery schema --project-id my-proj --dataset-id sales --embeddings
+neocarta bigquery logs --dataset-id sales --limit 500 --json
+neocarta csv ingest --csv-directory ./datasets/csv
+neocarta dataplex schema --project-id my-proj --project-number 123456789 --dataplex-location us --dataset-id sales
+neocarta dataplex glossary --project-id my-proj --project-number 123456789 --dataplex-location us
+neocarta osi ingest --spec-source ./datasets/osi/acme_semantic_model.yaml
+neocarta osi export --semantic-model-name acme_corp_model --output-path acme.yaml
+neocarta query-log ingest --query-log-file ./query_logs.json
+
+# Query the graph with the mirrored MCP tools (read-only):
+neocarta tool list-schemas --json
+neocarta tool get-context-by-table-vector-search --text-content "customer orders" --max-tables 5 --json
+```
+
+See the [CLI README](neocarta/_cli/README.md) for the full flag reference, env-var contract, exit-code map, and agent-integration details.
+
+---
+
 ## Neocarta MCP
 
-The Neocarta MCP server is available via the optional `[mcp]` add-on.
+The Neocarta MCP server is available via the optional `[mcp]` add-on. Start it with the standalone `neocarta-mcp` console script, or from the unified CLI with `neocarta mcp serve` (which requires both the `cli` and `mcp` extras). Both serve over stdio and read the same `NEO4J_*` / `EMBEDDING_*` environment configuration.
 
 ### Overview
 
@@ -685,10 +901,17 @@ This is a metadata retrieval MCP server that provides tools to query the Neo4j s
 **Tools**
 * `list_schemas` - List all schemas and their associated databases.
 * `list_tables_by_schema` - List all tables for a given schema name.
-* `get_metadata_schema_by_column_semantic_similarity` - Find tables by semantic similarity on column embeddings.
-* `get_metadata_schema_by_table_semantic_similarity` - Find tables by semantic similarity on table embeddings.
-* `get_metadata_schema_by_schema_and_table_semantic_similarity` - Find tables by semantic similarity across both schema and table embeddings.
+* `get_context_by_column_vector_search` - Find tables by semantic similarity on column embeddings.
+* `get_context_by_table_vector_search` - Find tables by semantic similarity on table embeddings.
+* `get_context_by_schema_and_table_vector_search` - Find tables by semantic similarity across both schema and table embeddings.
+* `get_context_by_column_full_text_search` / `get_context_by_table_full_text_search` - Full-text search on column or table name/description.
+* `get_context_by_column_hybrid_search` / `get_context_by_table_hybrid_search` - Hybrid vector + full-text search at the column or table level.
+* `get_context_by_column_business_term_hybrid_search` / `get_context_by_table_business_term_hybrid_search` - Hybrid search with the full-text branch bridged through `:BusinessTerm` tags.
 * `get_full_metadata_schema` - Return complete metadata for all tables. **Warning:** expensive — use only for debugging.
+
+The MCP server probes the target database at startup and registers, per label (Table, Column), the highest-priority retrieval tool whose indexes are present: business-term-bridged hybrid > hybrid > vector or full-text alone. Schema-level vector retrieval and catalog tools are registered independently.
+
+Every one of these tools is also reachable from the [CLI](#neocarta-cli) as `neocarta tool <tool>` (e.g. `neocarta tool get-context-by-table-vector-search --text-content "..."`) — same names, arguments, and documentation — for shell use or non-MCP agents, without running the server or installing the `[mcp]` extra.
 
 See the [MCP server README](neocarta/_mcp/README.md) for full server documentation.
 
@@ -703,7 +926,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
       "command": "uvx",
       "args": [
         "--from",
-        "neocarta[mcp]@0.3.0",
+        "neocarta[mcp]@0.8.0",
         "neocarta-mcp"
       ],
       "env": {
@@ -712,8 +935,7 @@ To connect the `neocarta-mcp` server to Claude Desktop, add the following entry 
         "NEO4J_PASSWORD": "your-password",
         "NEO4J_DATABASE": "neo4j",
         "OPENAI_API_KEY": "sk-...",
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768"
+        "EMBEDDING_MODEL": "text-embedding-3-small"
       }
     }
   }
@@ -776,6 +998,25 @@ The project is organized into the following dependency groups:
 - **mcp**: neocarta MCP server for metadata retrieval from Neo4j semantic layer
 - **agent**: Text2SQL agent with LangChain (includes mcp-server dependencies)
 - **dev**: Development tools (Jupyter notebooks)
+
+### Adding a New Connector
+
+Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/neocarta-add-source-connector/connector-contract.md). Read it before designing a connector.
+
+The repository ships a `neocarta-add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/neocarta-add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
+
+```bash
+# List connectors and their detected kind (source/format)
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py list
+
+# Scaffold a new source connector package + conformance test
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py scaffold <name>
+
+# Verify a connector against the contract (static checks + conformance pytest)
+uv run .claude/skills/neocarta-add-source-connector/scripts/driver.py verify <name>
+```
+
+A scaffolded connector is lint-clean as generated; fill in the `extract` / `transform` / `load` stages, then re-run `verify`. Connector creation and CLI integration are separate PRs.
 
 ### Sample Datasets
 
@@ -941,7 +1182,7 @@ Required environment variables (add to `.env` file):
 ```
 > What are the total sales by product category?
 
-Agent: [Calls get_metadata_schema_by_column_semantic_similarity with query about sales and categories]
+Agent: [Calls get_context_by_column_vector_search with query about sales and categories]
 Agent: [Generates SQL query using retrieved schema]
 Agent: [Calls execute_sql with generated query]
 Agent: Here are the total sales by product category:

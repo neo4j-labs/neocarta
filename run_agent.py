@@ -29,19 +29,32 @@ class GoogleAuth(httpx.Auth):
         yield request
 
 
+# Env vars forwarded to the MCP subprocess. `StdioServerParameters` rejects
+# None values, so any var not set in the parent environment is dropped below.
+# Provider auth vars (OPENAI_API_KEY, GEMINI_API_KEY, COHERE_API_KEY, ...) are
+# passed through if present so LiteLLM in the MCP server can pick them up.
+_mcp_env_candidates = {
+    "NEO4J_URI": os.getenv("NEO4J_URI"),
+    "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME"),
+    "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),
+    "NEO4J_DATABASE": os.getenv("NEO4J_DATABASE"),
+    "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+    # Provider credentials — set the ones your EMBEDDING_MODEL needs.
+    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+    # "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),  # noqa: ERA001
+    # "COHERE_API_KEY": os.getenv("COHERE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_KEY": os.getenv("AZURE_API_KEY"),  # noqa: ERA001
+    # "AZURE_API_BASE": os.getenv("AZURE_API_BASE"),  # noqa: ERA001
+    # "AZURE_API_VERSION": os.getenv("AZURE_API_VERSION"),  # noqa: ERA001
+    # "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),  # noqa: ERA001
+    # "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),  # noqa: ERA001
+    # "AWS_REGION_NAME": os.getenv("AWS_REGION_NAME"),  # noqa: ERA001
+}
 sql_metadata_graph_mcp_params = {
     "transport": "stdio",
     "command": "uv",
     "args": ["run", "neocarta-mcp"],
-    "env": {
-        "NEO4J_URI": os.getenv("NEO4J_URI"),
-        "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME"),
-        "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),
-        "NEO4J_DATABASE": os.getenv("NEO4J_DATABASE"),
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-        "EMBEDDING_MODEL": "text-embedding-3-small",
-        "EMBEDDING_DIMENSIONS": "768",
-    },
+    "env": {k: v for k, v in _mcp_env_candidates.items() if v is not None},
 }
 
 bigquery_mcp_params = {
@@ -66,21 +79,16 @@ CONFIG = {"configurable": {"thread_id": "1"}}
 # run the agent with MCP server using stdio transport
 async def main() -> None:
     """Connect to MCP servers, build the agent, and run an interactive chat loop."""
-    # Get tools
-    mcp_tools = await client.get_tools()
-
-    tool_names = {
-        # From SQL Metadata Graph MCP Server
-        "list_schemas",
-        "list_tables_by_schema",
-        "get_metadata_schema_by_column_semantic_similarity",
-        "get_metadata_schema_by_schema_and_table_semantic_similarity",
-        "get_full_metadata_schema",
-        # From BigQuery MCP Server
-        "execute_sql",
-    }
-
-    allowed_tools = [tool for tool in mcp_tools if tool.name in tool_names]
+    # Get tools per server. The neocarta server self-filters its tool set based on
+    # the target database's index inventory, so we trust everything it exposes.
+    # The BigQuery MCP server exposes more than we want, so we explicitly allowlist
+    # only the SQL execution tool.
+    neocarta_tools = await client.get_tools(server_name="sql_metadata_graph")
+    bigquery_tools = await client.get_tools(server_name="bigquery")
+    bigquery_allowed = {"execute_sql"}
+    allowed_tools = list(neocarta_tools) + [
+        tool for tool in bigquery_tools if tool.name in bigquery_allowed
+    ]
 
     agent = create_text2sql_agent(allowed_tools)
 

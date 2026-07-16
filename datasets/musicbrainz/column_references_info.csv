@@ -1,0 +1,12 @@
+source_database_name,source_schema_name,source_table_name,source_column_name,target_database_name,target_schema_name,target_table_name,target_column_name,criteria
+MusicBrainz,musicbrainz,artist,area,MusicBrainz,musicbrainz,area,id,artist.area = area.id
+MusicBrainz,musicbrainz,artist_credit_name,artist_credit,MusicBrainz,musicbrainz,artist_credit,id,artist_credit_name.artist_credit = artist_credit.id
+MusicBrainz,musicbrainz,artist_credit_name,artist,MusicBrainz,musicbrainz,artist,id,artist_credit_name.artist = artist.id
+MusicBrainz,musicbrainz,release_group,artist_credit,MusicBrainz,musicbrainz,artist_credit,id,release_group.artist_credit = artist_credit.id
+MusicBrainz,musicbrainz,release,artist_credit,MusicBrainz,musicbrainz,artist_credit,id,release.artist_credit = artist_credit.id
+MusicBrainz,musicbrainz,release,release_group,MusicBrainz,musicbrainz,release_group,id,release.release_group = release_group.id
+MusicBrainz,musicbrainz,recording,artist_credit,MusicBrainz,musicbrainz,artist_credit,id,recording.artist_credit = artist_credit.id
+MusicBrainz,musicbrainz,medium,release,MusicBrainz,musicbrainz,release,id,medium.release = release.id
+MusicBrainz,musicbrainz,track,medium,MusicBrainz,musicbrainz,medium,id,track.medium = medium.id
+MusicBrainz,musicbrainz,track,recording,MusicBrainz,musicbrainz,recording,id,track.recording = recording.id
+MusicBrainz,musicbrainz,track,artist_credit,MusicBrainz,musicbrainz,artist_credit,id,track.artist_credit = artist_credit.id

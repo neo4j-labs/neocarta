@@ -4,7 +4,7 @@ Generates and stores vector embeddings for nodes in the semantic graph, enabling
 
 ## Overview
 
-The embeddings module embeds the `description` field of graph nodes using OpenAI's embeddings API and writes the resulting vectors back to Neo4j. Vector indexes are created automatically per node label, and only nodes without an existing `embedding` property are processed — making reruns safe and incremental.
+The embeddings module embeds the `description` field of graph nodes using any embedding provider supported by [LiteLLM](https://docs.litellm.ai/) (OpenAI, Azure OpenAI, Cohere, Bedrock, Vertex AI, Gemini, Ollama, HuggingFace, etc.) and writes the resulting vectors back to Neo4j. The vector dimension is auto-detected from the model on first use, the Neo4j vector index is created at that size, and only nodes without an existing `embedding` property are processed — making reruns safe and incremental.
 
 ## Process
 
@@ -18,32 +18,29 @@ Neo4j (nodes missing embeddings)
 Neo4j (embedding property set on each node)
 ```
 
-1. **Fetch** — queries Neo4j for nodes of a given label where `description IS NOT NULL` and `embedding IS NULL`
-2. **Embed** — calls the OpenAI embeddings API for each description, in batches
-3. **Write** — sets the `embedding` vector property on each matched node using `db.create.setNodeVectorProperty`
+1. **Probe** — embed a tiny test string once to discover the model's native vector size
+2. **Index** — create the Neo4j vector index at that size (idempotent, skips if it already exists)
+3. **Fetch** — queries Neo4j for nodes of a given label where `description IS NOT NULL` and `embedding IS NULL`
+4. **Embed** — calls the embeddings API for each description, in batches
+5. **Write** — sets the `embedding` vector property on each matched node using `db.create.setNodeVectorProperty`
 
 A cosine-similarity vector index (e.g. `table_vector_index`) is created for each node label before embedding begins, if one does not already exist.
+
 
 ## Usage
 
 ### Sync
 
-Use `OpenAI` (sync client) and call `run()`:
-
 ```python
-from openai import OpenAI
 from neo4j import GraphDatabase
 from neocarta import NodeLabel
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-connector = OpenAIEmbeddingsConnector(
+connector = LiteLLMEmbeddingsConnector(
     neo4j_driver=driver,
-    client=client,
-    embedding_model="text-embedding-3-small",
-    dimensions=768,
+    embedding_model="text-embedding-3-small",  # dimension auto-detected
     database_name="neo4j",
 )
 # Enum members are recommended, but exact string values (e.g. "Table", "Column") also work.
@@ -52,22 +49,18 @@ connector.run(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN], batch_size=100)
 
 ### Async
 
-Use `AsyncOpenAI` and call `arun()`. Within each batch, all embedding API calls are issued concurrently via `asyncio.gather`, making this significantly faster for large graphs:
+Within each batch, all embedding API calls are issued concurrently via `asyncio.gather`, making this significantly faster for large graphs:
 
 ```python
-from openai import AsyncOpenAI
 from neo4j import GraphDatabase
 from neocarta import NodeLabel
-from neocarta.enrichment.embeddings import OpenAIEmbeddingsConnector
+from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-connector = OpenAIEmbeddingsConnector(
+connector = LiteLLMEmbeddingsConnector(
     neo4j_driver=driver,
-    async_client=async_client,
-    embedding_model="text-embedding-3-small",
-    dimensions=768,
+    embedding_model="text-embedding-3-small",  # dimension auto-detected
 )
 # Enum members are recommended, but exact string values (e.g. "Table", "Column") also work.
 await connector.arun(node_labels=[NodeLabel.TABLE, NodeLabel.COLUMN], batch_size=100)
@@ -79,13 +72,24 @@ See [examples/sync_embeddings.py](../../../examples/sync_embeddings.py) and [exa
 
 | Parameter | Default | Description |
 |---|---|---|
-| `embedding_model` | `"text-embedding-3-small"` | OpenAI model to use |
-| `dimensions` | `768` | Vector dimensions (must match the vector index) |
+| `embedding_model` | `"text-embedding-3-small"` | LiteLLM model identifier (provider prefix optional for OpenAI) |
+| `dimensions` | `None` | Requested vector dimension for models that support truncation. When set it is sent to the provider; if the model rejects it (doesn't support truncation), the connector drops it and retries, keeping the native dimension. `None` = auto-detect. |
+| `litellm_kwargs` | `None` | Extra keyword arguments forwarded to `litellm.embedding` / `litellm.aembedding`. Use this for `api_key` / `api_base` (LiteLLM Proxy or custom endpoints) or `api_version`. |
 | `database_name` | `"neo4j"` | Target Neo4j database |
 | `node_labels` | `[NodeLabel.TABLE, NodeLabel.COLUMN]` | Node labels to embed |
 | `batch_size` | `100` | Nodes processed per batch |
 
-**Required environment variable:** `OPENAI_API_KEY`
+By default the vector dimension is read directly from the model's response on first use. To request a non-default size from a model that supports it (e.g. OpenAI `text-embedding-3-large` truncated to 1024), pass `dimensions=1024`; the probe call then detects 1024 and the index is created at 1024. Models that don't support truncation reject the parameter; the connector then drops it and retries, keeping the model's native dimension, so the index always matches the vectors actually returned.
+
+**Authentication:** Set the appropriate environment variable for your provider, e.g.:
+
+- `OPENAI_API_KEY` for OpenAI
+- `GEMINI_API_KEY` for Gemini (AI Studio)
+- `COHERE_API_KEY` for Cohere
+- `AZURE_API_KEY`, `AZURE_API_BASE`, `AZURE_API_VERSION` for Azure OpenAI
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION_NAME` for Bedrock
+
+See the [LiteLLM provider docs](https://docs.litellm.ai/docs/providers) for the full list.
 
 ## Batch Processing
 
@@ -98,12 +102,12 @@ Failed individual embeddings (e.g. API errors) return `None` and are silently sk
 
 ## Vector Index
 
-`create_vector_index` (from `neocarta.ingest.indexes`) is called once per node label before embedding. It creates a Neo4j vector index using cosine similarity:
+`create_vector_index` (from `neocarta.ingest.indexes`) is called once per node label after the dimension probe. It creates a Neo4j vector index using cosine similarity:
 
 ```
 {node_label.lower()}_vector_index  →  ON (n:{NodeLabel}).embedding
-    vector.dimensions: <dimensions>
+    vector.dimensions: <detected dimension>
     vector.similarity_function: cosine
 ```
 
-The index creation is idempotent (`IF NOT EXISTS`), so it is safe to call on every run.
+The index creation is idempotent (`IF NOT EXISTS`), so it is safe to call on every run. **If you switch to a model with a different output dimension on an existing graph**, the old index will not be recreated — drop the existing `*_vector_index` constraints first, then rerun.

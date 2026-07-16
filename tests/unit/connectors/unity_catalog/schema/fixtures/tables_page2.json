@@ -1,0 +1,15 @@
+{
+  "tables": [
+    {
+      "name": "shipments",
+      "catalog_name": "main",
+      "schema_name": "sales",
+      "table_type": "EXTERNAL",
+      "comment": "Shipment facts",
+      "columns": [
+        {"name": "shipment_id", "type_text": "bigint", "type_name": "LONG", "nullable": false, "comment": null}
+      ]
+    }
+  ],
+  "next_page_token": ""
+}

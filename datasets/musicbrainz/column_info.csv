@@ -1,0 +1,87 @@
+database_name,schema_name,table_name,column_name,data_type,is_nullable,is_primary_key,is_foreign_key,description
+MusicBrainz,musicbrainz,artist,id,INTEGER,false,true,false,Surrogate primary key identifying the artist row
+MusicBrainz,musicbrainz,artist,gid,UUID,false,false,false,Stable MusicBrainz identifier exposed in public URLs
+MusicBrainz,musicbrainz,artist,name,VARCHAR,false,false,false,Official display name of the artist
+MusicBrainz,musicbrainz,artist,sort_name,VARCHAR,false,false,false,Name rewritten for alphabetical sorting of artists
+MusicBrainz,musicbrainz,artist,type,INTEGER,true,false,false,Reference code describing whether the artist is a person group or other type
+MusicBrainz,musicbrainz,artist,area,INTEGER,true,false,true,Geographic area the artist is primarily associated with
+MusicBrainz,musicbrainz,artist,gender,INTEGER,true,false,false,Reference code capturing the gender of a person artist
+MusicBrainz,musicbrainz,artist,begin_date_year,SMALLINT,true,false,false,Year the artist began activity or was born
+MusicBrainz,musicbrainz,artist,end_date_year,SMALLINT,true,false,false,Year the artist ceased activity or died
+MusicBrainz,musicbrainz,artist,comment,VARCHAR,true,false,false,Short disambiguation comment distinguishing similar artists
+MusicBrainz,musicbrainz,artist,ended,BOOLEAN,false,false,false,Flag indicating whether the artist has ended activity
+MusicBrainz,musicbrainz,area,id,INTEGER,false,true,false,Surrogate primary key identifying the area row
+MusicBrainz,musicbrainz,area,gid,UUID,false,false,false,Stable MusicBrainz identifier for the area
+MusicBrainz,musicbrainz,area,name,VARCHAR,false,false,false,Display name of the geographic area
+MusicBrainz,musicbrainz,area,type,INTEGER,true,false,false,Reference code describing the kind of area such as country or city
+MusicBrainz,musicbrainz,area,comment,VARCHAR,true,false,false,Short disambiguation comment for the area
+MusicBrainz,musicbrainz,area,begin_date_year,SMALLINT,true,false,false,Year the area came into existence
+MusicBrainz,musicbrainz,area,end_date_year,SMALLINT,true,false,false,Year the area ceased to exist
+MusicBrainz,musicbrainz,artist_credit,id,INTEGER,false,true,false,Surrogate primary key identifying the artist credit
+MusicBrainz,musicbrainz,artist_credit,name,VARCHAR,false,false,false,Combined display name of all artists in the credit
+MusicBrainz,musicbrainz,artist_credit,artist_count,SMALLINT,false,false,false,Number of artists participating in the credit
+MusicBrainz,musicbrainz,artist_credit,ref_count,INTEGER,true,false,false,Count of entities that reference this artist credit
+MusicBrainz,musicbrainz,artist_credit,created,TIMESTAMP,true,false,false,Timestamp when the artist credit was created
+MusicBrainz,musicbrainz,artist_credit_name,artist_credit,INTEGER,false,false,true,Artist credit this name entry belongs to
+MusicBrainz,musicbrainz,artist_credit_name,position,SMALLINT,false,false,false,Ordering position of the artist within the credit
+MusicBrainz,musicbrainz,artist_credit_name,artist,INTEGER,false,false,true,Artist referenced by this credit name entry
+MusicBrainz,musicbrainz,artist_credit_name,name,VARCHAR,false,false,false,Credited name for the artist as shown in this credit
+MusicBrainz,musicbrainz,artist_credit_name,join_phrase,VARCHAR,true,false,false,Text joining this artist to the next one in the credit
+MusicBrainz,musicbrainz,release_group,id,INTEGER,false,true,false,Surrogate primary key identifying the release group
+MusicBrainz,musicbrainz,release_group,gid,UUID,false,false,false,Stable MusicBrainz identifier for the release group
+MusicBrainz,musicbrainz,release_group,name,VARCHAR,false,false,false,Display title of the release group
+MusicBrainz,musicbrainz,release_group,artist_credit,INTEGER,false,false,true,Artist credit attributed to the release group
+MusicBrainz,musicbrainz,release_group,type,INTEGER,true,false,false,Primary type of the release group such as album or single
+MusicBrainz,musicbrainz,release_group,comment,VARCHAR,true,false,false,Short disambiguation comment for the release group
+MusicBrainz,musicbrainz,release,id,INTEGER,false,true,false,Surrogate primary key identifying the release
+MusicBrainz,musicbrainz,release,gid,UUID,false,false,false,Stable MusicBrainz identifier for the release
+MusicBrainz,musicbrainz,release,name,VARCHAR,false,false,false,Display title of the release
+MusicBrainz,musicbrainz,release,artist_credit,INTEGER,false,false,true,Artist credit attributed to the release
+MusicBrainz,musicbrainz,release,release_group,INTEGER,false,false,true,Release group this release belongs to
+MusicBrainz,musicbrainz,release,status,INTEGER,true,false,false,Reference code for the release status such as official or promotion
+MusicBrainz,musicbrainz,release,packaging,INTEGER,true,false,false,Reference code describing the physical packaging of the release
+MusicBrainz,musicbrainz,release,language,INTEGER,true,false,false,Reference code for the language of the release
+MusicBrainz,musicbrainz,release,script,INTEGER,true,false,false,Reference code for the writing script used on the release
+MusicBrainz,musicbrainz,release,barcode,VARCHAR,true,false,false,Barcode printed on the release packaging
+MusicBrainz,musicbrainz,release,comment,VARCHAR,true,false,false,Short disambiguation comment for the release
+MusicBrainz,musicbrainz,recording,id,INTEGER,false,true,false,Surrogate primary key identifying the recording
+MusicBrainz,musicbrainz,recording,gid,UUID,false,false,false,Stable MusicBrainz identifier for the recording
+MusicBrainz,musicbrainz,recording,name,VARCHAR,false,false,false,Display title of the recording
+MusicBrainz,musicbrainz,recording,artist_credit,INTEGER,false,false,true,Artist credit attributed to the recording
+MusicBrainz,musicbrainz,recording,length,INTEGER,true,false,false,Duration of the recording in milliseconds
+MusicBrainz,musicbrainz,recording,comment,VARCHAR,true,false,false,Short disambiguation comment for the recording
+MusicBrainz,musicbrainz,recording,video,BOOLEAN,false,false,false,Flag indicating whether the recording is a video
+MusicBrainz,musicbrainz,track,id,INTEGER,false,true,false,Surrogate primary key identifying the track
+MusicBrainz,musicbrainz,track,gid,UUID,false,false,false,Stable MusicBrainz identifier for the track
+MusicBrainz,musicbrainz,track,recording,INTEGER,false,false,true,Recording that this track represents
+MusicBrainz,musicbrainz,track,medium,INTEGER,false,false,true,Medium on which this track appears
+MusicBrainz,musicbrainz,track,position,INTEGER,false,false,false,Numeric position of the track on the medium
+MusicBrainz,musicbrainz,track,number,VARCHAR,false,false,false,Printed track number which may include non numeric characters
+MusicBrainz,musicbrainz,track,name,VARCHAR,false,false,false,Display title of the track
+MusicBrainz,musicbrainz,track,artist_credit,INTEGER,false,false,true,Artist credit attributed to the track
+MusicBrainz,musicbrainz,track,length,INTEGER,true,false,false,Duration of the track in milliseconds
+MusicBrainz,musicbrainz,medium,id,INTEGER,false,true,false,Surrogate primary key identifying the medium
+MusicBrainz,musicbrainz,medium,release,INTEGER,false,false,true,Release that this medium is part of
+MusicBrainz,musicbrainz,medium,position,INTEGER,false,false,false,Ordering position of the medium within the release
+MusicBrainz,musicbrainz,medium,format,INTEGER,true,false,false,Reference code for the medium format such as CD or vinyl
+MusicBrainz,musicbrainz,medium,name,VARCHAR,true,false,false,Optional descriptive name of the medium
+MusicBrainz,musicbrainz,medium,track_count,INTEGER,false,false,false,Number of tracks present on the medium
+MusicBrainz,musicbrainz,work,id,INTEGER,false,true,false,Surrogate primary key identifying the work
+MusicBrainz,musicbrainz,work,gid,UUID,false,false,false,Stable MusicBrainz identifier for the work
+MusicBrainz,musicbrainz,work,name,VARCHAR,false,false,false,Display title of the musical work
+MusicBrainz,musicbrainz,work,type,INTEGER,true,false,false,Reference code describing the type of work such as song or symphony
+MusicBrainz,musicbrainz,work,comment,VARCHAR,true,false,false,Short disambiguation comment for the work
+MusicBrainz,musicbrainz,work,language,INTEGER,true,false,false,Reference code for the language of the work lyrics
+MusicBrainz,musicbrainz,label,id,INTEGER,false,true,false,Surrogate primary key identifying the label
+MusicBrainz,musicbrainz,label,gid,UUID,false,false,false,Stable MusicBrainz identifier for the label
+MusicBrainz,musicbrainz,label,name,VARCHAR,false,false,false,Official display name of the label
+MusicBrainz,musicbrainz,label,sort_name,VARCHAR,false,false,false,Name rewritten for alphabetical sorting of labels
+MusicBrainz,musicbrainz,label,type,INTEGER,true,false,false,Reference code describing the kind of label such as production or distributor
+MusicBrainz,musicbrainz,label,label_code,INTEGER,true,false,false,Numeric label code assigned by the industry
+MusicBrainz,musicbrainz,label,begin_date_year,SMALLINT,true,false,false,Year the label was founded
+MusicBrainz,musicbrainz,label,end_date_year,SMALLINT,true,false,false,Year the label was dissolved
+MusicBrainz,musicbrainz,label,comment,VARCHAR,true,false,false,Short disambiguation comment for the label
+MusicBrainz,musicbrainz,url,id,INTEGER,false,true,false,Surrogate primary key identifying the url row
+MusicBrainz,musicbrainz,url,gid,UUID,false,false,false,Stable MusicBrainz identifier for the url
+MusicBrainz,musicbrainz,url,url,TEXT,false,false,false,The external web address referenced by MusicBrainz
+MusicBrainz,musicbrainz,url,ref_count,INTEGER,true,false,false,Count of entities that reference this url
