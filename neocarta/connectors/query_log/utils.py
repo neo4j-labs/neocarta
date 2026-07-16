@@ -108,6 +108,9 @@ def parse_sql_query(
         case "bigquery":
             platform = "GCP"
             service = "BIGQUERY"
+        case "snowflake":
+            platform = "SNOWFLAKE"
+            service = "SNOWFLAKE"
         case _:
             raise ConfigError(f"Unsupported read argument: {read}")
 

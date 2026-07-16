@@ -74,6 +74,35 @@ ENV_VARS: dict[str, str] = {
         "(for `databricks tags`)."
     ),
     "DATABRICKS_TOKEN": "Databricks personal access token (secret; for `databricks tags`).",
+    "SNOWFLAKE_ACCOUNT": "Snowflake account identifier, e.g. xy12345.us-east-1 (for `snowflake *`).",
+    "SNOWFLAKE_USER": "Snowflake username (for `snowflake *`).",
+    "SNOWFLAKE_PASSWORD": (
+        "Snowflake password (secret). One of several auth methods — see "
+        "SNOWFLAKE_PRIVATE_KEY_PATH / SNOWFLAKE_AUTHENTICATOR (for `snowflake *`)."
+    ),
+    "SNOWFLAKE_PRIVATE_KEY_PATH": (
+        "Path to an unencrypted-or-encrypted PEM private key for key-pair auth "
+        "(recommended for MFA-enforced accounts, where password auth is blocked "
+        "for programmatic access; for `snowflake *`)."
+    ),
+    "SNOWFLAKE_PRIVATE_KEY_PASSPHRASE": (
+        "Passphrase for an encrypted SNOWFLAKE_PRIVATE_KEY_PATH (secret; optional)."
+    ),
+    "SNOWFLAKE_AUTHENTICATOR": (
+        "Snowflake authenticator, e.g. `externalbrowser`, `oauth`, or "
+        "`PROGRAMMATIC_ACCESS_TOKEN` (with SNOWFLAKE_TOKEN); for `snowflake *`."
+    ),
+    "SNOWFLAKE_TOKEN": (
+        "OAuth / programmatic-access token used with SNOWFLAKE_AUTHENTICATOR "
+        "(secret; for `snowflake *`)."
+    ),
+    "SNOWFLAKE_WAREHOUSE": "Snowflake warehouse used to run the metadata queries (for `snowflake *`).",
+    "SNOWFLAKE_ROLE": "Snowflake role to assume (optional; for `snowflake *`).",
+    "SNOWFLAKE_DATABASE": "Snowflake database to read (the graph Database node; for `snowflake *`).",
+    "SNOWFLAKE_SCHEMA": (
+        "Snowflake schema to ingest (`snowflake schema`) or filter queries by "
+        "(`snowflake logs`, optional)."
+    ),
 }
 
 
@@ -139,6 +168,27 @@ class CLISettings(BaseSettings):
     # Databricks (governance tags)
     databricks_host: str | None = Field(default=None, validation_alias="DATABRICKS_HOST")
     databricks_token: SecretStr | None = Field(default=None, validation_alias="DATABRICKS_TOKEN")
+
+    # Snowflake
+    snowflake_account: str | None = Field(default=None, validation_alias="SNOWFLAKE_ACCOUNT")
+    snowflake_user: str | None = Field(default=None, validation_alias="SNOWFLAKE_USER")
+    snowflake_password: SecretStr | None = Field(
+        default=None, validation_alias="SNOWFLAKE_PASSWORD"
+    )
+    snowflake_private_key_path: str | None = Field(
+        default=None, validation_alias="SNOWFLAKE_PRIVATE_KEY_PATH"
+    )
+    snowflake_private_key_passphrase: SecretStr | None = Field(
+        default=None, validation_alias="SNOWFLAKE_PRIVATE_KEY_PASSPHRASE"
+    )
+    snowflake_authenticator: str | None = Field(
+        default=None, validation_alias="SNOWFLAKE_AUTHENTICATOR"
+    )
+    snowflake_token: SecretStr | None = Field(default=None, validation_alias="SNOWFLAKE_TOKEN")
+    snowflake_warehouse: str | None = Field(default=None, validation_alias="SNOWFLAKE_WAREHOUSE")
+    snowflake_role: str | None = Field(default=None, validation_alias="SNOWFLAKE_ROLE")
+    snowflake_database: str | None = Field(default=None, validation_alias="SNOWFLAKE_DATABASE")
+    snowflake_schema: str | None = Field(default=None, validation_alias="SNOWFLAKE_SCHEMA")
 
 
 def load_settings() -> CLISettings:
