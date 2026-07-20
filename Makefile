@@ -83,30 +83,40 @@ refresh-mermaid-architecture-images:
 	mmdc -i assets/mermaid/architecture/bigquery-full-architecture.mmd -o assets/images/architecture/bigquery-full-architecture.png
 	mmdc -i assets/mermaid/architecture/quickstart-flow.mmd -o assets/images/architecture/quickstart-flow.png --scale 2 --backgroundColor transparent
 
+# Test selection is by pytest marker (-m). The path/--ignore args are retained as a
+# transitional collection boundary: pytest imports modules at collection time before
+# -m deselects, and each CI job installs only a subset of optional deps, so scoping
+# collection keeps a target from importing modules whose deps are absent. See S0-3.
 test-unit:
-	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent
+	uv run pytest tests/unit -m unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent
 
 test-it:
-	uv run pytest tests/integration -v --ignore=tests/integration/_mcp --ignore=tests/integration/_cli
+	uv run pytest tests/integration -m integration -v --ignore=tests/integration/_mcp --ignore=tests/integration/_cli
 
 test-mcp:
-	uv run pytest tests/integration/_mcp -v
-	uv run pytest tests/unit/_mcp -v
+	uv run pytest tests/integration/_mcp -m mcp -v
+	uv run pytest tests/unit/_mcp -m mcp -v
 
 test-cli:
-	uv run pytest tests/unit/_cli -v
+	uv run pytest tests/unit/_cli -m cli -v
 
 test-agent:
-	uv run pytest tests/unit/agent -v
+	uv run pytest tests/unit/agent -m agent -v
 
 test-smoke:
-	uv run pytest tests/smoke -v
+	uv run pytest tests/smoke -m smoke -v
 
 test-all:
 	uv run pytest tests/ -v
 
 test-cov:
-	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent --cov=neocarta --cov-report=term-missing --cov-report=xml --cov-report=html
+	uv run pytest tests/unit -m unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent --cov=neocarta --cov-report=term-missing --cov-report=xml --cov-report=html
+
+# Prove the marker-based selection is identical to the legacy path-based selection
+# for every test-* target, and that the markers partition the suite (exactly one per
+# test). Needs a full env (uv sync --all-groups + all extras) so every module imports.
+check-markers:
+	uv run python scripts/check_marker_parity.py
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
