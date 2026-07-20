@@ -80,18 +80,22 @@ TARGETS: dict[str, dict[str, list[str]]] = {
 }
 
 
-def collect(args: list[str]) -> set[str]:
-    """Return the set of test node ids pytest collects for ``args``.
+def collect_with_status(args: list[str]) -> tuple[set[str], int]:
+    """Collect test node ids for ``args`` and report pytest's exit status.
 
     Args:
         args: Extra arguments appended to ``pytest --collect-only -q`` (paths,
             ``-m`` expressions, ``--ignore`` flags).
 
     Returns:
-        The collected node ids (lines containing ``::``).
+        A ``(node_ids, returncode)`` pair. ``returncode`` 0 (tests collected) or 5
+        (none collected) means a *healthy* collection; any other value (e.g. 2) means
+        an import/collection error left the reported ``node_ids`` incomplete — callers
+        that count tests must treat the count as unreliable in that case (used by the
+        S0-4 regression gate to tell a genuine test deletion apart from a broken import).
 
     Raises:
-        SystemExit: If pytest reports a collection error.
+        SystemExit: If pytest reports a collection error *and* collected nothing.
     """
     # Trusted call: the argv is this repo's own interpreter plus the hardcoded target
     # definitions above — no external/untrusted input reaches the command.
@@ -105,7 +109,25 @@ def collect(args: list[str]) -> set[str]:
     node_ids = {line for line in proc.stdout.splitlines() if "::" in line}
     if proc.returncode not in (0, 5) and not node_ids:  # 5 == no tests collected
         sys.exit(f"pytest collection failed for {args}:\n{proc.stdout}\n{proc.stderr}")
-    return node_ids
+    return node_ids, proc.returncode
+
+
+def collect(args: list[str]) -> set[str]:
+    """Return the set of test node ids pytest collects for ``args``.
+
+    A thin wrapper over :func:`collect_with_status` for callers that only need the set.
+
+    Args:
+        args: Extra arguments appended to ``pytest --collect-only -q`` (paths,
+            ``-m`` expressions, ``--ignore`` flags).
+
+    Returns:
+        The collected node ids (lines containing ``::``).
+
+    Raises:
+        SystemExit: If pytest reports a collection error.
+    """
+    return collect_with_status(args)[0]
 
 
 def check_target_parity() -> bool:
