@@ -78,7 +78,7 @@ jobs:
         run: make test-smoke
 
   coverage:
-    name: Coverage report (Python 3.12)
+    name: Coverage + test-count regression gate (Python 3.12)
     runs-on: ubuntu-latest
 
     steps:
@@ -95,11 +95,13 @@ jobs:
         with:
           enable-cache: true
 
-      # Mirror the `test` job's install so connector modules import during measurement.
+      # Full install: this is the env the #288 coverage floors were measured under
+      # (coverage-baseline.md -> Reproduce), so the gate compares apples-to-apples, and
+      # it makes the whole tests/ tree importable for the full-suite collection count.
       - name: Install dependencies
-        run: uv sync --dev --extra cli --extra databricks --extra snowflake
+        run: uv sync --all-groups --all-extras
 
-      - name: "Run coverage (report only; failing gate lands in #290)"
+      - name: Measure coverage (make test-cov -> coverage.xml + .coverage)
         run: make test-cov
 
       - name: Upload coverage report
@@ -110,3 +112,8 @@ jobs:
             coverage.xml
             htmlcov/
           if-no-files-found: error
+
+      # The gate: fail if total/per-package coverage drops below the #288 floors or the
+      # full tests/ collected count shrinks. Names the offending metric. (S0-4 / #290)
+      - name: Enforce coverage + test-count regression gate (#290)
+        run: make check-regression

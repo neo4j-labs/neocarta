@@ -118,6 +118,14 @@ test-cov:
 check-markers:
 	uv run python scripts/check_marker_parity.py
 
+# Enforce the GUIDE §4 "no coverage / test-count regression" invariant against the
+# committed #288 baseline (docs/testing/coverage-baseline.toml): fails if total or
+# per-package coverage drops below its floor, or the full tests/ collected count shrinks.
+# Run after `make test-cov` (needs .coverage) in a full env (uv sync --all-groups
+# --all-extras) so every module imports during collection. See S0-4 / #290.
+check-regression:
+	uv run python scripts/check_regression_gate.py
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
