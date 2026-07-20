@@ -105,6 +105,9 @@ test-smoke:
 test-all:
 	uv run pytest tests/ -v
 
+test-cov:
+	uv run pytest tests/unit -v --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent --cov=neocarta --cov-report=term-missing --cov-report=xml --cov-report=html
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true

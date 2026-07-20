@@ -84,6 +84,8 @@ neocarta-mcp = "neocarta._mcp.server:run"
 dev = [
     "ipykernel>=7.1.0",
     "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+    "coverage[toml]>=7.15.2",
     "testcontainers[neo4j,postgres]>=4.14.2",
     "ruff>=0.15.10",
 ]
@@ -117,6 +119,29 @@ include = ["neocarta/**", "pyproject.toml", "README.md", "LICENSE"]
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["neocarta"]
+omit = [
+    # source = neocarta already scopes measurement to the package; these keep the
+    # intent explicit and survive any future change to `source`.
+    "tests/*",
+    "examples/*",
+    "agent/*",
+    "datasets/*",
+    "eval/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+precision = 2
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "if __name__ == .__main__.:",
+]
 
 [tool.ruff]
 line-length = 100
