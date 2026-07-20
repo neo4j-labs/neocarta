@@ -16,6 +16,8 @@
 
 ### Changed
 
+- Test selection is now driven by pytest **markers** (`unit` / `integration` / `mcp` / `cli` / `smoke` / `agent`) rather than directory paths: markers are registered in `pyproject.toml` with `--strict-markers`, auto-applied by suite location via a `pytest_collection_modifyitems` hook in `tests/conftest.py`, and every `make test-*` target now selects with `-m <marker>` (the path/`--ignore` args are retained as a transitional collection boundary because pytest imports modules before `-m` deselects and each CI job installs only a subset of optional deps). This keeps `make test-*` selection intact when the later refactor tickets move test files. A `make check-markers` target (`scripts/check_marker_parity.py`) proves the marker-selected set is identical to the legacy path-selected set for every target and that the markers partition the suite (exactly one per test). No test added, deleted, or altered — pure test-infra change, no behavior change. (#289)
+- The BigQuery schema connector now routes through the shared metadata-normalizer pipeline (`Retriever → MetadataNormalizer → NormalizedGraphTransformer`) instead of a bespoke transformer; the emitted graph is unchanged. Removed `BigQuerySchemaTransformer`. (#271)
 - `is_primary_key` / `is_foreign_key` on `Column` class are now optional fields for connectors that don't provide these fields, such as the Unity Catalog connector.
 
 ### Added
