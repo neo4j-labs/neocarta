@@ -9,7 +9,6 @@ This module also auto-applies the suite-group marker to every collected test (se
 by marker rather than by directory path (S0-3 / GUIDE D4).
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -35,22 +34,6 @@ _SCHEMA = "test_dataset"
 # to the old path-selected set.
 _SUBDIR_MARKERS = (("_mcp", "mcp"), ("_cli", "cli"), ("agent", "agent"))
 _ROOT_MARKERS = {"smoke": "smoke", "integration": "integration", "unit": "unit"}
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register ``--update-goldens`` for the characterization harness (S0-SPIKE-1)."""
-    parser.addoption(
-        "--update-goldens",
-        action="store_true",
-        default=False,
-        help="Regenerate characterization golden files instead of comparing against them.",
-    )
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    """Map ``--update-goldens`` onto the ``UPDATE_GOLDENS`` env flag the harness reads."""
-    if config.getoption("--update-goldens"):
-        os.environ["UPDATE_GOLDENS"] = "1"
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
