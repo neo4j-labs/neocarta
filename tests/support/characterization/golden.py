@@ -5,9 +5,8 @@ Goldens are plain JSON committed next to the test that owns them: canonical form
 so a diff is human-reviewable and stable across the CI Python-version matrix. There is
 no snapshot-library dependency — stdlib ``json`` + ``difflib`` only.
 
-Regeneration is opt-in and explicit: set ``UPDATE_GOLDENS=1`` (or pass
-``--update-goldens`` — ``tests/conftest.py`` maps the flag onto the env var). The
-harness never writes a golden on comparison failure.
+Regeneration is opt-in and explicit: set ``UPDATE_GOLDENS=1``. The harness never
+writes a golden on comparison failure.
 """
 
 from __future__ import annotations

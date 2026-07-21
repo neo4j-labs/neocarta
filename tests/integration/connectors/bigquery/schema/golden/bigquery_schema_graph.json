@@ -5,6 +5,20 @@
         "Column"
       ],
       "properties": {
+        "description": "Customer ID reference",
+        "id": "test_project_id.test_dataset.orders.customer_id",
+        "is_foreign_key": true,
+        "is_primary_key": false,
+        "name": "customer_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
         "description": "Customer ID",
         "id": "test_project_id.test_dataset.customers.customer_id",
         "is_foreign_key": false,
@@ -26,20 +40,6 @@
         "name": "customer_name",
         "nullable": true,
         "type": "STRING"
-      }
-    },
-    {
-      "labels": [
-        "Column"
-      ],
-      "properties": {
-        "description": "Customer ID reference",
-        "id": "test_project_id.test_dataset.orders.customer_id",
-        "is_foreign_key": true,
-        "is_primary_key": false,
-        "name": "customer_id",
-        "nullable": false,
-        "type": "INT64"
       }
     },
     {
@@ -118,30 +118,6 @@
   ],
   "relationships": [
     {
-      "dst": "test_project_id.test_dataset.customers.customer_id",
-      "properties": {},
-      "src": "test_project_id.test_dataset.customers",
-      "type": "HAS_COLUMN"
-    },
-    {
-      "dst": "test_project_id.test_dataset.customers.customer_name",
-      "properties": {},
-      "src": "test_project_id.test_dataset.customers",
-      "type": "HAS_COLUMN"
-    },
-    {
-      "dst": "test_project_id.test_dataset.orders.customer_id",
-      "properties": {},
-      "src": "test_project_id.test_dataset.orders",
-      "type": "HAS_COLUMN"
-    },
-    {
-      "dst": "test_project_id.test_dataset.orders.order_id",
-      "properties": {},
-      "src": "test_project_id.test_dataset.orders",
-      "type": "HAS_COLUMN"
-    },
-    {
       "dst": "test_project_id.test_dataset",
       "properties": {},
       "src": "test_project_id",
@@ -154,10 +130,16 @@
       "type": "HAS_TABLE"
     },
     {
-      "dst": "test_project_id.test_dataset.orders",
+      "dst": "test_project_id.test_dataset.customers.customer_id",
       "properties": {},
-      "src": "test_project_id.test_dataset",
-      "type": "HAS_TABLE"
+      "src": "test_project_id.test_dataset.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders.customer_id",
+      "type": "REFERENCES"
     },
     {
       "dst": "test_project_id.test_dataset.customers.customer_id.c4ca4238a0b923820dcc509a6f75849b",
@@ -172,10 +154,28 @@
       "type": "HAS_VALUE"
     },
     {
-      "dst": "test_project_id.test_dataset.customers.customer_id",
+      "dst": "test_project_id.test_dataset.customers.customer_name",
       "properties": {},
-      "src": "test_project_id.test_dataset.orders.customer_id",
-      "type": "REFERENCES"
+      "src": "test_project_id.test_dataset.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders",
+      "properties": {},
+      "src": "test_project_id.test_dataset",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders.customer_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders.order_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders",
+      "type": "HAS_COLUMN"
     }
   ]
 }
