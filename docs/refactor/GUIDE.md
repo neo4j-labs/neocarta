@@ -166,6 +166,35 @@ administration tickets cite by code:
 - **D-S9-8** — config precedence gains a **manifest layer** (flag > env > manifest > default); parity preserved when the manifest is absent. (S9.3)
 - **D-S9-9** — as of **1.2.0**, adherence to the §10 external standards is **mandatory** for application-admin code (REVIEW.md-enforced). (S9.12)
 
+**Section deltas (RP-D — S10–S12, + S7/S8 backports).** Settled decisions the authN/permissions, deployment, and docs/closeout tickets cite by code:
+
+- **D-S7-7** — the API/UI are **built in S7** (local-only / default-deny / unbound; loud startup banner + CI tripwire on the open-bind dev flag); only network **exposure + authN/authZ** defer to S10 (amends D-S7-3). (S7.9/7.10, S10.6)
+- **D-S7-8** — the **UI = Neo4j Needle**: a React SPA on **`@neo4j-ndl/react` + `@neo4j-ndl/base` + NVL**; **human-only** consumers; plug-and-play with Neo4j products (see §10). (S7.10)
+- **D-S7-9** — the **API = REST/OpenAPI** generated over the op-specs (matches Neo4j Aura's *platform* API); **GraphQL (`@neo4j/graphql`)** is reserved for a graph-*as-data* surface only; serves humans + apps, **agents via CLI/MCP only** (see §10). (S7.9)
+- **D-S8-6** — the extension SPI/capability metadata gains a **runtime/system-requirements facet** (Python + system/build deps + provisioning); the S11 build **composes only enabled extensions' requirements** (backport, extends S8.2 — enables D-S11-5 + the D17 spin-out). (S8.2, S11.3)
+- **D-S10-1** — HTTP/Streamable-HTTP MCP = **OAuth 2.1 Resource Server** per the MCP spec (401→metadata→PKCE; audience-bound token validation); **stdio MCP stays local/unauthenticated** (see §10). (S10.2)
+- **D-S10-2** — authN via **Authlib** (OIDC / OAuth 2.1 RS token validation, JWKS from the IdP; Entra/Okta); neocarta does **not** build authentication. (S10.2)
+- **D-S10-3** — the S9.2.4 AuthZEN gate hook **generalizes to the consumption executor**, so **one PEP** gates every op-spec (consumption + admin) at the executor boundary. (S10.3)
+- **D-S10-4** — AuthZEN PEP → **pluggable PDP**; **OpenFGA** is the AuthZEN-native reference default (OPA needs a translation shim); the permission/role model lives **in the PDP**, not neocarta (extends D-S9-4, see §10). (S10.3/10.5)
+- **D-S10-5** — **SCIM provisioning** via `scim2-server` / `scim2-models` (the Pydantic-based `python-scim` toolkit) for Entra/Okta user/group lifecycle (see §10). (S10.4)
+- **D-S10-6** — **SAML deferred to fast-follow**: v1 = OIDC + SCIM; **SAML** (`python3-saml`) is a documented extension point, not v1-blocking. (S10.7)
+- **D-S10-7** — removing the S7 default-deny/local gate (mandatory caller auth on the network surfaces) is **the 2.0.0 break**; local stdio-MCP + CLI are unaffected. (S10.6)
+- **D-S11-1** — **two OCI images**: a lean **consumption service** + a **composable ingest** image (multi-stage · distroless · uv · non-root). (S11.2/11.3)
+- **D-S11-2** — **ingest = batch/Job, consumption = long-running Deployment.** (S11.2/3/4)
+- **D-S11-3** — ship **OCI images + reference manifests** (docker-compose + Helm/K8s); **K8s is NOT mandated** ("overkill unless multi-team/customer"). (S11.4)
+- **D-S11-4** — consumption transport = **Streamable HTTP + REST behind TLS** (SSE deprecated); in-memory sessions → sticky/shared for horizontal scale. (S11.2)
+- **D-S11-5** — connector system deps are **extension-scoped** → composable ingest (JDBC's JVM/JAR present only when the connector is enabled); depends on **D-S8-6**. (S11.3)
+- **D-S11-6** — container config = **12-factor env + secret-provider** (S9.3.3); **no secrets in images.** (S11.5)
+- **D-S11-7** — the **Neo4j version/edition matrix is deferred to implementation** (runtime `>=6.1.0` vs test-container `5.26.23` skew logged for the executor). (S11.7)
+- **D-S11-8** — *discrepancy:* Makefile `install-*` `--group` refs (`metadata-graph`/`mcp-server`) don't match `pyproject.toml` extras/groups; fixed during S11. (S11)
+- **D-S12-1** — the bundled Text2SQL agent is **clean-removed in 2.0.0** with a loud CHANGELOG `### Removed` — **no `DeprecationWarning` shim, no backport** (unpackaged demo code, not packaged public API); D2's MCP-consumability preserved as docs (realizes D2). (S12.1)
+- **D-S12-2** — docs **adopt Diátaxis IA** in-repo (tutorials/how-to/reference/explanation; delegate wholesale, no docs-site tooling); the explanation quadrant = net-new committed docs (see §11). (S12.2)
+- **D-S12-3** — the **migration guide is net-new**, integrating the convergent **Django backwards-incompatible + SQLAlchemy before/after** template (no single spec); covers path moves, connector-authoring, agent removal, auth, container deploy (see §11). (S12.3)
+- **D-S12-4** — **CHANGELOG 2.0.0** via **Keep a Changelog + SemVer 2.0.0** (`### Removed`/`### Changed` under `[2.0.0]`; links out to the migration guide) (see §11). (S12.5)
+- **D-S12-5** — **examples updated + first smoke coverage**: 3 relocate / 11 API-shape / 3 rewrite; the `tests/smoke/test_imports.py` moving-path imports fixed in lockstep. (S12.4)
+- **D-S12-6** — **env-var single source of truth**: reconcile `environment-variables.md` ↔ `_cli/config.py` ↔ `.env.example`; add missing Snowflake/JDBC/UC/OSI/QueryLog families; drop unbacked Databricks-schema vars. (S12.6)
+- **D-S12-7** — **PEP-702 deprecation policy adopted go-forward**: `DeprecationWarning` + `@deprecated` (via `typing_extensions`), Django deprecate-in-minor/remove-in-major window; the standing convention for *future* public-API removals — **not** applied retroactively to the unpackaged demo agent (see §11). (S12.7)
+
 ## 8. Working agreement
 
 - **Environment:** this project uses **`uv`**. Always run code via `uv run`. Install dev deps with
@@ -198,16 +227,36 @@ Each refactor ticket carries these sections — use them as intended:
 
 ## 10. External standards (application administration)
 
-> **Scope:** these bind the **application-administration** seams introduced in the **S9 (Administration,
-> 1.2.0)** and **S10 (AuthN & Permissions, 2.0.0)** bands — *not* the 1.0.0 ingest work above. Application
-> administration (identity, authorization, secrets, observability) is a solved, standardized problem:
-> neocarta **integrates and delegates to these standards rather than inventing its own**. When an S9/S10
+> **Scope:** these bind the **S7 interface standards (1.1.0 band)** and the **application-administration**
+> seams introduced in the **S9 (Administration, 1.2.0)** and **S10 (AuthN & Permissions, 2.0.0)** bands —
+> *not* the 1.0.0 ingest work above. The interface surface (UI, API, MCP transport) and application
+> administration (identity, authorization, secrets, observability) are solved, standardized problems:
+> neocarta **integrates and delegates to these standards rather than inventing its own**. When an S7/S9/S10
 > ticket says *"per GUIDE §10"*, bind to the named standard here; do not hand-roll an equivalent.
+
+**User interface (S7)**
+- **Neo4j Needle** — the Neo4j design system: **`@neo4j-ndl/react`** + **`@neo4j-ndl/base`** + **NVL** (Neo4j
+  Visualization Library); **human-only** consumers; plug-and-play with Neo4j products.
+  <https://www.neo4j.design/> (component reference at needle.neo4j.design).
+- *Rule:* the UI adheres to **Needle**; do **not** hand-roll a design system.
+
+**API surface (S7)**
+- **REST + OpenAPI** — generated over the op-spec corpus (matches the **Neo4j Aura platform API**
+  conventions); the surface is **method/control-shaped**. OpenAPI: <https://www.openapis.org/>.
+- **GraphQL via `@neo4j/graphql`** — the Neo4j convention for exposing the **graph *as data***; use it **only**
+  if a graph-data-serving surface later arises, **not** for the control API. <https://neo4j.com/docs/graphql/>.
+- *Rule:* the API serves **humans + other applications**; **agents consume exclusively via CLI/MCP**.
+
+**MCP transport authentication (S7 / S10)**
+- **OAuth 2.1 Resource Server** — HTTP / Streamable-HTTP MCP validates IdP-issued tokens per the MCP spec
+  (401 → protected-resource-metadata → PKCE; audience-bound token validation), implemented with **Authlib**;
+  **stdio MCP stays local / unauthenticated**. <https://modelcontextprotocol.io/>
 
 **Identity / authentication (federation with enterprise IdPs — Microsoft Entra, Okta, …)**
 - **OpenID Connect (OIDC) / OAuth 2.x** — modern app + API authentication. <https://openid.net/connect/>
 - **SAML 2.0** (OASIS) — enterprise web SSO. <https://docs.oasis-open.org/security/saml/v2.0/>
-- **SCIM 2.0** (RFC 7643/7644) — user & group provisioning lifecycle (joiner/mover/leaver).
+- **SCIM 2.0** (RFC 7643/7644) — user & group provisioning lifecycle (joiner/mover/leaver). Implement with
+  **`scim2-server` / `scim2-models`** (Pydantic-based, the `python-scim` project).
   <https://datatracker.ietf.org/doc/html/rfc7644>
 - *Rule:* integrate a proven library (e.g. Authlib for OIDC/OAuth, python3-saml for SAML); assign access by
   **groups / app-roles**, never per-user. neocarta does **not** implement authentication.
@@ -223,7 +272,8 @@ Each refactor ticket carries these sections — use them as intended:
   **PDP** — it does **not** build a policy engine or own a permission model.
 - **Policy engines** (the pluggable PDP): OPA/Rego <https://www.openpolicyagent.org/> · AWS Cedar
   <https://www.cedarpolicy.com/> · OpenFGA (Zanzibar) <https://openfga.dev/> ·
-  engine comparison <https://www.osohq.com/learn/opa-vs-cedar-vs-zanzibar>.
+  engine comparison <https://www.osohq.com/learn/opa-vs-cedar-vs-zanzibar>. **OpenFGA is the AuthZEN-native
+  reference PDP** (OPA needs a translation shim).
 
 **Secrets**
 - **12-Factor config** — secrets from the environment (the floor; neocarta's default). <https://12factor.net/config>
@@ -243,3 +293,25 @@ Each refactor ticket carries these sections — use them as intended:
 - **OpenGitOps** (CNCF) — declarative · versioned+immutable · pulled · **continuously reconciled**
   (desired-vs-actual). neocarta's config-as-code manifest is *desired state*; admin apply is *reconciliation*.
   <https://opengitops.dev/>
+
+## 11. External standards (documentation, migration & deprecation)
+
+> **Scope:** these bind the **S12 (cross-cutting, 2.0.0)** documentation, migration-guide, and
+> agent-removal / deprecation work. As in §10, neocarta **integrates or delegates to these standards rather
+> than inventing its own**. When an S12 ticket says *"per GUIDE §11"*, bind to the named standard here; each
+> bullet carries an **integrate/delegate verdict**.
+
+- **Diátaxis** — documentation information architecture (tutorials / how-to / reference / explanation).
+  <https://diataxis.fr/> — *delegate wholesale* (Django is the Python exemplar).
+- **Keep a Changelog** <https://keepachangelog.com/> + **SemVer 2.0.0** <https://semver.org/> —
+  `Deprecated`→minor, `Removed`→major; the changelog links out to the migration guide. *delegate.*
+- **Migration-guide template** — no single spec; integrate the convergent shape from **Django
+  "backwards-incompatible changes"**, **SQLAlchemy before/after**
+  (<https://docs.sqlalchemy.org/en/20/changelog/migration_20.html>), and the **Pydantic v1→v2** migration +
+  codemod pattern (<https://docs.pydantic.dev/latest/migration/>). *integrate; build content.*
+- **Python deprecation policy** — `DeprecationWarning` + **PEP 702 `@deprecated`** (via `typing_extensions`)
+  <https://peps.python.org/pep-0702/>; **Django**'s deprecate-in-minor / remove-in-major window
+  <https://docs.djangoproject.com/en/dev/internals/deprecation/>. *delegate; the go-forward convention for
+  future public-API removals (not applied retroactively to the unpackaged demo agent).*
+- **Standard-Readme** <https://github.com/RichardLitt/standard-readme> — *integrate loosely* (root-README
+  section skeleton only).
