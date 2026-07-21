@@ -1,0 +1,181 @@
+{
+  "nodes": [
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Customer ID reference",
+        "id": "test_project_id.test_dataset.orders.customer_id",
+        "is_foreign_key": true,
+        "is_primary_key": false,
+        "name": "customer_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Customer ID",
+        "id": "test_project_id.test_dataset.customers.customer_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "customer_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Customer name",
+        "id": "test_project_id.test_dataset.customers.customer_name",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "customer_name",
+        "nullable": true,
+        "type": "STRING"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Order ID",
+        "id": "test_project_id.test_dataset.orders.order_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "order_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Database"
+      ],
+      "properties": {
+        "id": "test_project_id",
+        "name": "test-project-id",
+        "platform": "GCP",
+        "service": "BIGQUERY"
+      }
+    },
+    {
+      "labels": [
+        "Schema"
+      ],
+      "properties": {
+        "description": "Test dataset description",
+        "id": "test_project_id.test_dataset",
+        "name": "test_dataset"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Customer table",
+        "id": "test_project_id.test_dataset.customers",
+        "name": "customers"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Order table",
+        "id": "test_project_id.test_dataset.orders",
+        "name": "orders"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "test_project_id.test_dataset.customers.customer_id.c4ca4238a0b923820dcc509a6f75849b",
+        "value": "1"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "test_project_id.test_dataset.customers.customer_id.c81e728d9d4c2f636f067f89cc14862c",
+        "value": "2"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "dst": "test_project_id.test_dataset",
+      "properties": {},
+      "src": "test_project_id",
+      "type": "HAS_SCHEMA"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers",
+      "properties": {},
+      "src": "test_project_id.test_dataset",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders.customer_id",
+      "type": "REFERENCES"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_id.c4ca4238a0b923820dcc509a6f75849b",
+      "properties": {},
+      "src": "test_project_id.test_dataset.customers.customer_id",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_id.c81e728d9d4c2f636f067f89cc14862c",
+      "properties": {},
+      "src": "test_project_id.test_dataset.customers.customer_id",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "test_project_id.test_dataset.customers.customer_name",
+      "properties": {},
+      "src": "test_project_id.test_dataset.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders",
+      "properties": {},
+      "src": "test_project_id.test_dataset",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders.customer_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "test_project_id.test_dataset.orders.order_id",
+      "properties": {},
+      "src": "test_project_id.test_dataset.orders",
+      "type": "HAS_COLUMN"
+    }
+  ]
+}
