@@ -29,11 +29,11 @@ report_format = "coverage.xml (Cobertura)"
 
 [test_count]
 # GUIDE §4 also forbids dropping tests. Authoritative `pytest --collect-only -q` counts.
-# Ratcheted up in S0.6 (#291) by the characterization-harness tests (+8 gated unit,
-# +4 integration); only `all` is enforced by the gate — the others are reference.
-gated_unit = 917    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1161     # full tests/unit (includes _mcp/_cli/agent)
-all = 1262          # tests/ (unit + integration + smoke)
+# Ratcheted up in S0.6 (#291) by the characterization-harness tests (+4 gated unit,
+# +2 integration); only `all` is enforced by the gate — the others are reference.
+gated_unit = 913    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1157     # full tests/unit (includes _mcp/_cli/agent)
+all = 1256          # tests/ (unit + integration + smoke)
 
 [total]
 line_measured = 67.35
