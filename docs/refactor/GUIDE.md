@@ -72,6 +72,10 @@ extensions/
   enrichments/            # enrichment extension point (S5)
 ```
 
+**Parent package** (ratified in `S0-5`, #286): the target tree hangs off the existing `neocarta/`
+package — the `etl/` and `extensions/` paths below are `neocarta/etl/…` and `neocarta/extensions/…`.
+**Status:** the empty packages are scaffolded; **no code has moved yet** (additive dual-path, §2).
+
 **Current → target mapping** (ratified in `S0-5`; nothing moves until its ticket, then additively):
 
 | Today | Target |
