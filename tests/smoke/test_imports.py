@@ -167,3 +167,26 @@ def test_osi_data_model_imports():
             UsedInJoin,
         ]
     )
+
+
+def test_etl_scaffold_imports():
+    # Empty 1.0.0 target packages scaffolded in S0-5 (#286); no code moved yet (see GUIDE §5).
+    import neocarta.etl
+    import neocarta.etl.enrichment
+    import neocarta.etl.metadata_normalizer
+    import neocarta.etl.metadata_normalizer.normalized_schema
+    import neocarta.etl.models
+    import neocarta.etl.ontology
+    import neocarta.etl.pipeline
+    import neocarta.etl.transform
+
+    assert neocarta.etl.pipeline
+
+
+def test_extensions_scaffold_imports():
+    # Empty 1.0.0 target packages scaffolded in S0-5 (#286); no code moved yet (see GUIDE §5).
+    import neocarta.extensions
+    import neocarta.extensions.connectors
+    import neocarta.extensions.enrichments
+
+    assert neocarta.extensions.connectors
