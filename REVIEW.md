@@ -28,6 +28,10 @@ Style, naming, and refactor suggestions are Nit (🟡) at most.
 
 ## Always check
 
+- Behavior-changing code ships tests **in the same PR**: refactors captured in
+  the S0 golden-master harness (parity proven before any legacy removal);
+  net-new code covered by new tests without lowering the coverage floor. Flag a
+  behavior change with no corresponding test add/update.
 - New/changed connectors conform to `SourceConnectorProtocol` /
   `FormatConnectorProtocol` in `neocarta/connectors/_base.py` (extract →
   transform → load → ingest, `run`/`close`, context-manager, `_extracted` /
