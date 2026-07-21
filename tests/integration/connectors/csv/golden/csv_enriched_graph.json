@@ -1,0 +1,1096 @@
+{
+  "nodes": [
+    {
+      "labels": [
+        "BusinessTerm"
+      ],
+      "properties": {
+        "description": "Average cost to acquire a new customer",
+        "id": "ecommerce_glossary.customer_metrics.customer_acquisition_cost",
+        "name": "Customer Acquisition Cost"
+      }
+    },
+    {
+      "labels": [
+        "BusinessTerm"
+      ],
+      "properties": {
+        "description": "Predicted total revenue from a customer over their lifetime",
+        "id": "ecommerce_glossary.customer_metrics.customer_lifetime_value",
+        "name": "Customer Lifetime Value"
+      }
+    },
+    {
+      "labels": [
+        "BusinessTerm"
+      ],
+      "properties": {
+        "description": "Percentage of inventory sold within a specific time period",
+        "id": "ecommerce_glossary.product_metrics.sell_through_rate",
+        "name": "Sell-Through Rate"
+      }
+    },
+    {
+      "labels": [
+        "BusinessTerm"
+      ],
+      "properties": {
+        "description": "Average dollar amount spent per order",
+        "id": "ecommerce_glossary.revenue_metrics.average_order_value",
+        "name": "Average Order Value"
+      }
+    },
+    {
+      "labels": [
+        "BusinessTerm"
+      ],
+      "properties": {
+        "description": "Total sales value of merchandise sold through the platform",
+        "id": "ecommerce_glossary.revenue_metrics.gross_merchandise_value",
+        "name": "Gross Merchandise Value"
+      }
+    },
+    {
+      "labels": [
+        "Category"
+      ],
+      "properties": {
+        "description": "Customer behavior and engagement metrics",
+        "id": "ecommerce_glossary.customer_metrics",
+        "name": "Customer Metrics"
+      }
+    },
+    {
+      "labels": [
+        "Category"
+      ],
+      "properties": {
+        "description": "Product performance and inventory metrics",
+        "id": "ecommerce_glossary.product_metrics",
+        "name": "Product Metrics"
+      }
+    },
+    {
+      "labels": [
+        "Category"
+      ],
+      "properties": {
+        "description": "Key revenue and financial metrics",
+        "id": "ecommerce_glossary.revenue_metrics",
+        "name": "Revenue Metrics"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Timestamp when the customer record was created",
+        "embedding": [
+          0.51723,
+          -0.54474,
+          0.13599,
+          -0.54146,
+          0.03649,
+          0.41447,
+          -0.82054,
+          0.54545
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.customers.created_at",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "created_at",
+        "nullable": true,
+        "type": "TIMESTAMP"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Unique identifier for the customer",
+        "embedding": [
+          0.08628,
+          0.66224,
+          -0.60042,
+          -0.96858,
+          0.42586,
+          0.56066,
+          -0.13976,
+          -0.32115
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "customer_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Full name of the customer",
+        "embedding": [
+          0.99131,
+          0.35088,
+          0.06185,
+          0.73167,
+          -0.52242,
+          -0.46238,
+          0.05206,
+          -0.56166
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.customers.customer_name",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "customer_name",
+        "nullable": true,
+        "type": "STRING"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Customer's email address",
+        "embedding": [
+          0.76146,
+          0.29287,
+          0.23774,
+          0.13692,
+          0.60576,
+          0.33222,
+          0.4508,
+          0.89964
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.customers.email",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "email",
+        "nullable": true,
+        "type": "STRING"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Foreign key reference to orders table",
+        "embedding": [
+          -0.87537,
+          -0.72524,
+          0.17951,
+          -0.2384,
+          -0.50121,
+          -0.89175,
+          -0.53891,
+          -0.77977
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items.order_id",
+        "is_foreign_key": true,
+        "is_primary_key": false,
+        "name": "order_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Unique identifier for the order line item",
+        "embedding": [
+          0.92712,
+          0.78958,
+          0.3706,
+          -0.5641,
+          0.86505,
+          0.00185,
+          0.67518,
+          0.92154
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items.order_item_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "order_item_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Price per unit at time of order in USD",
+        "embedding": [
+          0.9262,
+          0.30478,
+          -0.218,
+          -0.69987,
+          0.01597,
+          0.63598,
+          -0.71695,
+          0.26461
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items.price",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "price",
+        "nullable": true,
+        "type": "NUMERIC"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Foreign key reference to products table",
+        "embedding": [
+          -0.5644,
+          -0.46279,
+          0.67767,
+          0.89419,
+          0.74357,
+          -0.29003,
+          0.37969,
+          -0.63796
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items.product_id",
+        "is_foreign_key": true,
+        "is_primary_key": false,
+        "name": "product_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Quantity of the product ordered",
+        "embedding": [
+          -0.38202,
+          -0.65827,
+          0.08459,
+          -0.02298,
+          0.6902,
+          0.89803,
+          -0.82858,
+          0.35728
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items.quantity",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "quantity",
+        "nullable": true,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Foreign key reference to customers table",
+        "embedding": [
+          -0.33657,
+          0.74961,
+          -0.24096,
+          -0.37117,
+          -0.2366,
+          0.3465,
+          0.52622,
+          0.69928
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.orders.customer_id",
+        "is_foreign_key": true,
+        "is_primary_key": false,
+        "name": "customer_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Timestamp when the order was placed",
+        "embedding": [
+          0.68825,
+          -0.46764,
+          -0.22099,
+          -0.62839,
+          -0.17943,
+          -0.75355,
+          -0.20566,
+          0.92079
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.orders.order_date",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "order_date",
+        "nullable": true,
+        "type": "TIMESTAMP"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Unique identifier for the order",
+        "embedding": [
+          -0.05847,
+          -0.59836,
+          -0.5622,
+          0.1638,
+          -0.77061,
+          -0.04959,
+          -0.59588,
+          -0.2105
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.orders.order_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "order_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Total order amount in USD",
+        "embedding": [
+          0.45025,
+          0.51261,
+          0.18436,
+          -0.06624,
+          -0.45884,
+          -0.68015,
+          0.95929,
+          -0.24017
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "total_amount",
+        "nullable": true,
+        "type": "NUMERIC"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Product category (e.g., Electronics, Clothing)",
+        "embedding": [
+          0.75846,
+          -0.27481,
+          -0.54888,
+          0.34814,
+          0.15551,
+          -0.59441,
+          0.4774,
+          -0.59718
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.products.category",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "category",
+        "nullable": true,
+        "type": "STRING"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Product price in USD",
+        "embedding": [
+          -0.89846,
+          -0.38863,
+          -0.78536,
+          -0.42465,
+          -0.67135,
+          0.08014,
+          0.78064,
+          0.6036
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.products.price",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "price",
+        "nullable": true,
+        "type": "NUMERIC"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Unique identifier for the product",
+        "embedding": [
+          0.48972,
+          0.64375,
+          -0.2663,
+          0.47627,
+          0.40236,
+          0.81149,
+          0.43563,
+          0.14441
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.products.product_id",
+        "is_foreign_key": false,
+        "is_primary_key": true,
+        "name": "product_id",
+        "nullable": false,
+        "type": "INT64"
+      }
+    },
+    {
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "description": "Name of the product",
+        "embedding": [
+          0.77515,
+          -0.58327,
+          0.67074,
+          0.31051,
+          0.64712,
+          -0.68398,
+          0.08224,
+          0.1265
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.products.product_name",
+        "is_foreign_key": false,
+        "is_primary_key": false,
+        "name": "product_name",
+        "nullable": true,
+        "type": "STRING"
+      }
+    },
+    {
+      "labels": [
+        "Database"
+      ],
+      "properties": {
+        "description": "Demo e-commerce dataset with foreign key relationships for testing",
+        "id": "demo_e_commerce",
+        "name": "Demo E-commerce",
+        "platform": "GCP",
+        "service": "BIGQUERY"
+      }
+    },
+    {
+      "labels": [
+        "Glossary"
+      ],
+      "properties": {
+        "description": "Standard business terms and metrics for e-commerce analytics",
+        "id": "ecommerce_glossary",
+        "name": "E-commerce Business Glossary"
+      }
+    },
+    {
+      "labels": [
+        "Query"
+      ],
+      "properties": {
+        "content": "SELECT c.customer_name, SUM(o.total_amount) as total_spend FROM demo_ecommerce.customers c JOIN demo_ecommerce.orders o ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY total_spend DESC",
+        "description": "Calculate total spend per customer",
+        "id": "q001"
+      }
+    },
+    {
+      "labels": [
+        "Query"
+      ],
+      "properties": {
+        "content": "SELECT p.category, COUNT(DISTINCT oi.order_id) as order_count FROM demo_ecommerce.products p JOIN demo_ecommerce.order_items oi ON p.product_id = oi.product_id GROUP BY p.category",
+        "description": "Count orders by product category",
+        "id": "q002"
+      }
+    },
+    {
+      "labels": [
+        "Query"
+      ],
+      "properties": {
+        "content": "SELECT DATE(o.order_date) as date, SUM(o.total_amount) as daily_revenue FROM demo_ecommerce.orders o GROUP BY DATE(o.order_date) ORDER BY date",
+        "description": "Calculate daily revenue",
+        "id": "q003"
+      }
+    },
+    {
+      "labels": [
+        "Query"
+      ],
+      "properties": {
+        "content": "SELECT p.product_name, SUM(oi.quantity) as total_quantity FROM demo_ecommerce.products p JOIN demo_ecommerce.order_items oi ON p.product_id = oi.product_id GROUP BY p.product_name ORDER BY total_quantity DESC LIMIT 10",
+        "description": "Top 10 best selling products by quantity",
+        "id": "q004"
+      }
+    },
+    {
+      "labels": [
+        "Schema"
+      ],
+      "properties": {
+        "description": "Demo e-commerce dataset with foreign key relationships for testing",
+        "id": "demo_e_commerce.demo_ecommerce",
+        "name": "demo_ecommerce"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Customer master table containing all registered customers",
+        "embedding": [
+          -0.76021,
+          0.05229,
+          0.73488,
+          0.92587,
+          -0.88675,
+          -0.97776,
+          -0.28818,
+          0.03399
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.customers",
+        "name": "customers"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Individual line items for each order, links to orders and products via foreign keys",
+        "embedding": [
+          -0.21902,
+          0.24977,
+          0.18882,
+          0.9914,
+          0.96122,
+          0.48687,
+          0.92537,
+          0.37313
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.order_items",
+        "name": "order_items"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Orders placed by customers, links to customers via customer_id foreign key",
+        "embedding": [
+          -0.39197,
+          0.50281,
+          0.72608,
+          -0.73708,
+          -0.75262,
+          0.43698,
+          0.83521,
+          -0.0072
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.orders",
+        "name": "orders"
+      }
+    },
+    {
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "description": "Product catalog containing all available products",
+        "embedding": [
+          -0.35007,
+          0.78268,
+          -0.1713,
+          0.65347,
+          -0.72842,
+          0.59613,
+          0.02902,
+          0.00832
+        ],
+        "id": "demo_e_commerce.demo_ecommerce.products",
+        "name": "products"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "demo_e_commerce.demo_ecommerce.products.category.2eaf52d9953caf90d2820637784e4b24",
+        "value": "Home & Office"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "demo_e_commerce.demo_ecommerce.products.category.918e180e06b96c76b7193c9fcb1cb312",
+        "value": "Sports"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "demo_e_commerce.demo_ecommerce.products.category.ee3c6e8ed9c27c45f161ea416c997df8",
+        "value": "Electronics"
+      }
+    },
+    {
+      "labels": [
+        "Value"
+      ],
+      "properties": {
+        "id": "demo_e_commerce.demo_ecommerce.products.category.efe0bd2c212eceec598c42a15b8cd07f",
+        "value": "Clothing"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "dst": "ecommerce_glossary.customer_metrics.customer_acquisition_cost",
+      "properties": {},
+      "src": "ecommerce_glossary.customer_metrics",
+      "type": "HAS_BUSINESS_TERM"
+    },
+    {
+      "dst": "ecommerce_glossary.customer_metrics.customer_lifetime_value",
+      "properties": {},
+      "src": "ecommerce_glossary.customer_metrics",
+      "type": "HAS_BUSINESS_TERM"
+    },
+    {
+      "dst": "ecommerce_glossary.product_metrics.sell_through_rate",
+      "properties": {},
+      "src": "ecommerce_glossary.product_metrics",
+      "type": "HAS_BUSINESS_TERM"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.average_order_value",
+      "properties": {},
+      "src": "ecommerce_glossary.revenue_metrics",
+      "type": "HAS_BUSINESS_TERM"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.gross_merchandise_value",
+      "properties": {},
+      "src": "ecommerce_glossary.revenue_metrics",
+      "type": "HAS_BUSINESS_TERM"
+    },
+    {
+      "dst": "ecommerce_glossary.customer_metrics",
+      "properties": {},
+      "src": "ecommerce_glossary",
+      "type": "HAS_CATEGORY"
+    },
+    {
+      "dst": "ecommerce_glossary.product_metrics",
+      "properties": {},
+      "src": "ecommerce_glossary",
+      "type": "HAS_CATEGORY"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics",
+      "properties": {},
+      "src": "ecommerce_glossary",
+      "type": "HAS_CATEGORY"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.created_at",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.customer_name",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.email",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.order_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.order_item_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.price",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.product_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.quantity",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.customer_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.order_date",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.order_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.price",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_id",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_name",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products",
+      "type": "HAS_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce",
+      "properties": {},
+      "src": "demo_e_commerce",
+      "type": "HAS_SCHEMA"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce",
+      "type": "HAS_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category.2eaf52d9953caf90d2820637784e4b24",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products.category",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category.918e180e06b96c76b7193c9fcb1cb312",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products.category",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category.ee3c6e8ed9c27c45f161ea416c997df8",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products.category",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category.efe0bd2c212eceec598c42a15b8cd07f",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products.category",
+      "type": "HAS_VALUE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.order_id",
+      "properties": {
+        "criteria": "order_items.order_id = orders.order_id"
+      },
+      "src": "demo_e_commerce.demo_ecommerce.order_items.order_id",
+      "type": "REFERENCES"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_id",
+      "properties": {
+        "criteria": "order_items.product_id = products.product_id"
+      },
+      "src": "demo_e_commerce.demo_ecommerce.order_items.product_id",
+      "type": "REFERENCES"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+      "properties": {
+        "criteria": "orders.customer_id = customers.customer_id"
+      },
+      "src": "demo_e_commerce.demo_ecommerce.orders.customer_id",
+      "type": "REFERENCES"
+    },
+    {
+      "dst": "ecommerce_glossary.customer_metrics.customer_lifetime_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.customer_metrics.customer_acquisition_cost",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.customer_metrics.customer_lifetime_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.gross_merchandise_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.product_metrics.sell_through_rate",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.order_items.quantity",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.average_order_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.average_order_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.revenue_metrics.gross_merchandise_value",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.product_metrics.sell_through_rate",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "ecommerce_glossary.product_metrics.sell_through_rate",
+      "properties": {},
+      "src": "demo_e_commerce.demo_ecommerce.products.product_id",
+      "type": "TAGGED_WITH"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.customer_id",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers.customer_name",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.customer_id",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.order_id",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.product_id",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.category",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_id",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.order_date",
+      "properties": {},
+      "src": "q003",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders.total_amount",
+      "properties": {},
+      "src": "q003",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.product_id",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items.quantity",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_id",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products.product_name",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_COLUMN"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.customers",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders",
+      "properties": {},
+      "src": "q001",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products",
+      "properties": {},
+      "src": "q002",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.orders",
+      "properties": {},
+      "src": "q003",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.order_items",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_TABLE"
+    },
+    {
+      "dst": "demo_e_commerce.demo_ecommerce.products",
+      "properties": {},
+      "src": "q004",
+      "type": "USES_TABLE"
+    }
+  ]
+}
