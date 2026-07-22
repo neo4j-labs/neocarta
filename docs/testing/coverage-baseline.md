@@ -13,7 +13,7 @@
 `make test-cov` runs:
 
 ```
-uv run pytest tests/unit -v \
+uv run pytest tests/unit -m unit -v \
   --ignore=tests/unit/_mcp --ignore=tests/unit/_cli --ignore=tests/unit/agent \
   --cov=neocarta --cov-report=term-missing --cov-report=xml --cov-report=html
 ```
@@ -73,9 +73,9 @@ was stale):
 
 | Scope | Collected |
 |---|---:|
-| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 865 |
-| full `tests/unit` | 1,109 |
-| all `tests/` (unit + integration + smoke) | 1,205 |
+| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 878 |
+| full `tests/unit` | 1,122 |
+| all `tests/` (unit + integration + smoke) | 1,218 |
 
 ## Reproduce
 

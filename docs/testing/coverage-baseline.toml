@@ -32,9 +32,9 @@ report_format = "coverage.xml (Cobertura)"
 # Re-baselined against `main` for the 0.8.1 safety net: the 0.9.x normalization stack (and
 # its ~50 tests) is not present on this branch, so these counts sit below an EKL-tree run.
 # Only `all` is enforced by the gate — the others are reference.
-gated_unit = 865    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1109     # full tests/unit (includes _mcp/_cli/agent)
-all = 1205          # tests/ (unit + integration + smoke)
+gated_unit = 878    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1122     # full tests/unit (includes _mcp/_cli/agent)
+all = 1218          # tests/ (unit + integration + smoke)
 
 [total]
 line_measured = 68.53

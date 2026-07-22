@@ -59,11 +59,11 @@ def serialize_transform(transformer: Any) -> dict[str, Any]:
         for family in families
     }
     if hasattr(transformer, "get_properties"):
-        properties = {
-            family: transformer.get_properties(family)
-            for family in families
-            if transformer.get_properties(family)
-        }
+        properties = {}
+        for family in families:
+            allowlist = transformer.get_properties(family)
+            if allowlist:
+                properties[family] = allowlist
         if properties:
             graph["_properties"] = properties
     return graph

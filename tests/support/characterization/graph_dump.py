@@ -5,7 +5,9 @@ properties) after a connector ingests into Neo4j, normalized so the snapshot is
 byte-reproducible across runs and machines:
 
 - The ``__neocarta_graph__`` singleton is excluded — it carries wall-clock
-  ``datetime()`` timestamps and the release version.
+  ``datetime()`` timestamps and the release version — as is any relationship
+  touching it, so a relationship endpoint can never dangle (reference a node
+  absent from ``nodes``) in the snapshot.
 - Endpoints use the deterministic application ``id`` the loader MERGEs on, never
   Neo4j's internal/element ids.
 - Order is normalized here (Neo4j does not guarantee return order): every node and
@@ -24,8 +26,12 @@ from neo4j import Driver, RoutingControl
 
 _METADATA_LABEL = "__neocarta_graph__"
 _NODES_CYPHER = "MATCH (n) RETURN labels(n) AS labels, properties(n) AS properties"
+# Exclude relationships touching the metadata singleton on either endpoint so the dump
+# stays self-consistent with the node exclusion below (the singleton has no ``.id``, so
+# such a relationship would otherwise emit a null src/dst that dangles against ``nodes``).
 _RELS_CYPHER = (
-    "MATCH (a)-[r]->(b) "
+    f"MATCH (a)-[r]->(b) "
+    f"WHERE NOT a:`{_METADATA_LABEL}` AND NOT b:`{_METADATA_LABEL}` "
     "RETURN type(r) AS type, a.id AS src, b.id AS dst, properties(r) AS properties"
 )
 
