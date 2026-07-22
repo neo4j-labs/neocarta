@@ -19,8 +19,8 @@
 ## Summary
 
 - **REAL** — the behavioral core: connector `*/test_extract.py` · `*/test_transform.py` ·
-  `*/test_ingest_transform.py`; `ingest/*`; `data_model` (`normalized`, `schema/lpg`, `glossary`,
-  `governance`, `instance`); `normalization/*`; `_mcp/test_search_strategy` · `test_osi_cypher`; the
+  `*/test_ingest_transform.py`; `ingest/*`; `data_model` (`schema/lpg`, `glossary`,
+  `governance`, `instance`); `_mcp/test_search_strategy` · `test_osi_cypher`; the
   `agent` tool tests; and **all** `tests/integration/*` (real Neo4j).
 - **CONTRACT** — the **13 per-connector `test_conformance.py` modules (~173 tests)**, each asserting the
   same `SourceConnectorProtocol` contract (isinstance / callable stage methods / README present /
@@ -28,7 +28,7 @@
   dedup/parametrize target.
 - **SMOKE / low-value** — all of `tests/smoke/` (13, packaging surface); most of `_cli/*` (plumbing only,
   by design); trivial-getter `data_model/schema/rdbms` + `data_model/metadata`; single-assertion
-  micro-modules (`*_warnings`, some `*_logging`, `test_normalized_parity`, `query_log/test_extract`); and
+  micro-modules (`*_warnings`, some `*_logging`, `query_log/test_extract`); and
   isolated `isinstance` guards.
 
 ## Module classification
@@ -45,7 +45,8 @@
 | `bigquery/schema/test_conformance.py` | 13 | CONTRACT | |
 | `bigquery/schema/test_extract.py` | 8 | REAL | |
 | `bigquery/schema/test_logging.py` | 2 | REAL | narrow — asserts SQL never logged |
-| `bigquery/schema/test_normalized_parity.py` | 1 | REAL | parity check (BigQuery vs normalized transform); characterization-style |
+| `bigquery/schema/test_transform.py` | 21 | REAL | per-family transform assertions (customers/orders fixture) |
+| `bigquery/schema/test_transform_golden.py` | 2 | REAL | Layer-A golden characterization of the transform + injected-change negative control |
 | `csv/test_conformance.py` | 12 | CONTRACT | |
 | `csv/test_extract.py` | 51 | REAL | config/filter validation with message matching |
 | `databricks/schema/test_conformance.py` | 21 | CONTRACT | |
@@ -113,15 +114,6 @@
 | `embeddings/test_litellm_embeddings.py` | 7 | REAL | mocked provider |
 | `embeddings/test_logging.py` | 8 | REAL | logging (exception-type-only, no PII) |
 
-### `tests/unit/normalization/` — all REAL (new EKL code, 100% covered)
-
-| Module | Tests | Tier |
-|---|---:|---|
-| `test_graph_transform.py` | 6 | REAL |
-| `test_mapping.py` | 8 | REAL |
-| `test_normalizer.py` | 4 | REAL |
-| `information_schema/test_bigquery.py` | 15 | REAL |
-
 ### `tests/unit/_mcp/` (excluded from `make test-cov`; run by `make test-mcp`)
 
 | Module | Tests | Tier | Notes |
@@ -172,7 +164,6 @@ Modules: `test_tool.py` (25), `test_snowflake.py` (18), `test_databricks.py` (14
 | `connectors/databricks/test_connector_IT.py` | 7 | |
 | `connectors/jdbc/test_connector_IT.py` | 1 | skip-guarded (Java 11+ / SchemaCrawler jars) |
 | `connectors/unity_catalog/test_connector_IT.py` | 1 | |
-| `normalization/test_graph_transform_IT.py` | 3 | real-Neo4j parity for the normalized transform |
 
 ### `tests/smoke/` — all SMOKE (by design: packaging / public-API surface)
 

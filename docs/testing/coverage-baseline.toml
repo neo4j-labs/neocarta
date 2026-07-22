@@ -29,31 +29,36 @@ report_format = "coverage.xml (Cobertura)"
 
 [test_count]
 # GUIDE §4 also forbids dropping tests. Authoritative `pytest --collect-only -q` counts.
-# Ratcheted up in S0.6 (#291) by the characterization-harness tests (+4 gated unit,
-# +2 integration); only `all` is enforced by the gate — the others are reference.
-gated_unit = 913    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1157     # full tests/unit (includes _mcp/_cli/agent)
-all = 1256          # tests/ (unit + integration + smoke)
+# Re-baselined against `main` for the 0.8.1 safety net: the 0.9.x normalization stack (and
+# its ~50 tests) is not present on this branch, so these counts sit below an EKL-tree run.
+# Only `all` is enforced by the gate — the others are reference.
+gated_unit = 865    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1109     # full tests/unit (includes _mcp/_cli/agent)
+all = 1205          # tests/ (unit + integration + smoke)
 
 [total]
-line_measured = 67.35
-line_floor = 67
-branch_measured = 48.54
-branch_floor = 48
+line_measured = 68.53
+line_floor = 68
+branch_measured = 49.30
+branch_floor = 49
 
 # --- Enforceable per-package floors (packages the `make test-cov` scope exercises) ---
 
 [packages.connectors]
-line_measured = 74.69
-line_floor = 74
-branch_measured = 58.17
-branch_floor = 58
+line_measured = 78.45
+line_floor = 78
+branch_measured = 60.41
+branch_floor = 60
 
+# data_model branch is lower here than on the EKL tree: the normalization stack's
+# 100%-covered `data_model/normalized/*` subpackage (a 0.9.x-band addition) is not on
+# this branch, so the aggregate reflects only main's data_model. This is a re-baseline
+# to actual behavior, not a hand-lowered floor.
 [packages.data_model]
-line_measured = 99.76
+line_measured = 99.66
 line_floor = 99
-branch_measured = 92.86
-branch_floor = 92
+branch_measured = 83.33
+branch_floor = 83
 
 [packages.enrichment]
 line_measured = 79.57
@@ -66,12 +71,6 @@ line_measured = 65.44
 line_floor = 65
 branch_measured = 37.23
 branch_floor = 37
-
-[packages.normalization]
-line_measured = 100.0
-line_floor = 100
-branch_measured = 100.0
-branch_floor = 100
 
 [packages.root]
 line_measured = 95.5

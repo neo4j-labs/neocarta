@@ -30,15 +30,17 @@ enforceable floors #290 gates against.
 
 | Package (Cobertura name) | Line % | Line floor | Branch % | Branch floor |
 |---|---:|---:|---:|---:|
-| `normalization` | 100.00 | 100 | 100.00 | 100 |
-| `data_model` | 99.76 | 99 | 92.86 | 92 |
+| `data_model` | 99.66 | 99 | 83.33 | 83 |
 | `root` (`neocarta/*.py` = `.`) | 95.50 | 95 | 86.84 | 86 |
 | `enrichment` | 79.57 | 79 | 63.64 | 63 |
-| `connectors` | 74.69 | 74 | 58.17 | 58 |
+| `connectors` | 78.45 | 78 | 60.41 | 60 |
 | `ingest` | 65.44 | 65 | **37.23** | 37 |
-| **TOTAL** | **67.35** | **67** | **48.54** | **48** |
+| **TOTAL** | **68.53** | **68** | **49.30** | **49** |
 
-`connectors` (4,559 lines) dominates the total. `ingest`'s **37% branch coverage** is the weakest area and
+Measured against `main` for the 0.8.1 safety net: the 0.9.x normalization stack (its
+100%-covered `normalization` / `data_model/normalized` packages) is not on this branch, so
+there is no `normalization` row and `data_model`'s branch floor reflects main-only code.
+`connectors` dominates the total. `ingest`'s **37% branch coverage** is the weakest area and
 a refactor target (see [test-quality-inventory.md](test-quality-inventory.md) → gap list).
 
 ## Scope caveat — `_mcp` and `_cli` (read this before trusting a `_mcp`/`_cli` number)
@@ -71,9 +73,9 @@ was stale):
 
 | Scope | Collected |
 |---|---:|
-| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 909 |
-| full `tests/unit` | 1,153 |
-| all `tests/` (unit + integration + smoke) | 1,248 |
+| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 865 |
+| full `tests/unit` | 1,109 |
+| all `tests/` (unit + integration + smoke) | 1,205 |
 
 ## Reproduce
 
