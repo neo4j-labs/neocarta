@@ -1,7 +1,7 @@
 # Changelog of neocarta library and MCP server
 
 
-## Upcoming
+## v0.8.1
 
 ### Documentation
 - `CLAUDE.md` now documents the **Google** docstring convention (matching the Ruff `pydocstyle` config that CI enforces) instead of numpy, which `make lint` actually rejects. (#276)
