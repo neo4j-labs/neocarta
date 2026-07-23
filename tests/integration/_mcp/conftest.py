@@ -1,17 +1,42 @@
 """Pytest fixtures for MCP server integration tests."""
 
+import os
 import random
 import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
 from neocarta.connectors.csv import CSVConnector
 from neocarta.connectors.osi import OsiConnector
 from neocarta.enrichment.embeddings import LiteLLMEmbeddingsConnector
 from neocarta.enums import NodeLabel
+
+# The MCP server settings are a module-level singleton: ``neocarta/_mcp/settings.py`` builds
+# ``mcp_server_settings = Settings()`` at import, with required ``neo4j_uri`` / ``neo4j_username``
+# / ``neo4j_password``. Importing any ``neocarta._mcp.server`` test module in this package
+# therefore needs those vars at *collection* time — otherwise ``--collect-only`` raises a
+# ``ValidationError`` and the module silently drops out of the suite. That is what made the #290
+# regression gate red in CI (its ``coverage`` job has no ``NEO4J_*`` env and no ``.env``, so the
+# full-tree collected count fell below the baseline). This conftest is loaded before the test
+# modules in its directory, so seed the vars here: honor a real ``.env`` first (preserving
+# existing behavior when configured), then fall back to inert defaults so the package stays
+# collectable in a bare env. ``setdefault`` never overrides an already-set value.
+#
+# Known tradeoff (accepted for the 0.8.1 safety net): because this runs at import, the inert
+# defaults persist for the whole process, so in a single ``pytest tests/`` run (``make test-all``)
+# they leak into later-collected suites. It is a no-op whenever a real ``.env`` is present (the
+# normal dev / CI-secret case), and CI runs each suite as an isolated job, so the only exposure is
+# a bare-env ``make test-all``. A fixture / ``pytest_configure`` cannot replace this: the singleton
+# is built during *collection* (at module import), before any fixture runs — the seed must happen
+# at conftest import time, or collection fails again (the #290 regression this guards).
+load_dotenv()
+os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
+os.environ.setdefault("NEO4J_USERNAME", "neo4j")
+os.environ.setdefault("NEO4J_PASSWORD", "password")
 
 DATABASE_NAME = "neo4j"
 

@@ -1,6 +1,6 @@
 [project]
 name = "neocarta"
-version = "0.8.0"
+version = "0.8.1"
 description = "Library that facilitates the creation of semantic layer metadata graph in Neo4j."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -84,6 +84,8 @@ neocarta-mcp = "neocarta._mcp.server:run"
 dev = [
     "ipykernel>=7.1.0",
     "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+    "coverage[toml]>=7.15.2",
     "testcontainers[neo4j,postgres]>=4.14.2",
     "ruff>=0.15.10",
 ]
@@ -117,6 +119,42 @@ include = ["neocarta/**", "pyproject.toml", "README.md", "LICENSE"]
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+addopts = "--strict-markers"
+# Suite-group markers drive `make test-*` selection (see S0-3 / GUIDE D4) so it is
+# intent-based and survives file moves rather than being coupled to directory paths.
+# Markers are auto-applied by suite location in tests/conftest.py; --strict-markers
+# turns any unregistered/typo'd marker into a hard error.
+markers = [
+    "unit: fast, isolated unit tests (no external services)",
+    "integration: tests requiring a live Neo4j (Docker/testcontainers)",
+    "mcp: MCP server unit + integration tests",
+    "cli: CLI command unit tests",
+    "smoke: import/packaging smoke tests",
+    "agent: Text2SQL agent unit tests (transitional; removed with the agent, GUIDE D2)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["neocarta"]
+omit = [
+    # source = neocarta already scopes measurement to the package; these keep the
+    # intent explicit and survive any future change to `source`.
+    "tests/*",
+    "examples/*",
+    "agent/*",
+    "datasets/*",
+    "eval/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+precision = 2
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "if __name__ == .__main__.:",
+]
 
 [tool.ruff]
 line-length = 100

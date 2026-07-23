@@ -76,3 +76,44 @@ jobs:
 
       - name: Run smoke tests
         run: make test-smoke
+
+  coverage:
+    name: Coverage + test-count regression gate (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Full install: this is the env the #288 coverage floors were measured under
+      # (coverage-baseline.md -> Reproduce), so the gate compares apples-to-apples, and
+      # it makes the whole tests/ tree importable for the full-suite collection count.
+      - name: Install dependencies
+        run: uv sync --all-groups --all-extras
+
+      - name: Measure coverage (make test-cov -> coverage.xml + .coverage)
+        run: make test-cov
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: error
+
+      # The gate: fail if total/per-package coverage drops below the #288 floors or the
+      # full tests/ collected count shrinks. Names the offending metric. (S0-4 / #290)
+      - name: Enforce coverage + test-count regression gate (#290)
+        run: make check-regression
