@@ -4,6 +4,9 @@ from neocarta.connectors.utils.generate_id import (
     generate_governance_tag_instance_id,
     generate_governance_tag_key_id,
     generate_governance_tag_value_id,
+    generate_node_id,
+    generate_property_id,
+    generate_relationship_id,
     generate_value_id,
 )
 
@@ -69,3 +72,22 @@ def test_generate_value_id_float():
     """Test generating a value ID for a float value."""
     value_id = generate_value_id("my-project", "sales", "orders", "status", 1.0)
     assert value_id
+
+
+def test_generate_node_id_normalizes():
+    assert generate_node_id("My-DBMS", "neo4j", "Person") == "my_dbms.neo4j.person"
+
+
+def test_generate_relationship_id_normalizes():
+    assert generate_relationship_id("My-DBMS", "neo4j", "KNOWS") == "my_dbms.neo4j.knows"
+
+
+def test_generate_property_id_is_owner_scoped_and_not_double_normalized():
+    node_id = generate_node_id("dbms", "neo4j", "Person")  # "dbms.neo4j.person"
+    assert generate_property_id(node_id, "firstName") == "dbms.neo4j.person.firstname"
+
+
+def test_property_id_distinct_across_owners_for_same_name():
+    node_id = generate_node_id("dbms", "neo4j", "Person")
+    rel_id = generate_relationship_id("dbms", "neo4j", "KNOWS")
+    assert generate_property_id(node_id, "since") != generate_property_id(rel_id, "since")
