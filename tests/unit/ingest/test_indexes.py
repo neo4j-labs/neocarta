@@ -88,3 +88,19 @@ def test_loader_does_not_create_name_index_for_value_nodes():
     loader.load_value_nodes([])
 
     assert all("_name_index" not in q for q in _executed_queries(driver))
+
+
+def test_name_range_index_defaults_to_name_property():
+    driver = _mock_driver()
+    create_name_range_index(driver, "Table")
+    query = driver.execute_query.call_args.kwargs["query_"]
+    assert "CREATE INDEX table_name_index IF NOT EXISTS" in query
+    assert "ON (n.name)" in query
+
+
+def test_name_range_index_accepts_property_override():
+    driver = _mock_driver()
+    create_name_range_index(driver, "Node", property_name="label")
+    query = driver.execute_query.call_args.kwargs["query_"]
+    assert "CREATE INDEX node_label_index IF NOT EXISTS" in query
+    assert "ON (n.label)" in query
