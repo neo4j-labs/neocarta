@@ -12,13 +12,22 @@ import pytest
 from pydantic import AliasChoices, BaseModel, ValidationError
 
 from neocarta.data_model._validators import coerce_nullable
+from neocarta.etl.metadata_normalizer import normalized_schema
 from neocarta.etl.metadata_normalizer.normalized_schema import (
+    BusinessTermAssignmentRecord,
+    BusinessTermRecord,
+    CategoryRecord,
     ColumnRecord,
     DatabaseRecord,
     ForeignKeyRecord,
+    GlossaryRecord,
+    GovernanceTagKeyRecord,
+    GovernanceTagValueRecord,
+    LineageRecord,
     NormalizedStructuralSchema,
     SchemaRecord,
     TableRecord,
+    ValueRecord,
 )
 
 ALL_MODELS = [
@@ -27,6 +36,16 @@ ALL_MODELS = [
     TableRecord,
     ColumnRecord,
     ForeignKeyRecord,
+    # S1.2 facet records — the D6 identity guards are contract-wide, so they live
+    # here once rather than being duplicated in test_facets.py.
+    ValueRecord,
+    GlossaryRecord,
+    CategoryRecord,
+    BusinessTermRecord,
+    BusinessTermAssignmentRecord,
+    GovernanceTagKeyRecord,
+    GovernanceTagValueRecord,
+    LineageRecord,
     NormalizedStructuralSchema,
 ]
 
@@ -124,6 +143,22 @@ class TestNoGraphIdentity:
     def test_no_field_looks_like_a_graph_id(self, model: type[BaseModel]) -> None:
         # Natural-key names end in "_name"/"_type"; a bare "*_id" would be a graph id.
         assert not any(name.endswith("_id") for name in model.model_fields)
+
+    @pytest.mark.parametrize("model", ALL_MODELS)
+    def test_no_graph_label_discriminator(self, model: type[BaseModel]) -> None:
+        # The graph's polymorphic TAGGED_WITH carries source_label + source_id; a
+        # facet row instead derives its grain from key-path depth, so naming an
+        # ontology label here would re-couple the contract to the ontology (§6).
+        assert "source_label" not in model.model_fields
+
+    def test_guard_covers_every_exported_model(self) -> None:
+        # A new record cannot be added to the package without these guards seeing it.
+        exported = {
+            getattr(normalized_schema, name)
+            for name in normalized_schema.__all__
+            if isinstance(getattr(normalized_schema, name), type)
+        }
+        assert exported == set(ALL_MODELS)
 
 
 class TestColumnRecordMapsEveryConnector:
