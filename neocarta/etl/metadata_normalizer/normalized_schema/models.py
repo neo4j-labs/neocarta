@@ -13,15 +13,22 @@ nullability names all resolve onto one canonical token per concept. Connectors'
 raw source rows validate directly because each divergent field accepts its known
 source synonyms via :class:`pydantic.AliasChoices` (canonical token first, so it
 stays the public field name and a spin-out connector can always emit canonical
-names — GUIDE D17). Value coercions (GUIDE D7) — nullability token folding, NaN
-scrubbing, platform/service casing — run as ``field_validator``s; source-specific
-nullability fallbacks stay in the connector.
+names — GUIDE D17). That mapping lives in ``_vocabulary.py``, which the optional
+facets share so the two halves cannot drift (GUIDE §4). Value coercions (GUIDE D7)
+— nullability token folding, NaN scrubbing, platform/service casing — run as
+``field_validator``s; source-specific nullability fallbacks stay in the connector.
 
 Containment edges (``HAS_SCHEMA`` / ``HAS_TABLE`` / ``HAS_COLUMN``) are *not*
 modelled here: they are fully derivable from the natural-key hierarchy each row
 carries. Only the non-derivable cross-hierarchy foreign-key reference is a table
 (:class:`ForeignKeyRecord`). See ``README.md`` for the vocabulary rationale and
 the Graph Spec ``sources`` mapping sketch.
+
+The optional facets that hang off this core — values, lineage, glossary and
+governance — live in ``facets.py`` and surface as further sparse tables on
+:class:`NormalizedStructuralSchema`. The references facet *is*
+:class:`ForeignKeyRecord`, which stays here because a foreign key is a declared
+structural constraint that a core-only connector emits.
 
 Scope is the RDBMS *structural* core (schema connectors). The query and
 graph/semantic (OSI) paradigms are separate normalized surfaces (GUIDE D11).
@@ -30,41 +37,22 @@ graph/semantic (OSI) paradigms are separate normalized surfaces (GUIDE D11).
 from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from ....data_model._validators import coerce_nullable, coerce_str_or_none, coerce_upper
-
-# --- Standardized field vocabulary -------------------------------------------
-# Canonical token (the field name) ⟵ the known source-column synonyms every
-# schema connector emits for that concept. Documented here pending #296
-# ratification. The synonym sets are collision-free within a single source row
-# (no connector row carries two names for the same concept), and the canonical
-# token is listed first so it wins when both it and a synonym are present.
-
-_DATABASE_NAME_SYNONYMS = (
-    "database_name",  # jdbc, csv
-    "project_id",  # bigquery, dataplex
-    "table_catalog",  # bigquery / rdbms base (table + column frames)
-    "catalog_name",  # unity catalog, rdbms base (schema frame)
-    "database",  # snowflake (database frame)
-    "catalog",  # databricks (database frame)
+from ._vocabulary import (
+    DATA_TYPE_SYNONYMS,
+    DATABASE_NAME_SYNONYMS,
+    NULLABLE_SYNONYMS,
+    SCHEMA_NAME_SYNONYMS,
+    TABLE_NAME_SYNONYMS,
 )
-_SCHEMA_NAME_SYNONYMS = (
-    "schema_name",  # rdbms base, jdbc, unity catalog, csv
-    "table_schema",  # bigquery / rdbms base (table + column frames)
-    "dataset_id",  # bigquery, dataplex
-)
-_TABLE_NAME_SYNONYMS = (
-    "table_name",  # bigquery, rdbms base, jdbc, unity catalog, csv
-    "table_id",  # dataplex (identity segment; display label is display_name)
-)
-_DATA_TYPE_SYNONYMS = (
-    "data_type",  # bigquery, rdbms base, csv
-    "column_data_type",  # dataplex
-    "type",  # jdbc
-    "column_type",  # unity catalog
-)
-_NULLABLE_SYNONYMS = (
-    "nullable",  # jdbc, unity catalog
-    "is_nullable",  # bigquery, rdbms base, csv
-    "column_mode",  # dataplex ("NULLABLE" / "REQUIRED")
+from .facets import (
+    BusinessTermAssignmentRecord,
+    BusinessTermRecord,
+    CategoryRecord,
+    GlossaryRecord,
+    GovernanceTagKeyRecord,
+    GovernanceTagValueRecord,
+    LineageRecord,
+    ValueRecord,
 )
 
 
@@ -73,7 +61,7 @@ class DatabaseRecord(BaseModel):
 
     database_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_DATABASE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*DATABASE_NAME_SYNONYMS),
         description="The natural-key name of the database.",
     )
     platform: str | None = Field(
@@ -99,12 +87,12 @@ class SchemaRecord(BaseModel):
 
     database_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_DATABASE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*DATABASE_NAME_SYNONYMS),
         description="The natural-key name of the parent database.",
     )
     schema_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_SCHEMA_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*SCHEMA_NAME_SYNONYMS),
         description="The natural-key name of the schema.",
     )
     description: str | None = Field(
@@ -121,17 +109,17 @@ class TableRecord(BaseModel):
 
     database_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_DATABASE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*DATABASE_NAME_SYNONYMS),
         description="The natural-key name of the parent database.",
     )
     schema_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_SCHEMA_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*SCHEMA_NAME_SYNONYMS),
         description="The natural-key name of the parent schema.",
     )
     table_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_TABLE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*TABLE_NAME_SYNONYMS),
         description="The natural-key name (identity segment) of the table.",
     )
     display_name: str | None = Field(
@@ -163,28 +151,28 @@ class ColumnRecord(BaseModel):
 
     database_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_DATABASE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*DATABASE_NAME_SYNONYMS),
         description="The natural-key name of the parent database.",
     )
     schema_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_SCHEMA_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*SCHEMA_NAME_SYNONYMS),
         description="The natural-key name of the parent schema.",
     )
     table_name: str = Field(
         ...,
-        validation_alias=AliasChoices(*_TABLE_NAME_SYNONYMS),
+        validation_alias=AliasChoices(*TABLE_NAME_SYNONYMS),
         description="The natural-key name of the parent table.",
     )
     column_name: str = Field(..., description="The natural-key name of the column.")
     data_type: str | None = Field(
         default=None,
-        validation_alias=AliasChoices(*_DATA_TYPE_SYNONYMS),
+        validation_alias=AliasChoices(*DATA_TYPE_SYNONYMS),
         description="The data type of the column (may be absent in some sources).",
     )
     nullable: bool = Field(
         default=True,
-        validation_alias=AliasChoices(*_NULLABLE_SYNONYMS),
+        validation_alias=AliasChoices(*NULLABLE_SYNONYMS),
         description="Whether the column can be null.",
     )
     is_primary_key: bool | None = Field(
@@ -271,10 +259,21 @@ class ForeignKeyRecord(BaseModel):
 
 
 class NormalizedStructuralSchema(BaseModel):
-    """The structural-core tabular contract a schema connector emits (GUIDE D5).
+    """The whole tabular contract a connector emits (GUIDE D5).
 
-    A bundle of the entity tables plus the foreign-key table. Sparse by design:
-    a connector populates only the tables it produces (GUIDE D10).
+    The structural core — the entity tables plus the foreign-key table — and the
+    optional facet tables that hang off it. Sparse by design: a connector
+    populates only the tables it produces (GUIDE D10), so a connector emitting
+    only the structural core validates unchanged.
+
+    Each facet is omitted **independently** by leaving its table(s) empty:
+
+    - values → ``values``
+    - references → ``foreign_keys`` (the structural core's own table)
+    - lineage → ``lineage``
+    - glossary → ``glossaries`` / ``categories`` / ``business_terms`` /
+      ``business_term_assignments``
+    - governance → ``governance_tag_keys`` / ``governance_tag_values``
     """
 
     databases: list[DatabaseRecord] = Field(default_factory=list, description="The Database rows.")
@@ -283,4 +282,32 @@ class NormalizedStructuralSchema(BaseModel):
     columns: list[ColumnRecord] = Field(default_factory=list, description="The Column rows.")
     foreign_keys: list[ForeignKeyRecord] = Field(
         default_factory=list, description="The foreign-key (REFERENCES) rows."
+    )
+    # --- optional facets (S1.2), each omitted by staying empty --------------------
+    values: list[ValueRecord] = Field(
+        default_factory=list, description="The sampled column-value rows (values facet)."
+    )
+    glossaries: list[GlossaryRecord] = Field(
+        default_factory=list, description="The Glossary rows (glossary facet)."
+    )
+    categories: list[CategoryRecord] = Field(
+        default_factory=list, description="The glossary Category rows (glossary facet)."
+    )
+    business_terms: list[BusinessTermRecord] = Field(
+        default_factory=list, description="The BusinessTerm rows (glossary facet)."
+    )
+    business_term_assignments: list[BusinessTermAssignmentRecord] = Field(
+        default_factory=list,
+        description="The business-term assignment (TAGGED_WITH) rows (glossary facet).",
+    )
+    governance_tag_keys: list[GovernanceTagKeyRecord] = Field(
+        default_factory=list,
+        description="The governance tag-key rows (governance facet, definition layer).",
+    )
+    governance_tag_values: list[GovernanceTagValueRecord] = Field(
+        default_factory=list,
+        description="The governance tag-value rows (governance facet, definition layer).",
+    )
+    lineage: list[LineageRecord] = Field(
+        default_factory=list, description="The data-flow (lineage) rows."
     )

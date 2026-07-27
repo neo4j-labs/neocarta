@@ -1,5 +1,15 @@
 """Shared source-agnostic tabular contract; populated in S1 (see GUIDE §5)."""
 
+from .facets import (
+    BusinessTermAssignmentRecord,
+    BusinessTermRecord,
+    CategoryRecord,
+    GlossaryRecord,
+    GovernanceTagKeyRecord,
+    GovernanceTagValueRecord,
+    LineageRecord,
+    ValueRecord,
+)
 from .models import (
     ColumnRecord,
     DatabaseRecord,
@@ -10,10 +20,18 @@ from .models import (
 )
 
 __all__ = [
+    "BusinessTermAssignmentRecord",
+    "BusinessTermRecord",
+    "CategoryRecord",
     "ColumnRecord",
     "DatabaseRecord",
     "ForeignKeyRecord",
+    "GlossaryRecord",
+    "GovernanceTagKeyRecord",
+    "GovernanceTagValueRecord",
+    "LineageRecord",
     "NormalizedStructuralSchema",
     "SchemaRecord",
     "TableRecord",
+    "ValueRecord",
 ]
