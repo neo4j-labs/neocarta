@@ -48,6 +48,52 @@ def coerce_upper(value: str | None) -> str | None:
     return value.upper() if value is not None else None
 
 
+_NULLABLE_TRUE_TOKENS = frozenset({"NULLABLE", "YES", "Y", "TRUE", "T", "1"})
+_NULLABLE_FALSE_TOKENS = frozenset({"REQUIRED", "NO", "N", "FALSE", "F", "0"})
+
+
+def coerce_nullable(value: Any) -> Any:
+    """Coerce a source nullability value to a ``bool``.
+
+    Normalises the standardised nullability vocabulary schema connectors emit —
+    the ``INFORMATION_SCHEMA`` ``"YES"``/``"NO"`` strings and the
+    BigQuery/Dataplex ``"NULLABLE"``/``"REQUIRED"`` mode strings (case
+    insensitive) — plus native bools. ``None``/NaN map to ``True`` (the
+    permissive default matching the normalized ``nullable`` field). Unrecognised
+    values are returned unchanged for Pydantic to coerce or reject.
+
+    Source-specific fallbacks (e.g. Dataplex ``"REPEATED"`` → not nullable, or a
+    driver's missing-value default) stay in the connector; this normalises only
+    the shared token vocabulary.
+
+    Parameters
+    ----------
+    value : Any
+        The raw nullability value.
+
+    Returns:
+    -------
+    Any
+        ``True``/``False`` for a recognised token or bool, ``True`` for
+        ``None``/NaN, otherwise ``value`` unchanged.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return True
+    if isinstance(value, str):
+        token = value.strip().upper()
+        if token in _NULLABLE_TRUE_TOKENS:
+            return True
+        if token in _NULLABLE_FALSE_TOKENS:
+            return False
+        return value
+    if isna(value):
+        return True
+
+    return value
+
+
 def coerce_str(value: Any) -> str:
     """Cast a value to ``str``, mapping NaN-like values to an empty string.
 
