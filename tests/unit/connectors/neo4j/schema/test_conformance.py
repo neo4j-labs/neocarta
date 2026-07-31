@@ -20,7 +20,11 @@ PACKAGE = "neocarta.connectors.neo4j.schema"
 
 def _make_connector() -> Neo4jSchemaConnector:
     """Construct a Neo4jSchemaConnector with mocked external dependencies."""
-    return Neo4jSchemaConnector(neo4j_driver=MagicMock())
+    return Neo4jSchemaConnector(
+        source_neo4j_driver=MagicMock(),
+        neo4j_driver=MagicMock(),
+        source_name="dbms",
+    )
 
 
 def test_conforms_to_source_connector_protocol():
@@ -73,3 +77,18 @@ def test_load_before_transform_raises_state_error():
     connector = _make_connector()
     with pytest.raises(StateError):
         connector.load()
+
+
+def test_context_manager_returns_self():
+    """The connector is usable as a context manager and yields itself."""
+    connector = _make_connector()
+    with connector as ctx:
+        assert ctx is connector
+
+
+def test_close_leaves_both_injected_drivers_open():
+    """close() must not close either caller-owned driver (source or target)."""
+    connector = _make_connector()
+    connector.close()
+    connector.neo4j_driver.close.assert_not_called()
+    connector.source_neo4j_driver.close.assert_not_called()
