@@ -110,8 +110,13 @@ No connector produces **lineage** at all; see *Not modelled* below.
   as column-grain. Only blank folds — a real name is never stripped.
 - **Sparse rows** (D10). Key metadata (`is_primary_key` / `is_foreign_key`)
   defaults to `None` = "the source said nothing", never a fabricated `False`, so
-  a non-clobber merge can't let a partial row erase a fuller one. `nullable`
-  keeps the permissive `True` default to match the current graph model. Note the
+  the [non-clobber merge](../../../../docs/refactor/merge-contract.md) can't let a
+  partial row erase a fuller one — a tri-state field is protected by value
+  coalescing on its own. `nullable` keeps the permissive `True` default to match
+  the current graph model, and is therefore the one field that is *not*: having no
+  "unknown", its default is indistinguishable from an asserted `True`, so only the
+  writer's property-scope layer (leaving it out of the write entirely, as
+  `connectors/query_log` already does) keeps a sparse row honest about it. Note the
   one place `None` means something else: in a facet **key** segment it means "the
   path ends here" (the grain), which does not collide with the unknown-vs-false
   rule because the grain-bearing records carry no attribute columns at all.

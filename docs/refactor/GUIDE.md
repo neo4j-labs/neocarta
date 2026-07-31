@@ -119,7 +119,7 @@ These are **settled** decisions. A ticket citing `D#` means "this constraint is 
   rare explicit-ID override exists for cross-source alignment.
 - **D7** — normalization needs value coercions (not just field renames).
 - **D10** — sparse rows are supported with a **non-clobber merge** contract (partial data never erases
-  fuller data).
+  fuller data). Specified and tested in `docs/refactor/merge-contract.md` (`S1-3`).
 - **D11** — two ingestion paradigms: **tabular** (→ normalized schema) and **graph/semantic** (OSI now),
   each decoupled, converging on one canonical model.
 - **D12** — legacy `export()` (graph → file) is kept alive through the 1.0.0 cutover for parity; its
