@@ -31,7 +31,7 @@ class SchemaExtractorCache(TypedDict, total=False):
     node_info: pd.DataFrame  # label
     relationship_info: pd.DataFrame  # type
     node_property_info: pd.DataFrame  # label, property, type, unique, indexed, existence
-    relationship_property_info: pd.DataFrame  # type, property, type, unique, indexed, existence
+    relationship_property_info: pd.DataFrame  # rel_type, property, type, unique, indexed, existence
     relationship_endpoint_info: pd.DataFrame  # type, source_label, target_label
 
 
