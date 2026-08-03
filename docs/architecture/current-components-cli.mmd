@@ -1,0 +1,48 @@
+---
+title: Neocarta — C4 Level 3 Components — CLI (neocarta) — CURRENT STATE
+---
+flowchart TB
+    subgraph Legend["Legend"]
+        direction LR
+        LP(["Person"]):::person
+        LComp["Component"]:::comp
+        LDown["Downstream (core lib / server)"]:::down
+        LExt{{"External"}}:::external
+    end
+
+    USER(["Data / Platform Engineer"]):::person
+
+    subgraph CLI["neocarta/_cli/"]
+        direction TB
+        MAIN["main.py — root Click group<br/>global flags · ctx.obj · exit codes"]:::comp
+        subgraph CMDS["commands/"]
+            direction TB
+            CONNCMD["connector groups:<br/>bigquery · dataplex · snowflake · databricks ·<br/>jdbc · csv · osi · query-log"]:::comp
+            MCPCMD["mcp serve"]:::comp
+            TOOLCMD["tool (retrieval mirror · sync driver)"]:::comp
+            ACTX["agent-context (introspection JSON)"]:::comp
+        end
+        COMMON["_common.py<br/>neo4j_options · _neo4j_driver ·<br/>_build_embedder · _run_embeddings"]:::comp
+        CONFIG["config.py — CLISettings<br/>(flag &gt; env &gt; default)"]:::comp
+        OUT["output.py (Rich) · errors.py · _logging"]:::comp
+    end
+
+    CORE["core library<br/>connectors · ingest · enrichment"]:::down
+    MCPSRV["neocarta-mcp server"]:::down
+    NEO[("Neo4j")]:::external
+
+    USER --> MAIN
+    MAIN --> CMDS
+    MAIN --> CONFIG
+    MAIN --> OUT
+    CMDS --> COMMON
+    CONNCMD -->|lazy import + ingest| CORE
+    COMMON -->|driver / embedder| CORE
+    COMMON --> NEO
+    MCPCMD -.->|delegates run| MCPSRV
+    TOOLCMD -->|direct read| NEO
+
+    classDef person fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+    classDef comp fill:#ede7f6,stroke:#5e35b1,color:#311b92;
+    classDef down fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;

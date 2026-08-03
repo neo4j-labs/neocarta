@@ -1,0 +1,99 @@
+# Neocarta — C4 Level 3 Components — Core build pipeline — TARGET STATE (1.0.0 shape, held through 2.0.0)
+# Mirrors docs/architecture/current-components-core-pipeline.mmd (the view flagged dense in the
+# current-state pass), change-coded. In D2 because the target adds the ontology/normalizer/Graph-Spec
+# layers on top of an already-dense view. Traceability in target-state.md.
+
+vars: { d2-config: { layout-engine: elk } }
+
+classes: {
+  new:   { style: { fill: "#e8f5e9"; stroke: "#2e7d32"; stroke-width: 2 } }
+  mod:   { style: { fill: "#fff8e1"; stroke: "#f9a825"; stroke-width: 2 } }
+  rem:   { style: { fill: "#ffebee"; stroke: "#c62828"; stroke-dash: 4 } }
+  keep:  { style: { fill: "#eceff1"; stroke: "#90a4ae" } }
+  store: { shape: cylinder; style: { fill: "#e3f2fd"; stroke: "#1565c0" } }
+  ext:   { shape: hexagon; style: { fill: "#f5f5f5"; stroke: "#607d8b" } }
+}
+
+legend: Legend {
+  near: top-left
+  grid-columns: 2
+  n: NEW { class: new }
+  m: "MODIFIED / MOVED" { class: mod }
+  r: "REMOVED @ 1.0.0" { class: rem }
+  u: UNCHANGED { class: keep }
+  d: Datastore { class: store }
+  x: External { class: ext }
+}
+
+# ---------- External ----------
+src: "Tabular metadata sources\n(BigQuery · Snowflake · Databricks · JDBC · UC · CSV · logs)" { class: ext }
+osisrc: "Graph/semantic source\n(OSI YAML)" { class: ext }
+emb: "Embedding providers (LiteLLM)" { class: ext }
+neo: "Neo4j" { class: store }
+
+# ---------- Connectors (now extension artifacts) ----------
+conn: "extensions/connectors  (was connectors/)" {
+  base: "base types + categorical templates\n(RDBMS · Graph) + public API" { class: new }
+  persrc: "per-source extractors\nextract → emit normalized_schema (declared mapping)" { class: mod }
+  cache: "models — private extractor cache (D5)" { class: mod }
+}
+
+# ---------- Normalized schema (the new contract) ----------
+norm: "etl/metadata_normalizer/normalized_schema\nsource-agnostic tabular contract (identity-free)" { class: new }
+
+# ---------- Canonical model + ontology ----------
+model: "etl/  canonical model + ontology" {
+  models: "etl/models — canonical objects\n(was data_model/*)" { class: mod }
+  ont: "etl/ontology — NodeType / RelType /\nPropertySpec + per-type KeySpec identity (D6)" { class: new }
+}
+
+# ---------- Central transform ----------
+xform: "etl/transform  (central; was 11 per-connector transform.py)" {
+  tab: "tabular transform (#306)" { class: new }
+  graph: "graph/semantic transform — OSI (#307, seam D16)" { class: new }
+  idb: "generic KeySpec ID builder (#305)\nreplaces ~15 generate_*_id" { class: new }
+}
+
+# ---------- Pipeline + generic writer ----------
+pipe: "etl/pipeline  (was ingest/)" {
+  orch: "orchestrator — dedups 10 per-connector ingest()" { class: mod }
+  writer: "ontology-driven generic writer\n= import-spec targets · non-clobber merge (D10)" { class: mod }
+}
+
+# ---------- Enrichment ----------
+enr: "enrichment" {
+  eetl: "etl/enrichment — embeddings +\nontology-driven target selection" { class: mod }
+  eext: "extensions/enrichments — extension point (D17)" { class: new }
+}
+
+# ---------- Graph Spec substrate ----------
+gs: "Graph Spec adapter (neo4j/import-spec)\none sources→targets JSON lineage · D13/D14\n⚠ contingent on spike #297" { class: new }
+
+# ---------- Legacy path removed at cutover ----------
+legacy: "Legacy per-connector path — removed at 1.0.0 cutover (#318)" {
+  style: { stroke-dash: 4; stroke: "#c62828"; fill: "#fff5f5" }
+  lt: "per-connector transform.py" { class: rem }
+  lid: "connectors/utils/generate_*_id" { class: rem }
+  lload: "ingest/rdbms 30 bespoke load_* methods" { class: rem }
+  llpg: "data_model/schema/lpg stub" { class: rem }
+}
+
+# ---------- Edges ----------
+src -> conn.persrc: extract
+conn.base -> conn.persrc
+conn.persrc -> norm: emit
+norm -> xform.tab
+osisrc -> xform.graph
+xform.tab -> model.models: canonical objects
+xform.graph -> model.models
+model.ont -> xform.idb: KeySpec
+xform.idb -> model.models: IDs
+model.models -> pipe.writer
+model.ont -> pipe.writer: targets
+pipe.orch -> pipe.writer
+pipe.writer -> neo: write (import-spec targets)
+enr.eetl -> neo: read desc-nodes · write embeddings
+enr.eetl -> emb: embed
+enr.eext -> enr.eetl
+conn.persrc -> gs: declared mapping = SourceProvider SPI { style.stroke-dash: 3 }
+gs -> pipe.writer: import-spec lineage { style.stroke-dash: 3 }

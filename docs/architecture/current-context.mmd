@@ -1,0 +1,38 @@
+---
+title: Neocarta — C4 Level 1 (System Context) — CURRENT STATE
+---
+flowchart LR
+    %% ===== Legend (conventions used in every current-*.mmd) =====
+    subgraph Legend["Legend"]
+        direction LR
+        L1(["Person / actor"]):::person
+        L2["Internal system"]:::system
+        L3{{"External system"}}:::external
+        L4[("Datastore")]:::store
+        L5["dashed edge = async / process-launch<br/>solid edge = synchronous call"]:::note
+    end
+
+    %% ===== Actors =====
+    ENG(["Data / Platform Engineer<br/>(builds the graph)"]):::person
+    AICONS(["AI agent / MCP host<br/>(e.g. Claude Desktop, Text2SQL agent)"]):::person
+
+    %% ===== The system =====
+    NC["Neocarta<br/>semantic-layer toolkit<br/>(library · CLI · MCP server)"]:::system
+
+    %% ===== External systems =====
+    SRC{{"Metadata sources<br/>BigQuery · Dataplex · Snowflake · Databricks ·<br/>Unity Catalog · JDBC DBs · CSV / OSI / query-log files"}}:::external
+    EMB{{"Embedding / LLM providers<br/>via LiteLLM (OpenAI, Gemini, …)"}}:::external
+    NEO[("Neo4j<br/>metadata graph")]:::store
+
+    %% ===== Relationships =====
+    ENG -->|"runs CLI to extract and load metadata"| NC
+    NC -->|"extracts schema / catalog / query logs"| SRC
+    NC -->|"writes and reads the graph"| NEO
+    NC -->|"embeds descriptions and query text"| EMB
+    AICONS -->|"queries graph for context (MCP, read-only)"| NC
+
+    classDef person fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+    classDef system fill:#ede7f6,stroke:#5e35b1,color:#311b92,stroke-width:2px;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;
+    classDef store fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;

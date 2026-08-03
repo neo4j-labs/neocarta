@@ -1,0 +1,72 @@
+---
+title: Neocarta — C4 Level 3 Components — Core build pipeline (connectors → data_model → ingest → enrichment) — CURRENT STATE
+---
+flowchart LR
+    subgraph Legend["Legend"]
+        direction LR
+        LComp["Component / module"]:::comp
+        LExt{{"External system"}}:::external
+        LStore[("Datastore")]:::store
+        LWip["Stub / in-progress"]:::wip
+    end
+
+    SRC{{"Metadata sources"}}:::external
+    EMB{{"Embedding providers<br/>(LiteLLM / OpenAI)"}}:::external
+    NEO[("Neo4j")]:::store
+
+    subgraph CONN["connectors/ — extract → transform → load"]
+        direction TB
+        BASE["_base.py<br/>SourceConnectorProtocol /<br/>FormatConnectorProtocol"]:::comp
+        subgraph FAM["connector packages (13)"]
+            direction TB
+            SCHEMA["schema: bigquery · dataplex ·<br/>snowflake · databricks ·<br/>jdbc (SchemaCrawler) · unity_catalog"]:::comp
+            LOGS["query logs: bigquery · snowflake · file"]:::comp
+            GLOSS["dataplex glossary"]:::comp
+            GOV["databricks tags (governance)"]:::comp
+            FILE["file formats: csv · osi (YAML)"]:::comp
+        end
+        UTIL["utils/<br/>RdbmsSchemaConnector · RdbmsSchemaTransformer<br/>generate_id · dbapi_errors"]:::comp
+    end
+
+    subgraph DM["data_model/ — Pydantic graph models"]
+        direction TB
+        DMR["schema/rdbms · glossary · governance ·<br/>instance · query · osi · metadata"]:::comp
+        DMLPG["schema/lpg (in-progress, unused)"]:::wip
+    end
+
+    subgraph ING["ingest/ — Neo4j load (sync driver · UNWIND / MERGE)"]
+        direction TB
+        LOADER["rdbms/Neo4jRDBMSLoader<br/>load_*_nodes / load_*_relationships"]:::comp
+        IUTIL["utils.py — query builders + constraints"]:::comp
+        IDX["indexes.py — vector / full-text / range"]:::comp
+        META["metadata.py — __neocarta_graph__ upsert"]:::comp
+        OSILOAD["connectors/osi/OsiNeo4jLoader<br/>(subclass)"]:::comp
+        ILPG["lpg/ (constraints only · no loader)"]:::wip
+    end
+
+    subgraph ENR["enrichment/embeddings/ — post-load pass"]
+        direction TB
+        EBASE["BaseEmbeddingsConnector<br/>(batch loop · read/write graph)"]:::comp
+        ELL["LiteLLMEmbeddingsConnector /<br/>OpenAIEmbeddingsConnector"]:::comp
+    end
+
+    SRC -->|extract| FAM
+    BASE -.->|contract| FAM
+    SCHEMA -.->|shared base| UTIL
+    LOGS -.->|shared transform| UTIL
+    FAM -->|"transform → typed objects"| DMR
+    DMR -->|"model_dump → $rows"| LOADER
+    LOADER --> IUTIL
+    LOADER --> IDX
+    LOADER --> META
+    OSILOAD -.->|extends| LOADER
+    LOADER -->|"UNWIND / MERGE"| NEO
+    IDX -->|creates vector index| NEO
+    EBASE -->|"read desc-nodes · write embedding"| NEO
+    EBASE --> ELL
+    ELL -->|embed| EMB
+
+    classDef comp fill:#ede7f6,stroke:#5e35b1,color:#311b92;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;
+    classDef store fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef wip fill:#fff3e0,stroke:#fb8c00,color:#e65100,stroke-dasharray: 5 3;

@@ -1,0 +1,42 @@
+---
+title: Target Containers — Band 1.0.0 (connector cutover · MAJOR break #1)
+---
+flowchart LR
+    %% Cumulative container snapshot at end of 1.0.0. Highlights what landed THIS band vs current.
+    subgraph Legend[" "]
+        direction LR
+        LN["landed this band"]:::new
+        LM["restructured"]:::mod
+        LU["unchanged"]:::keep
+        LB["⚠ break point"]:::brk
+    end
+
+    ENG(["Data / Platform Engineer"]):::keep
+
+    subgraph SYS["Neocarta 1.0.0"]
+        direction TB
+        CLI["CLI (unchanged this band)"]:::keep
+        MCP["MCP server (unchanged this band)"]:::keep
+        ETL["etl/ pipeline + extensions/connectors<br/>replaces connectors/ + ingest/ + data_model/<br/>connectors now emit normalized schema only"]:::mod
+        BREAK["⚠ connector-authoring contract BREAK<br/>transform()/load()/run() removed (#315/#318)<br/>ingest() + CLI callers UNAFFECTED"]:::brk
+        NEO[("Neo4j")]:::keep
+    end
+
+    AGENT["Text2SQL agent (still bundled)"]:::keep
+    SRC{{"Metadata sources"}}:::keep
+    EMB{{"Embedding / LLM providers"}}:::keep
+
+    ENG --> CLI
+    CLI --> ETL
+    ETL -->|extract| SRC
+    ETL -->|write| NEO
+    ETL -->|embed| EMB
+    ETL -.-> BREAK
+    MCP --> NEO
+    AGENT --> MCP
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef mod fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#e65100;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef brk fill:#fff3e0,stroke:#c62828,stroke-width:2px,color:#b71c1c;
+    classDef store fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;

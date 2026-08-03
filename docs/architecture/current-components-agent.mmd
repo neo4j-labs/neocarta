@@ -1,0 +1,38 @@
+---
+title: Neocarta — C4 Level 3 Components — Text2SQL agent (consumer) — CURRENT STATE
+---
+flowchart LR
+    subgraph Legend["Legend"]
+        direction LR
+        LComp["Component"]:::comp
+        LExt{{"External system"}}:::external
+        LP(["Person"]):::person
+        LN["dashed = variant-only path"]:::note
+    end
+
+    USER(["User"]):::person
+
+    subgraph AGENT["agent/ + run_agent.py"]
+        direction TB
+        RUN["run_agent.py<br/>MultiServerMCPClient · GoogleAuth · chat loop"]:::comp
+        BUILD["agent.py — create_text2sql_agent<br/>LangGraph create_agent · InMemorySaver · ChatLiteLLM"]:::comp
+        MB["musicbrainz_agent.py (variant)"]:::comp
+    end
+
+    NCMCP{{"neocarta-mcp<br/>(stdio subprocess)"}}:::external
+    BQMCP{{"Google BigQuery MCP<br/>(remote HTTP · execute_sql)"}}:::external
+    LLM{{"Chat LLM via LiteLLM"}}:::external
+    MBAPI{{"MusicBrainz REST API"}}:::external
+
+    USER -->|question| RUN
+    RUN -->|builds| BUILD
+    RUN -->|schema context| NCMCP
+    RUN -->|execute_sql| BQMCP
+    BUILD -->|reason / tool-calling| LLM
+    MB -.->|variant uses| NCMCP
+    MB -.->|variant uses| MBAPI
+
+    classDef comp fill:#ede7f6,stroke:#5e35b1,color:#311b92;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;
+    classDef person fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;

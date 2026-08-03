@@ -1,0 +1,121 @@
+# Neocarta — C4 Level 2 (Containers) — TARGET STATE (2.0.0 end-state)
+# Change-coded vs docs/architecture/current-containers.mmd. Every NEW/MODIFIED/REMOVED
+# element traces to a ticket in target-state.md's traceability matrix.
+# Rendered in D2 (not Mermaid) because the target container view is dense:
+# ~22 nodes with many-to-many auth / observability / config edges.
+
+vars: { d2-config: { layout-engine: elk } }
+
+classes: {
+  new:    { style: { fill: "#e8f5e9"; stroke: "#2e7d32"; stroke-width: 2 } }
+  mod:    { style: { fill: "#fff8e1"; stroke: "#f9a825"; stroke-width: 2 } }
+  rem:    { style: { fill: "#ffebee"; stroke: "#c62828"; stroke-dash: 4 } }
+  keep:   { style: { fill: "#eceff1"; stroke: "#90a4ae" } }
+  store:  { shape: cylinder; style: { fill: "#e3f2fd"; stroke: "#1565c0" } }
+  ext:    { shape: hexagon; style: { fill: "#f5f5f5"; stroke: "#607d8b" } }
+  extnew: { shape: hexagon; style: { fill: "#e8f5e9"; stroke: "#2e7d32"; stroke-width: 2 } }
+  person: { shape: person; style: { fill: "#ede7f6"; stroke: "#5e35b1" } }
+  pnew:   { shape: person; style: { fill: "#e8f5e9"; stroke: "#2e7d32"; stroke-width: 2 } }
+}
+
+legend: Legend {
+  near: top-left
+  grid-columns: 2
+  n: NEW { class: new }
+  m: MODIFIED { class: mod }
+  r: "REMOVED (ghost)" { class: rem }
+  u: UNCHANGED { class: keep }
+  d: Datastore { class: store }
+  x: External { class: ext }
+  edges: "solid = sync call  ·  dashed = async / token flow" { shape: text; grid-columns: 1 }
+}
+
+# ---------- Actors ----------
+eng: "Data / Platform Engineer" { class: person }
+admin: "Application Admin" { class: pnew }
+user: "Human user (console)" { class: pnew }
+agenthost: "AI agent / MCP host" { class: person }
+apiclient: "App / API client" { class: pnew }
+
+# ---------- External systems ----------
+src: "Metadata sources\n(BigQuery · Snowflake · Databricks · … · files)" { class: ext }
+emb: "Embedding / LLM providers\n(LiteLLM)" { class: ext }
+idp: "Enterprise IdP\n(Entra / Okta)\nOIDC · SCIM" { class: extnew }
+pdp: "Policy engine / PDP\n(OpenFGA)" { class: extnew }
+secmgr: "Secret manager\n(Vault / cloud KMS) — future" { class: extnew }
+
+# ---------- Removed ----------
+agent: "Text2SQL agent (run_agent.py)\nREMOVED @ 2.0.0" { class: rem }
+
+# ---------- The system ----------
+nc: "Neocarta 2.0.0" {
+  ingest: "Ingest OCI image · batch Job" {
+    etl: "ETL pipeline\netl/: normalize → transform → write → enrich" { class: mod }
+    extconn: "extensions/connectors\n(per-source, spin-out-ready)" { class: new }
+    extenr: "extensions/enrichments" { class: new }
+  }
+
+  svc: "Consumption service OCI image · long-running Deployment" {
+    corpus: "Consumption corpus\n(sans-I/O op-specs)" { class: new }
+    admincorpus: "Administration corpus\n(admin op-specs)" { class: new }
+    execs: "Executors (sync · async)" { class: new }
+    mcp: "MCP adapter\nstdio + Streamable-HTTP" { class: mod }
+    api: "REST / OpenAPI API" { class: new }
+    ui: "Needle UI (React SPA)" { class: new }
+  }
+
+  extfw: "extensions/ framework\nSPI · discovery · boundary · entitlement-gate" { class: new }
+
+  platform: "Platform / cross-cutting" {
+    settings: "Settings core (SecretStr)" { class: mod }
+    manifest: "Config-as-code manifest\n(OpenGitOps)" { class: new }
+    secrets: "Secret-provider (ref: env://)" { class: new }
+    pep: "AuthZEN PEP" { class: new }
+    authn: "AuthN (Authlib · OAuth 2.1 RS)" { class: new }
+    otel: "OpenTelemetry\n(instruments all planes)" { class: new }
+  }
+
+  cli: "CLI\nthin adapter + admin group" { class: mod }
+  neo: "Neo4j\ngraph + admin runtime state" { class: store }
+}
+
+# ---------- Actor edges ----------
+eng -> nc.cli: runs ingest / admin
+admin -> nc.cli: admin ops
+admin -> nc.svc.api: admin ops (API-ready)
+user -> nc.svc.ui
+agenthost -> nc.svc.mcp: MCP tools
+apiclient -> nc.svc.api
+
+# ---------- Consumption / interface ----------
+nc.svc.ui -> nc.svc.api
+nc.svc.mcp -> nc.svc.corpus
+nc.svc.api -> nc.svc.corpus
+nc.cli -> nc.svc.corpus
+nc.cli -> nc.svc.admincorpus
+nc.svc.corpus -> nc.svc.execs
+nc.svc.admincorpus -> nc.svc.execs
+nc.svc.execs -> nc.platform.pep: every op gated
+nc.platform.pep -> pdp: decision { style.stroke-dash: 3 }
+nc.svc.execs -> nc.neo: read
+nc.svc.execs -> emb: embed query
+
+# ---------- Ingest ----------
+nc.ingest.extconn -> src: extract
+nc.ingest.etl -> nc.neo: write
+nc.ingest.etl -> emb: embed
+nc.ingest.extconn -> nc.extfw
+nc.ingest.extenr -> nc.extfw
+nc.svc.corpus -> nc.extfw: methods
+
+# ---------- Platform / auth ----------
+nc.svc.api -> nc.platform.authn
+nc.svc.mcp -> nc.platform.authn: HTTP only
+nc.svc.ui -> nc.platform.authn
+nc.platform.authn -> idp: validate token { style.stroke-dash: 3 }
+nc.platform.manifest -> nc.platform.settings
+nc.platform.settings -> nc.platform.secrets
+nc.platform.secrets -> secmgr: future { style.stroke-dash: 3 }
+
+# ---------- Removed relationship (ghost) ----------
+agenthost -> agent: was { style.stroke-dash: 4; style.stroke: "#c62828" }

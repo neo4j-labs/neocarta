@@ -1,0 +1,85 @@
+---
+title: Neocarta — C4 Level 3 Components — Consumption corpus + interface adapters — TARGET STATE (2.0.0)
+---
+flowchart TB
+    %% Supersedes current-components-mcp.mmd AND current-components-cli.mmd: MCP and CLI
+    %% become thin adapters over ONE shared corpus. Change-coded; traceability in target-state.md.
+    subgraph Legend["Legend — change coding"]
+        direction LR
+        LN["NEW"]:::new
+        LM["MODIFIED / MOVED"]:::mod
+        LU["UNCHANGED / reused"]:::keep
+        LE["solid = sync · dashed = auth/token"]:::note
+    end
+
+    %% ===== Actors / hosts =====
+    ENG(["Engineer / Admin"]):::keep
+    HOST{{"AI agent / MCP host"}}:::keep
+    APIC{{"App / API client"}}:::new
+    USER(["Human user"]):::new
+
+    subgraph IF["Interface adapters — thin over corpus (S7)"]
+        direction LR
+        CLI["CLI adapter (sync)<br/>+ admin group"]:::mod
+        MCP["MCP adapter (async)<br/>stdio + HTTP"]:::mod
+        API["REST / OpenAPI (async)"]:::new
+        UI["Needle UI (React)"]:::new
+    end
+    IFC["adapter contract + shared plumbing<br/>op-spec→surface · typed-error→contract · DTO→envelope"]:::new
+
+    subgraph CORPUS["consumption/ corpus (S6)"]
+        direction TB
+        METH["consumption/methods<br/>sans-I/O op-specs (#382)<br/>{query_fn, params, needs_embedding, result_model, availability_reqs}"]:::new
+        QRY["consumption/queries<br/>Cypher (← _mcp/cypher, #379)"]:::mod
+        DTO["consumption/models<br/>DTOs (← _mcp/models, #380)"]:::mod
+    end
+
+    subgraph EXE["Execution"]
+        direction LR
+        SYNC["sync executor"]:::new
+        ASYNC["async executor"]:::new
+        PEP["AuthZEN PEP<br/>gates every op (#437/#473)"]:::new
+    end
+
+    SET["settings core (SecretStr, unified) (#409)"]:::mod
+
+    NEO[("Neo4j (read)")]:::keep
+    EMB{{"Embedding providers (LiteLLM)"}}:::keep
+    IDP{{"IdP (OIDC/OAuth2.1)"}}:::new
+    PDP{{"PDP (OpenFGA)"}}:::new
+    AUTHN["AuthN (Authlib RS)"]:::new
+
+    ENG --> CLI
+    HOST --> MCP
+    APIC --> API
+    USER --> UI
+    UI --> API
+
+    CLI --> IFC
+    MCP --> IFC
+    API --> IFC
+    UI --> IFC
+    IFC --> METH
+    METH --> QRY
+    METH --> DTO
+    CLI -->|bind sync| SYNC
+    MCP -->|bind async| ASYNC
+    API -->|bind async| ASYNC
+    SYNC --> PEP
+    ASYNC --> PEP
+    PEP -.->|decision| PDP
+    SYNC -->|embed?| EMB
+    ASYNC -->|embed?| EMB
+    SYNC -->|run| QRY
+    ASYNC -->|run| QRY
+    QRY --> NEO
+    API -.-> AUTHN
+    MCP -.->|HTTP only| AUTHN
+    UI -.-> AUTHN
+    AUTHN -.-> IDP
+    SET -.-> IF
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef mod fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#e65100;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;

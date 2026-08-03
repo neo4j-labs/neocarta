@@ -1,0 +1,47 @@
+---
+title: Target Containers — Band 1.2.0 (extension framework + administration · minor)
+---
+flowchart LR
+    %% Cumulative snapshot at end of 1.2.0. NEW this band: extensions/ framework, administration
+    %% corpus, and platform seams shipped DEFAULT-OFF (activated at 2.0.0).
+    subgraph Legend[" "]
+        direction LR
+        LN["landed this band (default-off)"]:::new
+        LU["unchanged / prior band"]:::keep
+    end
+
+    ENG(["Engineer"]):::keep
+    ADMIN(["Application Admin"]):::new
+    HOST{{"AI agent / MCP host"}}:::keep
+
+    subgraph SYS["Neocarta 1.2.0"]
+        direction TB
+        ETL["etl/ ingest pipeline"]:::keep
+        CORPUS["consumption/ corpus + executors"]:::keep
+        IF["interface adapters: CLI · MCP · API · UI<br/>(API/UI still gated)"]:::keep
+        EXTFW["extensions/ framework<br/>SPI · discovery · boundary · entitlement-gate (#418)"]:::new
+        ADMINC["administration/ corpus<br/>config-manifest · pipeline/connector/extension admin (#433)"]:::new
+        SEAMS["platform seams (default-off)<br/>secret-provider · AuthZEN PEP hook · OIDC/SCIM cfg · OTel<br/>(#441/#437/#458/#457)"]:::new
+        NEO[("Neo4j<br/>+ admin runtime state")]:::keep
+    end
+
+    SRC{{"Metadata sources"}}:::keep
+    EMB{{"Embedding providers"}}:::keep
+
+    ENG --> IF
+    ADMIN --> ADMINC
+    HOST --> IF
+    IF --> CORPUS
+    CORPUS -->|read| NEO
+    CORPUS -->|embed| EMB
+    ETL -->|extract| SRC
+    ETL -->|write| NEO
+    ETL --> EXTFW
+    CORPUS --> EXTFW
+    ADMINC --> EXTFW
+    ADMINC --> SEAMS
+    ADMINC --> NEO
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef store fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;

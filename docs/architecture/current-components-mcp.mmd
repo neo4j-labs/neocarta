@@ -1,0 +1,50 @@
+---
+title: Neocarta — C4 Level 3 Components — MCP server (read path) — CURRENT STATE
+---
+flowchart LR
+    subgraph Legend["Legend"]
+        direction LR
+        LComp["Component"]:::comp
+        LReuse["Reused core component"]:::reuse
+        LExt{{"External / host"}}:::external
+        LStore[("Datastore")]:::store
+    end
+
+    HOST{{"MCP host / AI agent<br/>(stdio client)"}}:::external
+    NEO[("Neo4j (read-only)")]:::store
+    EMB{{"Embedding providers<br/>(LiteLLM)"}}:::external
+
+    subgraph MCP["neocarta/_mcp/"]
+        direction TB
+        SERVER["server.py<br/>create_mcp_server · run / main<br/>_select_search_strategy · run_stdio_async"]:::comp
+        SETTINGS["settings.py<br/>(pydantic-settings · no auth)"]:::comp
+        INV["inventory.py<br/>probe indexes / nodes · version check"]:::comp
+        subgraph TOOLS["tools/ (registered by available indexes)"]
+            direction TB
+            TCAT["catalog: list schemas / tables · full dump"]:::comp
+            TSEARCH["vector · full_text · hybrid ·<br/>business_term_hybrid (per label)"]:::comp
+            TOSI["osi_catalog · osi_domain · osi_definitions"]:::comp
+        end
+        CYPHER["cypher/ — read-only query strings"]:::comp
+    end
+
+    EMBED["enrichment/embeddings<br/>LiteLLMEmbeddingsConnector"]:::reuse
+    IDS["connectors/utils/generate_id"]:::reuse
+    METAMODEL["data_model.metadata.NeocartaGraph<br/>+ ingest.metadata FETCH cypher"]:::reuse
+
+    HOST -->|"tool calls (stdio)"| SERVER
+    SERVER --> SETTINGS
+    SERVER --> INV
+    SERVER -->|registers| TOOLS
+    INV --> METAMODEL
+    INV -->|probe| NEO
+    TOOLS --> CYPHER
+    TSEARCH -->|embed query text| EMBED
+    TOSI -->|deterministic ids| IDS
+    EMBED -->|embed| EMB
+    CYPHER -->|"read (RoutingControl.READ)"| NEO
+
+    classDef comp fill:#ede7f6,stroke:#5e35b1,color:#311b92;
+    classDef reuse fill:#e0f7fa,stroke:#0097a7,color:#006064;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;
+    classDef store fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;

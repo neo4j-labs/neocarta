@@ -1,0 +1,49 @@
+---
+title: Neocarta — C4 Level 1 System Context — TARGET STATE 2.0.0
+---
+flowchart LR
+    %% Change-coded vs current-context.mmd. NEW/MODIFIED/REMOVED trace to tickets in target-state.md.
+    subgraph Legend["Legend — change coding"]
+        direction LR
+        LN["NEW"]:::new
+        LM["MODIFIED"]:::mod
+        LR2["REMOVED / ghost"]:::rem
+        LU["UNCHANGED"]:::keep
+        LD[("Datastore")]:::store
+        LE["solid = sync · dashed = auth / token flow"]:::note
+    end
+
+    ENG(["Data / Platform Engineer"]):::keep
+    ADMIN(["Application Admin"]):::new
+    USER(["Human user · console"]):::new
+    AGENT(["AI agent / MCP host"]):::keep
+    APIC(["App / API client"]):::new
+
+    NC["Neocarta 2.0.0<br/>ingest + consumption + administration<br/>library · CLI · MCP · REST API · UI"]:::mod
+
+    SRC{{"Metadata sources<br/>BigQuery · Snowflake · … · files"}}:::keep
+    EMB{{"Embedding / LLM providers · LiteLLM"}}:::keep
+    NEO[("Neo4j<br/>graph + admin runtime state")]:::store
+    IDP{{"Enterprise IdP · Entra / Okta<br/>OIDC · SCIM"}}:::new
+    PDP{{"Policy engine / PDP · OpenFGA"}}:::new
+
+    OLDAGENT(["Bundled Text2SQL agent<br/>REMOVED at 2.0.0 · issue 500"]):::rem
+
+    ENG -->|build graph / ingest| NC
+    ADMIN -->|administer| NC
+    USER -->|browse via UI| NC
+    APIC -->|REST / OpenAPI| NC
+    AGENT -->|MCP tools| NC
+    NC -->|extract metadata| SRC
+    NC -->|read / write| NEO
+    NC -->|embed text| EMB
+    NC -.->|validate token · OIDC / OAuth2.1| IDP
+    NC -.->|authz decision · AuthZEN| PDP
+    AGENT -.->|was bundled| OLDAGENT
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef mod fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#e65100;
+    classDef rem fill:#ffebee,stroke:#c62828,stroke-dasharray:4 3,color:#b71c1c;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef store fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;

@@ -1,0 +1,46 @@
+---
+title: Target Containers — Band 1.1.0 (consumption corpus + interface adapters · minor)
+---
+flowchart LR
+    %% Cumulative snapshot at end of 1.1.0. NEW this band: corpus + executors + API/UI (gated).
+    subgraph Legend[" "]
+        direction LR
+        LN["landed this band"]:::new
+        LM["became thin adapter"]:::mod
+        LU["unchanged / prior band"]:::keep
+    end
+
+    ENG(["Engineer / Admin"]):::keep
+    HOST{{"AI agent / MCP host"}}:::keep
+
+    subgraph SYS["Neocarta 1.1.0"]
+        direction TB
+        ETL["etl/ ingest pipeline (from 1.0.0)"]:::keep
+        CORPUS["consumption/ corpus + executors (sync·async)<br/>op-specs, single source of truth (#376/#382)"]:::new
+        CLI["CLI adapter (sync) + admin-ready<br/>tool mirror replaced (#403)"]:::mod
+        MCP["MCP adapter (async)<br/>regenerated from op-specs (#398)"]:::mod
+        API["REST / OpenAPI API<br/>BUILT, local-only / default-deny (#465)"]:::new
+        UI["Needle UI (React)<br/>BUILT, local-only demo (#466)"]:::new
+        NEO[("Neo4j")]:::keep
+    end
+
+    AGENT["Text2SQL agent (still bundled)"]:::keep
+    SRC{{"Metadata sources"}}:::keep
+    EMB{{"Embedding providers"}}:::keep
+
+    ENG --> CLI
+    HOST --> MCP
+    UI --> API
+    CLI --> CORPUS
+    MCP --> CORPUS
+    API --> CORPUS
+    CORPUS -->|read| NEO
+    CORPUS -->|embed| EMB
+    ETL -->|extract| SRC
+    ETL -->|write| NEO
+    AGENT --> MCP
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef mod fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#e65100;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef store fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;

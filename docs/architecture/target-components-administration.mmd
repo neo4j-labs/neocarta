@@ -1,0 +1,70 @@
+---
+title: Neocarta — C4 Level 3 Components — Administration corpus + platform seams — TARGET STATE (2.0.0)
+---
+flowchart TB
+    %% Entirely NET-NEW subsystem (S9, 1.2.0) + S10 auth activation. No current-state equivalent.
+    %% Change-coded; every element traces to a ticket in target-state.md.
+    subgraph Legend["Legend — change coding"]
+        direction LR
+        LN["NEW"]:::new
+        LU["UNCHANGED / other view"]:::keep
+        LE["solid = sync · dashed = reconcile/token"]:::note
+    end
+
+    ADMIN(["Application Admin"]):::new
+
+    subgraph SURF["Admin interface exposure (#459)"]
+        direction LR
+        ACLI["CLI admin group (now)"]:::new
+        AAPI["API-ready (S10)"]:::new
+    end
+
+    subgraph ADMINCORPUS["administration/ corpus (#433) — S6 pattern, own registry"]
+        direction TB
+        AMETH["admin op-specs + registry"]:::new
+        AEXE["dual executor (sync · async)"]:::new
+        subgraph DOMAINS["admin domains"]
+            direction LR
+            PADM["pipeline admin<br/>file DAG · named insertion points (#443)"]:::new
+            CADM["connector admin (#447)"]:::new
+            XADM["extension admin (#451)"]:::new
+        end
+    end
+
+    subgraph PLAT["Platform seams (default-off @1.2.0 → activated @2.0.0)"]
+        direction TB
+        MANIFEST["config-as-code manifest<br/>OpenGitOps desired-state (#438)"]:::new
+        SECRETS["secret-provider (ref: env://) (#441)"]:::new
+        PEP["AuthZEN PEP gate (#437)"]:::new
+        AUTHCFG["OIDC / SAML / SCIM config (#458)"]:::new
+        OTEL["OpenTelemetry (#457)"]:::new
+    end
+
+    %% other-view subsystems this administers
+    PIPE["etl/pipeline (other view)"]:::keep
+    EXTFW["extensions/ framework (other view)"]:::keep
+    NEO[("Neo4j<br/>admin runtime state")]:::keep
+    PDP{{"PDP (OpenFGA)"}}:::new
+    IDP{{"IdP (Entra/Okta)"}}:::new
+
+    ADMIN --> ACLI
+    ADMIN --> AAPI
+    ACLI --> AMETH
+    AAPI --> AMETH
+    AMETH --> AEXE
+    AMETH --> DOMAINS
+    AEXE --> PEP
+    PEP -.->|decision| PDP
+    PADM -->|configures| PIPE
+    PADM --> MANIFEST
+    CADM -->|lifecycle| EXTFW
+    XADM -->|install/enable/disable| EXTFW
+    MANIFEST -.->|reconcile| NEO
+    AEXE -->|runtime state| NEO
+    SECRETS -.-> IDP
+    AUTHCFG -.-> IDP
+    OTEL -.->|telemetry| AEXE
+
+    classDef new fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef keep fill:#eceff1,stroke:#90a4ae,color:#37474f;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;

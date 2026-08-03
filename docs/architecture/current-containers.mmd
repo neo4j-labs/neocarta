@@ -1,0 +1,52 @@
+---
+title: Neocarta — C4 Level 2 (Containers) — CURRENT STATE
+---
+flowchart LR
+    subgraph Legend["Legend"]
+        direction LR
+        LP(["Person"]):::person
+        LC["Container (process / in-process library)"]:::container
+        LE{{"External system"}}:::external
+        LD[("Datastore")]:::store
+        LN["dashed = process-launch · solid = sync call"]:::note
+    end
+
+    ENG(["Data / Platform Engineer"]):::person
+
+    subgraph SYS["Neocarta system boundary"]
+        direction TB
+        CLI["CLI · neocarta<br/>Click console script"]:::container
+        MCP["MCP server · neocarta-mcp<br/>FastMCP · stdio · read-only"]:::container
+        LIB["Core library (in-process)<br/>connectors · data_model · ingest · enrichment"]:::container
+        NEO[("Neo4j<br/>metadata graph")]:::store
+    end
+
+    SRC{{"Metadata sources<br/>BigQuery · Dataplex · Snowflake ·<br/>Databricks · Unity Catalog · JDBC · files"}}:::external
+    EMB{{"Embedding / LLM providers<br/>(LiteLLM)"}}:::external
+
+    subgraph CONS["Consumers (in-repo, separate concern)"]
+        direction TB
+        AGENT["Text2SQL agent<br/>LangGraph · run_agent.py"]:::container
+    end
+    BQMCP{{"Google BigQuery MCP<br/>(remote HTTP · execute_sql)"}}:::external
+
+    ENG -->|runs| CLI
+    CLI -->|drives connectors / ingest / enrichment| LIB
+    CLI -->|"tool group: direct reads"| NEO
+    CLI -.->|"mcp serve launches"| MCP
+    LIB -->|extract metadata| SRC
+    LIB -->|"write nodes / rels + embeddings"| NEO
+    LIB -->|embed text| EMB
+    MCP -->|reuses embedder + read Cypher| LIB
+    MCP -->|read context| NEO
+    MCP -->|embed query text| EMB
+    AGENT -->|"stdio: schema context"| MCP
+    AGENT -->|execute_sql| BQMCP
+    AGENT -->|chat LLM| EMB
+    BQMCP -->|runs SQL on BigQuery| SRC
+
+    classDef person fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+    classDef container fill:#ede7f6,stroke:#5e35b1,color:#311b92;
+    classDef external fill:#eceff1,stroke:#607d8b,color:#263238;
+    classDef store fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef note fill:#ffffff,stroke:#bdbdbd,color:#616161;
