@@ -216,3 +216,6 @@ eval/datasets/schemas/
 datasets/dataplex/lookup_entry_links.py
 claude_config.json
 .local/
+
+# macOS system files
+.DS_Store
