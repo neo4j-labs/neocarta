@@ -109,7 +109,8 @@ package — the `etl/` and `extensions/` paths below are `neocarta/etl/…` and 
   SPIs). It is **mapping/ETL-shaped**, so the whole normalized-schema → ingest stack can be expressed as one
   Neo4j-native Graph Spec JSON lineage, and its `SourceProvider` SPI is a leading candidate for the
   connector-mapping mechanism. Treat the exact format as an **evolving external dependency** (it is RC) — adapt
-  behind our boundary, don't block on it.
+  behind our boundary, don't block on it. See **§12** for the underlying Neo4j PE metadata references (the
+  `S2-SPIKE-1` inputs: the three artifacts, the Meta-Graph schema sketch, and canonical source links).
 - **Characterization / golden-master** — a captured snapshot of current output used to prove a refactor
   didn't change behavior.
 
@@ -319,3 +320,55 @@ Each refactor ticket carries these sections — use them as intended:
   future public-API removals (not applied retroactively to the unpackaged demo agent).*
 - **Standard-Readme** <https://github.com/RichardLitt/standard-readme> — *integrate loosely* (root-README
   section skeleton only).
+
+## 12. Appendix — Neo4j PE metadata references (`S2-SPIKE-1` inputs)
+
+> Reference material on Neo4j Product Engineering's **undefined, still-evolving** native metadata format —
+> owner-provided (2026-07-15) as the primary inputs for **`S2-SPIKE-1`** (and consulted by **`S2.2`** /
+> `#301`, `#367`). **PE contact:** Matt Wood (owns the PE metadata-consolidation initiative). The two PRDs
+> are large Google Docs; distilled substance + canonical links are captured here rather than verbatim —
+> **re-fetch the Google Docs when the spike runs**, as the format is genuinely unsettled. (Graph Spec /
+> import-spec, `SourceProvider`, and `KeySpec` are defined in §6 / D6 / D13–D14; this appendix adds the
+> surrounding PE context those decisions rest on.)
+
+**The three PE artifacts (maturity + our role).**
+- **import-spec / Graph Spec** — <https://github.com/neo4j/import-spec> — **RC (~v1.0.0-rc17, Jul 2026)**.
+  JSON/YAML + JSON-schema import config: top-level `version`, `config`, `sources`, `targets` (Cypher over
+  `$rows`), `actions` (e.g. constraints); plugin SPIs (`SourceProvider`, `EntityTargetExtensionProvider`,
+  `ActionProvider`, `SpecificationValidator`). **Mapping/ETL, not a schema vocabulary.** → our mapping (S1)
+  + ingest (S5); the chosen JSON substrate (Q-S2-a).
+- **Graph Type** — executable schema projection (constraint/index Cypher). → our physical schema.
+- **Meta-Graph** — **WIP / demo** (EE + Aura; CE TBD; "2026.x"). Graph-native meta-model. → our ontology (S2).
+
+**Meta-Graph schema (revealed by the demo query pack + PRD).** Node labels: `GraphSpec`,
+`GraphSpecVersion` (holds `graphTypeCypherText`, `opennessMode`, `closedWorldIntent`), `SpecMetadata`,
+`SchemaModel`, `NodeType` (`nodeTypeId`, `stableId`, `name`, `identifyingLabels`, `impliedLabels`,
+`elementStatus`, `introducedInVersion`), `RelationshipType` (`typeName`, endpoints via `FROM`/`TO`),
+`PropertySpec` (`valueType`, `nullable`, `multivalued`, `indexedIntent`, `indexKind`), `IndexSpec`,
+`ConstraintSpec` (`constraintKind`, `supportLevel`, `executionStatus`, `preservationStatus`),
+`ValidationRule` (`ruleKind`, `executionLanguage`), `Annotation` (+ `annotation_fts` full-text index).
+Import-mapping side (PRD): `ImportMappingSet`, `DataSource`, `SourceObject`, `SourceField`, `NodeMapping`,
+`RelationshipMapping`, `PropertyMapping`, `KeySpec`, `EndpointBinding`; plus `SourceAsset`,
+`ProvenanceRecord`, `GeneratedArtifact`. Rels: `HAS_NODE_TYPE`, `HAS_REL_TYPE`, `HAS_PROPERTY`,
+`HAS_CONSTRAINT`, `HAS_INDEX`, `HAS_RULE`, `GOVERNS_NODE_TYPE|REL_TYPE|PROPERTY`, `TARGETS_*`,
+`HAS_ANNOTATION`, `PREVIOUS_VERSION`.
+
+**Ideas relevant to us:** description / `sourceExpression` / `compiledExpression` tiering; versioning via
+`PREVIOUS_VERSION`; aspirational-vs-materialized (modeled but not projected into Graph Type); `KeySpec`
+aligns with our **D6** identity / composite-key. **Known open issues** (why the format is unsettled):
+physical-vs-aspirational artifacts, Graph-Type-as-text-vs-graph, RDF-import fidelity, lifecycle states.
+
+**Ontology-as-First-Class-Citizen MVP (PRD direction).** Import RDF/OWL/SHACL/SKOS → materialize as a Neo4j
+subgraph → **refactor RDF→LPG** → generate Graph Spec + Cypher DDL/DML → SHACL-derived validation.
+**Export back to RDF is OUT of MVP scope.** This confirms our constraint (D13): **RDF is a lossy import
+source, never the native backend** — the backend is LPG-native, with Graph Spec as the backbone
+(ontology → model → ingest → validation).
+
+**Canonical source links (from the PRDs — re-fetch for the spike).**
+- import-spec: <https://github.com/neo4j/import-spec>
+- Meta-Graph gen scripts: <https://drive.google.com/file/d/1oHiKJ8z_0z4fIGN7IEVKXcM0WCmqCs21/view>
+- Meta-Graph demo query pack: <https://drive.google.com/file/d/1s2OE05OSokTi4U-1L8asTf5L2XgGYOAI/view>
+- PRD — Ontologies as First Class Citizens (full): <https://docs.google.com/document/d/1cTwcfNWzZSCF9o4_dTJShZYp7nPPDFZc8Q7Sq_W0Fqo/edit>
+- Modeling / Ontology / Schema FAQs: <https://docs.google.com/document/d/1Jq5Ds69sJECSVuR9cBYIp6K_QunyPI_YBsqhEtM6zno/edit>
+- RDF → Neo4j model mapping: <https://docs.google.com/spreadsheets/d/1omvZZVTkEK_I_Y_Y8DwrkN4weJSLJ8MIF2NBDwHIDyc/edit>
+- GSGS v1 handover: <https://docs.google.com/document/d/1BnGFWQj8-FCR0vMADl-__BFd5pZ2_-8G/edit>
