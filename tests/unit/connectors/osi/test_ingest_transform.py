@@ -96,6 +96,64 @@ def test_osi_table_preserves_original_source_string(minimal_spec):
     assert sources == {"warehouse.public.orders", "warehouse.public.customers"}
 
 
+def _source_spec(source: str) -> dict:
+    """Minimal single-dataset spec used to probe source classification."""
+    return {
+        "semantic_model": [
+            {
+                "name": "m",
+                "datasets": [{"name": "d", "source": source, "fields": [{"name": "c"}]}],
+            }
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    ("source", "database", "schema"),
+    [
+        # GCP project ids are *required* to contain hyphens, so this is the default
+        # shape of every BigQuery source, not an edge case.
+        ("my-project.my_dataset.my_table", "my-project", "my_dataset"),
+        ("warehouse.public.my-table", "warehouse", "public"),
+        ("`my-project`.`my_dataset`.`my_table`", "my-project", "my_dataset"),
+        ('"my-project"."my_dataset"."my_table"', "my-project", "my_dataset"),
+        ("warehouse.public.my$table", "warehouse", "public"),
+    ],
+)
+def test_quotable_three_part_source_emits_table_not_query(source, database, schema):
+    """Identifiers legal only when quoted still classify as tables, not SQL queries."""
+    t = _run(_source_spec(source))
+
+    assert t.query_nodes == []
+    assert len(t.table_nodes) == 1
+    assert [n.name for n in t.database_nodes] == [database]
+    assert [n.name for n in t.schema_nodes] == [schema]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "SELECT c FROM my-project.my_dataset.my_table",
+        "SELECT a.c FROM p AS a JOIN m AS b ON a.c = b.c",
+        "select 1",
+    ],
+)
+def test_sql_text_still_classifies_as_query(source):
+    """Widening the identifier pattern must not swallow real SQL into the table branch."""
+    t = _run(_source_spec(source))
+
+    assert t.table_nodes == []
+    assert t.database_nodes == []
+    assert t.schema_nodes == []
+    assert len(t.query_nodes) == 1
+
+
+def test_quotable_two_part_source_is_still_rejected():
+    """Quoting/hyphens do not exempt a source from the 3-part requirement."""
+    with pytest.raises(ValueError, match="not OSI-spec-compliant"):
+        _run(_source_spec("`my_dataset`.`my-table`"))
+
+
 # ---------------------------------------------------------------------- #
 # Query source routing
 # ---------------------------------------------------------------------- #

@@ -48,7 +48,30 @@ from ...utils.generate_id import (
     generate_table_id,
 )
 
-_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# A dotted `dataset.source` part is treated as an identifier if it *could* name an
+# object, whether or not it would need quoting to do so. Hyphens and `$` are accepted
+# for the same reason `connectors/snowflake/_identifiers.py` gives: such names are
+# legal, just only as *quoted* identifiers. This matters because GCP project ids are
+# required to contain lowercase letters, digits and hyphens, so every BigQuery source
+# (`my-project.my_dataset.my_table`) failed a `[A-Za-z_][A-Za-z0-9_]*` check and fell
+# through to the "treat it as a query" branch -- silently producing a Query node
+# instead of Table/Database/Schema. Real SQL still falls through, because it contains
+# whitespace and punctuation this pattern rejects.
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$-]*$")
+
+#: Quote characters an OSI `source` may wrap identifiers in: backticks (BigQuery) and
+#: double quotes (ANSI / Snowflake).
+_IDENT_QUOTES = ("`", '"')
+
+
+def _unquote_identifier(part: str) -> str:
+    """Strip one layer of matching backticks / double quotes from an identifier part."""
+    part = part.strip()
+    for quote in _IDENT_QUOTES:
+        if len(part) >= 2 and part.startswith(quote) and part.endswith(quote):
+            return part[1:-1]
+    return part
+
 
 #: Synthetic glossary / category used for BusinessTerms derived from OSI ai_context
 #: synonyms. BusinessTerm uniqueness in the graph is enforced by ``name`` at load
@@ -650,7 +673,7 @@ class OsiIngestTransformer:
         if not source:
             raise ValueError("dataset.source must not be empty")
 
-        parts = source.split(".")
+        parts = [_unquote_identifier(part) for part in source.split(".")]
         all_identifiers = all(_IDENT_RE.match(part) for part in parts)
 
         if len(parts) == 3 and all_identifiers:
