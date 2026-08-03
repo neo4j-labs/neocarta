@@ -116,7 +116,8 @@ These are **settled** decisions. A ticket citing `D#` means "this constraint is 
 - **D5** — a connector's extractor cache is **private**; its only public output is the normalized schema.
 - **D6** — identity is an ontology-declared **KeySpec** per NodeType; connector mappings are
   **identity-agnostic**; one generic ID builder replaces the per-connector `generate_*_id` functions; a
-  rare explicit-ID override exists for cross-source alignment.
+  rare explicit-ID override exists for cross-source alignment. The override is specified and tested in
+  `docs/refactor/explicit-id-override.md` (`S1-4`).
 - **D7** — normalization needs value coercions (not just field renames).
 - **D10** — sparse rows are supported with a **non-clobber merge** contract (partial data never erases
   fuller data). Specified and tested in `docs/refactor/merge-contract.md` (`S1-3`).

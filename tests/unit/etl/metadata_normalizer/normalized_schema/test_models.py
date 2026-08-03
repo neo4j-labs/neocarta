@@ -1,9 +1,10 @@
 """Contract-level tests for the normalized structural-core models.
 
 Proves the standardized vocabulary absorbs every schema connector's *raw* source
-field-names without loss, that value coercions (D7) apply, and that no graph
-identity (D6) leaks onto any field. The full connector flip is S4; here we prove
-the contract only.
+field-names without loss, that value coercions (D7) apply, and that the only graph
+identity (D6) on any field is the one reserved, opt-in ``explicit_id`` override
+S1.4 (#295) added — never a second one, and never on an edge record. The full
+connector flip is S4; here we prove the contract only.
 """
 
 from __future__ import annotations
@@ -48,6 +49,63 @@ ALL_MODELS = [
     LineageRecord,
     NormalizedStructuralSchema,
 ]
+
+# The S1.4 (#295) partition of the contract. Only an *entity* record has an identity
+# of its own, so only an entity record carries the D6 explicit-ID override; an edge is
+# merged on its endpoint pair, and the bundle is a container. `test_the_partition_covers
+# _every_exported_model` keeps the three lists exhaustive and disjoint, so a new record
+# has to be classified before it can exist.
+ENTITY_MODELS = [
+    DatabaseRecord,
+    SchemaRecord,
+    TableRecord,
+    ColumnRecord,
+    ValueRecord,
+    GlossaryRecord,
+    CategoryRecord,
+    BusinessTermRecord,
+    GovernanceTagKeyRecord,
+    GovernanceTagValueRecord,
+]
+EDGE_MODELS = [ForeignKeyRecord, BusinessTermAssignmentRecord, LineageRecord]
+
+EXPLICIT_ID = "explicit_id"
+
+# Ids the generated-id normalizer would rewrite (it lowercases and folds spaces/hyphens to
+# underscores), so any accidental coercion of the override shows up as an inequality. The
+# first is the real cross-source-alignment case: a Dataplex resource path.
+VERBATIM_IDS = [
+    "projects/p/locations/us/glossaries/ecommerce-glossary",
+    "Custom-ID With Spaces",
+    "  padded  ",
+    "MixedCase.Id",
+]
+
+# A minimal valid row per entity record: every required natural-key segment and nothing
+# else, so an override test exercises the field rather than the rest of the vocabulary.
+MINIMAL_ENTITY_ROWS: dict[str, dict] = {
+    "DatabaseRecord": {"database_name": "d"},
+    "SchemaRecord": {"database_name": "d", "schema_name": "s"},
+    "TableRecord": {"database_name": "d", "schema_name": "s", "table_name": "t"},
+    "ColumnRecord": {
+        "database_name": "d",
+        "schema_name": "s",
+        "table_name": "t",
+        "column_name": "c",
+    },
+    "ValueRecord": {
+        "database_name": "d",
+        "schema_name": "s",
+        "table_name": "t",
+        "column_name": "c",
+        "value": "v",
+    },
+    "GlossaryRecord": {"glossary_name": "g"},
+    "CategoryRecord": {"glossary_name": "g", "category_name": "cat"},
+    "BusinessTermRecord": {"glossary_name": "g", "category_name": "cat", "term_name": "term"},
+    "GovernanceTagKeyRecord": {"tag_namespace": "ns", "tag_key": "k"},
+    "GovernanceTagValueRecord": {"tag_namespace": "ns", "tag_key": "k", "tag_value": "v"},
+}
 
 
 def _accepted_input_names(model: type[BaseModel]) -> set[str]:
@@ -140,9 +198,12 @@ class TestNoGraphIdentity:
         assert "embedding" not in model.model_fields
 
     @pytest.mark.parametrize("model", ALL_MODELS)
-    def test_no_field_looks_like_a_graph_id(self, model: type[BaseModel]) -> None:
+    def test_the_reserved_override_is_the_only_id_field(self, model: type[BaseModel]) -> None:
         # Natural-key names end in "_name"/"_type"; a bare "*_id" would be a graph id.
-        assert not any(name.endswith("_id") for name in model.model_fields)
+        # D6 sanctions exactly one — the opt-in explicit-ID override (S1.4) — so the
+        # guard is narrowed to that single name rather than lifted: a *second* id field,
+        # or the override on a record that should not have one, still fails here.
+        assert [name for name in model.model_fields if name.endswith("_id")] in ([], [EXPLICIT_ID])
 
     @pytest.mark.parametrize("model", ALL_MODELS)
     def test_no_graph_label_discriminator(self, model: type[BaseModel]) -> None:
@@ -159,6 +220,108 @@ class TestNoGraphIdentity:
             if isinstance(getattr(normalized_schema, name), type)
         }
         assert exported == set(ALL_MODELS)
+
+    def test_the_partition_covers_every_exported_model(self) -> None:
+        # Entity / edge / bundle is what decides whether a record may carry the D6
+        # override, so the partition has to be exhaustive and disjoint — otherwise a new
+        # record could join the package without anyone deciding which side it is on.
+        assert set(ENTITY_MODELS) | set(EDGE_MODELS) | {NormalizedStructuralSchema} == set(
+            ALL_MODELS
+        )
+        assert len(ENTITY_MODELS) + len(EDGE_MODELS) + 1 == len(ALL_MODELS)
+
+
+class TestExplicitIdOverride:
+    """D6 (S1.4): the one reserved identity field — opt-in, unaliased, verbatim."""
+
+    @pytest.mark.parametrize("model", ALL_MODELS)
+    def test_only_entity_records_carry_the_override(self, model: type[BaseModel]) -> None:
+        # Positive and negative in one assertion: an edge record or the bundle growing
+        # the field fails here just as loudly as an entity record losing it. An edge is
+        # merged on its endpoint pair and has no id of its own, so the field would be
+        # permanently unconsumed there.
+        assert (EXPLICIT_ID in model.model_fields) is (model in ENTITY_MODELS)
+
+    @pytest.mark.parametrize("model", ENTITY_MODELS)
+    def test_override_is_optional_and_defaults_to_none(self, model: type[BaseModel]) -> None:
+        # "Identity-agnostic remains the default" — every row a connector emits today
+        # validates unchanged and carries no id.
+        assert model.model_validate(MINIMAL_ENTITY_ROWS[model.__name__]).explicit_id is None
+
+    @pytest.mark.parametrize("model", ENTITY_MODELS)
+    def test_override_is_never_aliased(self, model: type[BaseModel]) -> None:
+        # The one field with no AliasChoices. A source "*_id" column is not reliably a
+        # graph id — the vocabulary already spends table_id / dataset_id / project_id on
+        # *name* concepts — and an override wins over generation, so a wrong binding
+        # corrupts the id rather than being rejected. The connector must project.
+        assert model.model_fields[EXPLICIT_ID].validation_alias is None
+
+    @pytest.mark.parametrize(
+        ("model", "id_column", "source_value"),
+        [
+            pytest.param(DatabaseRecord, "database_id", "custom-db-id", id="csv_database_id"),
+            pytest.param(SchemaRecord, "schema_id", "custom-schema-id", id="csv_schema_id"),
+            pytest.param(TableRecord, "table_id", "t_1234", id="dataplex_table_id"),
+            pytest.param(ColumnRecord, "column_id", "custom-col-id", id="csv_column_id"),
+            pytest.param(ValueRecord, "value_id", "custom-val-id", id="sampling_frame_value_id"),
+            # The Dataplex values are the real shapes a live `neocarta-rajvardhan` glossary
+            # emits: the glossary/category ids are slugs, and term_id is a full resource path.
+            pytest.param(
+                GlossaryRecord, "glossary_id", "ecommerce-glossary", id="dataplex_glossary_id"
+            ),
+            pytest.param(
+                CategoryRecord, "category_id", "revenue-metrics", id="dataplex_category_id"
+            ),
+            pytest.param(
+                BusinessTermRecord,
+                "term_id",
+                "projects/p/locations/us/glossaries/ecommerce-glossary/terms/gross-merchandise-value",
+                id="dataplex_term_id",
+            ),
+        ],
+    )
+    def test_a_source_id_column_does_not_populate_the_override(
+        self, model: type[BaseModel], id_column: str, source_value: str
+    ) -> None:
+        # Dataplex "*_id" columns are slugs (or resource paths) and CSV's are graph ids, and the
+        # contract cannot tell them apart — so it absorbs neither. table_id is still accepted as
+        # the Dataplex identity segment for table_name; what must not happen is it arriving as an
+        # override, which would win over generation unnormalized.
+        row = {**MINIMAL_ENTITY_ROWS[model.__name__], id_column: source_value}
+        assert model.model_validate(row).explicit_id is None
+
+    @pytest.mark.parametrize("model", ENTITY_MODELS)
+    def test_the_shared_declaration_is_live_on_every_entity_record(
+        self, model: type[BaseModel]
+    ) -> None:
+        # One blank and one verbatim value per record proves the _identity.py factories actually
+        # bound here — they return a fresh descriptor per class, so a failure to attach would be
+        # silent. The value matrices below then run once, since the declaration is shared.
+        row = MINIMAL_ENTITY_ROWS[model.__name__]
+        assert model.model_validate({**row, EXPLICIT_ID: "  "}).explicit_id is None
+        assert (
+            model.model_validate({**row, EXPLICIT_ID: VERBATIM_IDS[0]}).explicit_id
+            == (VERBATIM_IDS[0])
+        )
+
+    @pytest.mark.parametrize("supplied", VERBATIM_IDS)
+    def test_override_is_preserved_verbatim(self, supplied: str) -> None:
+        row = {**MINIMAL_ENTITY_ROWS["ColumnRecord"], EXPLICIT_ID: supplied}
+        assert ColumnRecord.model_validate(row).explicit_id == supplied
+
+    @pytest.mark.parametrize("blank", ["", " ", "\t", None, float("nan")])
+    def test_every_blank_form_folds_to_none(self, blank: object) -> None:
+        # A blank cell means "generate this row", not "the id is the empty string": an
+        # empty string is falsy but is not None, so leaving it intact would make the
+        # resolver return "" and collapse every row of this type onto one empty-id node.
+        row = {**MINIMAL_ENTITY_ROWS["ColumnRecord"], EXPLICIT_ID: blank}
+        assert ColumnRecord.model_validate(row).explicit_id is None
+
+    @pytest.mark.parametrize("model", EDGE_MODELS)
+    def test_no_edge_record_accepts_the_override(self, model: type[BaseModel]) -> None:
+        # Not merely absent as a field — not an accepted input name either, so a
+        # connector projecting one onto an edge row gets it dropped, not honored.
+        assert EXPLICIT_ID not in _accepted_input_names(model)
 
 
 class TestColumnRecordMapsEveryConnector:

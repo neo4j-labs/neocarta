@@ -7,9 +7,10 @@ the extractor cache stays private.
 
 The structural core is defined in [`models.py`](models.py), the optional facets in
 [`facets.py`](facets.py), and the shared field vocabulary in
-[`_vocabulary.py`](_vocabulary.py) (one owner, GUIDE §4). Delivered by S1.1 (#292)
-and S1.2 (#293) as a **contract**: no runtime path uses it yet — connectors flip
-to it in S4, proven at parity against the #291 characterization harness.
+[`_vocabulary.py`](_vocabulary.py) (one owner, GUIDE §4), and the one reserved identity field in
+[`_identity.py`](_identity.py). Delivered by S1.1 (#292), S1.2 (#293) and S1.4
+(#295) as a **contract**: no runtime path uses it yet — connectors flip to it in
+S4, proven at parity against the #291 characterization harness.
 
 ## What it is
 
@@ -36,6 +37,14 @@ The structural core — five row models plus the bundle:
 | `GovernanceTagKeyRecord` | a governance tag key | `tag_namespace`, `tag_key` |
 | `GovernanceTagValueRecord` | one allowed value of a key | `tag_namespace`, `tag_key`, `tag_value` |
 | `LineageRecord` | one observed data-flow edge | source key × target key |
+
+Every **entity** record above — the four core ones and the six facet ones — also
+accepts an optional `explicit_id`, the reserved D6 escape hatch for a connector
+that must supply a pre-computed id (S1.4). The three edge records
+(`ForeignKeyRecord`, `BusinessTermAssignmentRecord`, `LineageRecord`) and the
+bundle do not: an edge is merged on its endpoint pair and has no identity of its
+own, so its endpoints resolve through the entity rows' overrides. See
+[`explicit-id-override.md`](../../../../docs/refactor/explicit-id-override.md).
 
 Each facet is omitted **independently** by leaving its table(s) empty:
 
@@ -74,7 +83,14 @@ Two ⚠️ qualifications, both deliberate:
   `ForeignKeyRecord`s once the connector projects canonical names — but those raw
   column names are **not** absorbed as aliases, because the query paradigm is a
   separate normalized surface (D11) and S1.1 made the same call for the structural
-  core this connector also fabricates.
+  core this connector also fabricates. The same holds for its **`*_id` columns**,
+  and there the projection is load-bearing rather than merely tidy: its
+  `dataset_id` is the *generated schema id* (`my_proj.sales`), not a dataset name,
+  yet `dataset_id` is an accepted `schema_name` synonym because in BigQuery and
+  Dataplex frames that column really is the name — so a raw row, which carries
+  neither `schema_name` nor `table_schema`, would bind the id as the name. Its
+  `column_info.table_name` is likewise the SQL *alias*. Both are pinned by
+  `test_query_log_passthrough_parity.py`.
 - **OSI** is the graph/semantic paradigm (D11), not a tabular one. Its
   synonym-derived business terms are expressible as `BusinessTermRecord`s, but its
   positional references and its `Metric`-grain tagging are not — a `Metric` key is
@@ -85,9 +101,21 @@ No connector produces **lineage** at all; see *Not modelled* below.
 
 ### Design rules (with the decision each honors)
 
-- **Source-derived fields only — no graph IDs, no embeddings** (D6). Identity is
-  assigned downstream by the KeySpec-driven ID builder from the raw key segments
-  each row carries; the `generate_id` logic is not replicated here.
+- **Source-derived fields only — no embeddings, and no graph IDs but one** (D6).
+  Identity is assigned downstream by the KeySpec-driven ID builder from the raw key
+  segments each row carries; the `generate_id` logic is not replicated here. The
+  single exception is the opt-in `explicit_id` override below, which D6 sanctions
+  and the guards enumerate rather than forbid.
+- **One reserved escape hatch, opt-in and unaliased** (D6, S1.4). An entity record
+  may carry `explicit_id`, a pre-computed graph id that **wins** over generation —
+  the rare cross-source-alignment case, e.g. a CSV landing on the same
+  `:BusinessTerm` node Dataplex minted under a resource-path id. Opt-in
+  (`default=None`), used **verbatim**, blank folds to `None`, and the one field with
+  **no** `AliasChoices`, since a source `*_id` column is not reliably a graph id.
+  Precedence is applied by the ID builder (`etl/transform.resolve_id`), not the
+  model. Rationale in [`_identity.py`](_identity.py); the full contract, the
+  endpoint-index spec and the parity table are in
+  [`explicit-id-override.md`](../../../../docs/refactor/explicit-id-override.md).
 - **Natural-key-addressed, so containment is implicit.** A `ColumnRecord` already
   carries its full `database/schema/table` path, so `HAS_SCHEMA` / `HAS_TABLE` /
   `HAS_COLUMN` are derivable and are **not** modelled as tables. Only the
@@ -209,6 +237,11 @@ pre-folds the slug instead, exactly as it must already pre-fold `column_mode`.
   canonical names). The CSV *format* allows optional columns, so a CSV that omits
   the path columns cannot populate the required natural-key fields — that is a
   malformed input for this contract, not something it silently accepts.
+  It is also the one connector with a real **explicit-ID** path — ten optional
+  `*_id` columns, used verbatim when supplied — so it owns the S4 reconciliations
+  that come with the override (parent id columns, per-row granularity, and the
+  golden it needs captured first), enumerated in
+  [`explicit-id-override.md`](../../../../docs/refactor/explicit-id-override.md).
 - **Dataplex** — currently fabricates `is_primary_key=False` / `is_foreign_key=False`
   (it exposes no key metadata); under this contract those become `None` (honest
   "unknown"). That is a deliberate behavior change to reconcile at the S4 flip
@@ -231,7 +264,10 @@ pre-folds the slug instead, exactly as it must already pre-fold `column_mode`.
   it just binds the *label* as identity and yields the wrong id
   (`e_commerce_business_glossary` rather than `ecommerce_glossary`). The contract
   cannot tell the two apart, which is precisely why those `*_id` columns are not
-  aliased and why the S4 flip needs a captured Dataplex-glossary golden first. Its entry
+  aliased — onto the identity fields *or* onto `explicit_id`, where the same slug
+  would become an override that **wins** over generation and lands the row on
+  `ecommerce-glossary` — and why the S4 flip needs a captured Dataplex-glossary
+  golden first. Its entry
   links carry a pre-resolved graph id (`entity_id`) rather than segments, but the
   extractor already parses `project / dataset / table / column` out of the resource
   path to build that id, so it can emit the segments instead; its `entity_type`
@@ -293,6 +329,8 @@ imply a relationship becomes a relationship `target`.
 
 ```jsonc
 // sketch — neutral-but-compatible, not a committed format (Graph Spec is RC; see S1-SPIKE-1)
+// `explicit_id` is omitted below on purpose: it is a source column that *selects* the
+// key rather than a node property, so it belongs to the target's identity expression.
 {
   "sources": [
     { "name": "columns", "type": "table",

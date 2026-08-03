@@ -2,10 +2,13 @@
 
 These models are the *only* public output a schema connector emits (GUIDE D5).
 They are **natural-key-addressed** — every row carries its full source name path
-(``database_name`` → … → ``column_name``) — and **identity-agnostic**: no graph
-IDs and no embeddings (GUIDE D6). Graph IDs are assigned downstream by the
-KeySpec-driven ID builder from these raw key segments; the ``generate_id`` logic
-is deliberately not replicated here.
+(``database_name`` → … → ``column_name``) — and **identity-agnostic by default**:
+no embeddings, and no graph IDs beyond the one reserved, opt-in ``explicit_id``
+override D6 sanctions for cross-source alignment (see ``_identity.py`` and
+``docs/refactor/explicit-id-override.md``). Graph IDs are otherwise assigned
+downstream by the KeySpec-driven ID builder from these raw key segments; the
+``generate_id`` logic is deliberately not replicated here, and neither is the
+precedence rule that lets an override displace it.
 
 Each record standardises the divergent field vocabulary every connector's
 ``transform.py`` uses today: the x4 container name, x4 data type, and x3
@@ -37,6 +40,7 @@ graph/semantic (OSI) paradigms are separate normalized surfaces (GUIDE D11).
 from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from ....data_model._validators import coerce_nullable, coerce_str_or_none, coerce_upper
+from ._identity import explicit_id_field, explicit_id_validator
 from ._vocabulary import (
     DATA_TYPE_SYNONYMS,
     DATABASE_NAME_SYNONYMS,
@@ -75,7 +79,9 @@ class DatabaseRecord(BaseModel):
         validation_alias=AliasChoices("description", "comment"),
         description="The description of the database.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _uppercase = field_validator("platform", "service", mode="after")(coerce_upper)
     _normalize = field_validator("description", "platform", "service", mode="before")(
         coerce_str_or_none
@@ -100,7 +106,9 @@ class SchemaRecord(BaseModel):
         validation_alias=AliasChoices("description", "comment"),
         description="The description of the schema.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("description", mode="before")(coerce_str_or_none)
 
 
@@ -135,7 +143,9 @@ class TableRecord(BaseModel):
         validation_alias=AliasChoices("description", "table_description", "comment"),
         description="The description of the table.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("display_name", "description", mode="before")(coerce_str_or_none)
 
 
@@ -188,7 +198,9 @@ class ColumnRecord(BaseModel):
         validation_alias=AliasChoices("description", "column_description", "comment"),
         description="The description of the column.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _coerce_nullable = field_validator("nullable", mode="before")(coerce_nullable)
     _normalize = field_validator("data_type", "description", mode="before")(coerce_str_or_none)
 
@@ -202,6 +214,12 @@ class ForeignKeyRecord(BaseModel):
     target sides distinct even when a connector's FK frame names them separately
     (``table_*`` vs ``referenced_*``) or shares one (``constraint_*`` /
     ``database_name``).
+
+    No ``explicit_id``: an edge is merged on its endpoint pair and has no identity
+    of its own, so the field would be permanently unconsumed here. Both endpoints
+    are ordinary column natural keys this row already carries in full, and each
+    resolves through the override its own :class:`ColumnRecord` declares (GUIDE
+    D6; ``docs/refactor/explicit-id-override.md``).
     """
 
     source_database_name: str = Field(
