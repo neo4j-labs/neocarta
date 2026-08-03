@@ -91,9 +91,11 @@ Why not declare the policy on the normalized model:
   model cannot see the stored value, so it could only carry an annotation that the writer must
   then read and act on — two owners of one piece of state, against GUIDE §4.
 - **The normalized contract is deliberately graph-agnostic** (D6). Its guards actively reject
-  graph identity on a field and require every field annotation to stay a bare scalar. A merge
-  policy is a graph-write concern; declaring it there re-couples the contract to the ontology it
-  exists to decouple from.
+  graph identity on a field — with the single reserved, opt-in exception S1.4 added for
+  cross-source alignment ([explicit-id-override.md](explicit-id-override.md)), which those same
+  guards now enumerate rather than forbid — and require every field annotation to stay a bare
+  scalar. A merge policy is a graph-write concern; declaring it there re-couples the contract to
+  the ontology it exists to decouple from.
 - **The model→writer channel already exists.** Layer 1 *is* `properties_list`, and
   `_validate_properties_list` already checks it against the model's fields. Nothing new is
   needed to express which properties a source speaks about.

@@ -8,9 +8,11 @@ validates unchanged. Omittability is structural: every facet table on
 D10), so there is nothing to switch off.
 
 Like the core (see ``models.py``), every facet row is **natural-key-addressed**
-and **identity-agnostic** (GUIDE D6): it carries the full source name path of the
-thing it describes and never a graph ID, an embedding, or — new here — a graph
-*label*. The graph model's polymorphic ``TAGGED_WITH`` uses a
+and **identity-agnostic by default** (GUIDE D6): it carries the full source name
+path of the thing it describes, and never an embedding or — new here — a graph
+*label*. Its only graph ID is the reserved, opt-in ``explicit_id`` override
+(``_identity.py``), which the facet **entity** records carry and the two
+attachment records do not. The graph model's polymorphic ``TAGGED_WITH`` uses a
 ``source_label`` + ``source_id`` pair; a facet row instead addresses its asset by
 an unbroken prefix of the natural-key path and lets the **grain follow from the
 depth** of that path. Naming a label would couple the connector to the ontology,
@@ -52,6 +54,7 @@ from ....data_model._validators import (
     coerce_str_or_none,
     coerce_str_required,
 )
+from ._identity import explicit_id_field, explicit_id_validator
 from ._vocabulary import (
     DATABASE_NAME_SYNONYMS,
     GLOSSARY_DISPLAY_NAME_SYNONYMS,
@@ -106,7 +109,9 @@ class ValueRecord(BaseModel):
             "empty string would mint identity the source never had (GUIDE D10)."
         ),
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _cast = field_validator("value", mode="before")(coerce_str_required)
 
 
@@ -121,7 +126,10 @@ class GlossaryRecord(BaseModel):
     projects ``glossary_name=<slug>`` and ``display_name=<raw glossary_name>``.
     Those ``*_id`` columns are deliberately not aliased here — ``AliasChoices``
     resolves to the first alias *present*, so an alias would silently bind the
-    label as identity.
+    label as identity. They are not aliased onto ``explicit_id`` either, and there
+    the stakes are higher: a slug is not a graph id, and an override *wins* over
+    generation, so the row would land on ``ecommerce-glossary`` where the graph
+    has ``ecommerce_glossary``.
     """
 
     glossary_name: str = Field(
@@ -147,7 +155,9 @@ class GlossaryRecord(BaseModel):
             "it has one. A locator, not an identity: the key is glossary_name."
         ),
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("display_name", "description", "resource_path", mode="before")(
         coerce_str_or_none
     )
@@ -182,7 +192,9 @@ class CategoryRecord(BaseModel):
         default=None,
         description="The source's own full resource path for the category, when it has one.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("display_name", "description", "resource_path", mode="before")(
         coerce_str_or_none
     )
@@ -224,7 +236,9 @@ class BusinessTermRecord(BaseModel):
         default=None,
         description="The source's own full resource path for the term, when it has one.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("display_name", "description", "resource_path", mode="before")(
         coerce_str_or_none
     )
@@ -253,6 +267,12 @@ class BusinessTermAssignmentRecord(BaseModel):
     graph model also allows a Schema grain (and, for glossary terms, a Metric
     grain), but only the OSI graph/semantic paradigm produces those (GUIDE D11);
     widening the path later is additive.
+
+    No ``explicit_id``, for the same reason :class:`~.models.ForeignKeyRecord` has
+    none: an edge is merged on its endpoint pair and has no identity of its own.
+    Both endpoints — the tagged asset and the applied term — resolve through the
+    overrides their own entity records declare, so the grain-by-depth rule above
+    also selects *which* record's override applies (GUIDE D6).
     """
 
     database_name: str = Field(
@@ -320,7 +340,9 @@ class GovernanceTagKeyRecord(BaseModel):
         validation_alias=AliasChoices("description", "tag_description"),
         description="What the tag means / how it should be applied.",
     )
+    explicit_id: str | None = explicit_id_field()
 
+    _fold_explicit_id = explicit_id_validator()
     _normalize = field_validator("description", mode="before")(coerce_str_or_none)
 
 
@@ -357,6 +379,9 @@ class GovernanceTagValueRecord(BaseModel):
         validation_alias=AliasChoices(*TAG_VALUE_SYNONYMS),
         description="One allowed value of the tag key, verbatim as the source spells it.",
     )
+    explicit_id: str | None = explicit_id_field()
+
+    _fold_explicit_id = explicit_id_validator()
 
 
 class LineageRecord(BaseModel):
@@ -381,6 +406,9 @@ class LineageRecord(BaseModel):
     record that a query read something, not that one object is derived from
     another, and they belong to the query paradigm that is a separate normalized
     surface (GUIDE D11).
+
+    No ``explicit_id`` either — an un-reified observation has no identity of its
+    own to override, and both sides resolve through their entity records.
 
     **No connector populates this table today**, so it carries key segments only —
     no statement type, expression or timestamp. Attributes arrive additively with

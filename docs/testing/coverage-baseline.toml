@@ -35,14 +35,19 @@ report_format = "coverage.xml (Cobertura)"
 # Ratcheted up by each PR's own delta, which keeps that main-vs-branch margin intact
 # rather than silently absorbing another branch's tests into the floor:
 #   S1.3 (#294) +59 unit / +14 integration — the merge-contract tests.
-gated_unit = 937    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1181     # full tests/unit (includes _mcp/_cli/agent)
-all = 1291          # tests/ (unit + integration + smoke)
+#   S1.4 (#295) +105 unit / +0 integration — the explicit-ID override contract guards and the
+#     csv / query_log passthrough parity suites, parametrized over the 10 entity records and
+#     the 8 CSV id columns.
+gated_unit = 1042   # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1286     # full tests/unit (includes _mcp/_cli/agent)
+all = 1396          # tests/ (unit + integration + smoke)
 
 [total]
-line_measured = 68.53
+# Measured refreshed by S1.4 (#295): line 68.53 -> 69.43, branch 49.30 -> 50.25. Floors
+# unchanged — same policy as the ingest note below.
+line_measured = 69.43
 line_floor = 68
-branch_measured = 49.30
+branch_measured = 50.25
 branch_floor = 49
 
 # --- Enforceable per-package floors (packages the `make test-cov` scope exercises) ---
@@ -57,10 +62,15 @@ branch_floor = 60
 # 100%-covered `data_model/normalized/*` subpackage (a 0.9.x-band addition) is not on
 # this branch, so the aggregate reflects only main's data_model. This is a re-baseline
 # to actual behavior, not a hand-lowered floor.
+#
+# Measured refreshed by S1.4 (#295), whose blank/NaN override parametrization exercises the
+# remaining `_validators.py` branches: line 99.66 -> 99.69, branch 83.33 -> 96.15. Floors are
+# deliberately NOT ratcheted in the same PR — the policy raises them after a *sustained* gain,
+# and a 13pp jump driven by one suite is exactly the case to let settle first.
 [packages.data_model]
-line_measured = 99.66
+line_measured = 99.69
 line_floor = 99
-branch_measured = 83.33
+branch_measured = 96.15
 branch_floor = 83
 
 [packages.enrichment]
