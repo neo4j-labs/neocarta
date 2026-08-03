@@ -1,20 +1,12 @@
-"""Parity: query_log needs no explicit-ID override, and why (S1.4, #295).
+"""Parity: query_log needs no explicit-ID override (S1.4, #295).
 
-The ticket pairs `query_log` with `csv` as an "ID-passthrough" connector, but the two
-are not the same thing and only one of them is an *override* case. `csv` passes through
-ids **a user supplied**; `query_log` computes its own inside its SQL parser
-(`connectors/query_log/utils.py`) with the very same `generate_*_id` functions and then
-carries them on the frame, so `transform.py` reads `Table(id=row.table_id)` rather than
-regenerating. That is generate-early-pass-later, not passthrough.
+`query_log` generates its ids in its own SQL parser and carries them on the frame rather
+than taking them from a user, so the proof it owes is the **negative** one: every
+structural id it emits is reproducible from the natural-key names on that same frame, and
+its rows are therefore identity-agnostic. See ``docs/refactor/explicit-id-override.md``
+for why that is the right framing rather than giving it an override.
 
-So the proof this file owes is the **negative** one: every structural id `query_log`
-emits is exactly reproducible from the natural-key names on the same frame, so its rows
-are identity-agnostic (`explicit_id is None`) and centralizing generation in #305 cannot
-change a single id. Giving it an override would defeat the centralization D6 exists for.
-
-Two boundaries this also pins: the raw frames must be **projected**, not validated
-directly (the `dataset_id` / alias traps below), and the query paradigm's own ids are a
-separate normalized surface (GUIDE D11) this contract deliberately does not model.
+Also pins the two projection traps those frames carry, and the D11 boundary.
 """
 
 from __future__ import annotations
@@ -106,20 +98,17 @@ class TestEveryStructuralIdReproducesFromItsNaturalKey:
             generated = generate_column_id(
                 record.database_name, record.schema_name, record.table_name, record.column_name
             )
-            # Production builds this id from the *already generated* table_id
-            # (`generate_column_id(*table_id.split("."), col)`); rebuilding it from the
-            # raw names agrees because `_normalize` is idempotent. Note that split also
-            # assumes no key segment contains a dot — a pre-existing limitation of the
-            # query-log parser, out of scope here and not endorsed by this test.
+            # Production builds this from the *already generated* table_id
+            # (`generate_column_id(*table_id.split("."), col)`); rebuilding from the raw names
+            # agrees because `_normalize` is idempotent. That split also assumes no segment
+            # contains a dot — a pre-existing parser limitation, not endorsed here.
             assert resolve_id(record.explicit_id, generated) == row["column_id"]
 
     def test_no_query_log_row_needs_an_override(self) -> None:
-        # The headline claim, stated once as a whole-frame property across all three grains:
-        # every structural row the parser emits validates as an identity-agnostic record. So
-        # `query_log` is not an override case, and #305 can generate its ids without changing
-        # any of them. (`Database` has no id on the frame to compare against — its transform
-        # already regenerates from `project_id` — so it is covered here rather than by an
-        # assertion that could only compare `generate_database_id` with itself.)
+        # The headline claim as a whole-frame property across all three grains, so #305 can
+        # generate these ids without changing any. `Database` is covered here rather than in its
+        # own test because the frame carries no database id to compare against — an assertion
+        # could only compare `generate_database_id` with itself.
         parsed = _parsed()
         paths = _table_paths(parsed)
         records = [

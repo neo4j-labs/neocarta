@@ -283,14 +283,10 @@ class TestExplicitIdOverride:
     def test_a_source_id_column_does_not_populate_the_override(
         self, model: type[BaseModel], id_column: str, source_value: str
     ) -> None:
-        # The Dataplex "*_id" columns are slugs (or whole resource paths) and the CSV ones are
-        # graph ids, and the contract cannot tell them apart — so it absorbs neither. Note
-        # table_id is still accepted, as the Dataplex *identity segment* for table_name; what
-        # must not happen is it arriving as an override. Absorbing one would be worse than the
-        # label-binding hazard S1.2 guards, because an override is used verbatim: the slug
-        # "ecommerce-glossary" would land unnormalized against a graph holding
-        # "ecommerce_glossary" on *every* row, where the identity-side trap only bites when a
-        # label differs from its slug by more than case/separator (on live data they coincide).
+        # Dataplex "*_id" columns are slugs (or resource paths) and CSV's are graph ids, and the
+        # contract cannot tell them apart — so it absorbs neither. table_id is still accepted as
+        # the Dataplex identity segment for table_name; what must not happen is it arriving as an
+        # override, which would win over generation unnormalized.
         row = {**MINIMAL_ENTITY_ROWS[model.__name__], id_column: source_value}
         assert model.model_validate(row).explicit_id is None
 
@@ -298,12 +294,9 @@ class TestExplicitIdOverride:
     def test_the_shared_declaration_is_live_on_every_entity_record(
         self, model: type[BaseModel]
     ) -> None:
-        # One blank and one verbatim value per record, which is what proves the factories
-        # in _identity.py actually bound here: they return a fresh descriptor per class, so
-        # a failure to attach would be silent, showing up only as a row keeping its blank
-        # id. The value matrices below then run once, on the busiest record — the
-        # declaration is shared, so repeating them per record re-tests one code path ten
-        # times over.
+        # One blank and one verbatim value per record proves the _identity.py factories actually
+        # bound here — they return a fresh descriptor per class, so a failure to attach would be
+        # silent. The value matrices below then run once, since the declaration is shared.
         row = MINIMAL_ENTITY_ROWS[model.__name__]
         assert model.model_validate({**row, EXPLICIT_ID: "  "}).explicit_id is None
         assert (

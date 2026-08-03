@@ -69,30 +69,14 @@ site.
 source `*_id` column is not reliably a graph id. `_vocabulary.py` already spends three of
 them on **name** concepts (`table_id` → `table_name`, `dataset_id` → `schema_name`,
 `project_id` → `database_name`), and Dataplex's `glossary_id` / `category_id` / `term_id`
-are **slugs**. Absorbing any of them would be worse than the label-binding hazard S1.2
-already documented, and measuring both against live Dataplex data (`neocarta-rajvardhan`,
-one real glossary and three real terms) shows exactly why:
-
-| | S1.2's hazard — `*_id` aliased onto the **identity** field | S1.4's — `*_id` aliased onto **`explicit_id`** |
-|---|---|---|
-| mechanism | the label is normalized into an id | the value is used **verbatim** |
-| on live data | `id("ecommerce-glossary")` and `id("Ecommerce Glossary")` both give `ecommerce_glossary` — they **coincide**, because `_normalize` folds `-` and ` ` alike | the slug lands as `ecommerce-glossary`, the hyphen intact, against a graph holding `ecommerce_glossary` — it **diverges** |
-| failure mode | data-dependent: bites only when the label differs from the slug by more than case/separator | deterministic: bites on every row |
-
-So the alias would be a silently **broken deterministic ID** (REVIEW.md 🔴) every time — and
-worse, the *identity*-side trap it resembles is the intermittent one, which means friendly
-data can make a missing guard look fine. The live term frame sharpens it further: its
-`term_id` is a full resource path
-(`projects/…/glossaries/ecommerce-glossary/terms/gross-merchandise-value`), so an alias there
-would inject that whole path as the node's id. `explicit_id` is therefore the one field with
-`validation_alias=None`, and connectors project onto it deliberately.
-
-Two smaller facts the same live run established, both narrowing claims S1.2 stated broadly:
-a raw Dataplex **glossary** row does validate unprojected (it has a `glossary_name` column,
-so the hazard is real there), but a raw **term** row is *rejected* — the real frame carries
-only `glossary_id` / `category_id` / `term_id` / `term_name`, so the required `glossary_name`
-and `category_name` are missing and the contract cannot silently accept it. The
-silent-acceptance hazard is frame-specific, not glossary-wide.
+are **slugs**, and a Dataplex `term_id` is a whole resource path. Absorbing any of them is
+strictly worse than the label-binding hazard S1.2 already documents, and the difference is
+the verbatim rule: S1.2's trap only bites when a label differs from its slug by more than
+case or separator (`_normalize` folds `-` and ` ` alike, so they often coincide), whereas an
+aliased override diverges on **every** row because nothing normalizes it. Deterministically
+broken beats intermittently broken for a guard's purposes — REVIEW.md 🔴 either way. So
+`explicit_id` is the one field with `validation_alias=None`, and connectors project onto it
+deliberately.
 
 **Why blank folds to `None`.** An empty string is falsy but is not `None`. Left intact it
 would reach `resolve_id`, be returned as the id, and collapse every row of that type onto a
@@ -184,19 +168,14 @@ reproducible from the natural-key names on the same frame** and it needs no over
 Its `Query` / `CTE` / query-owned-column ids are rooted on a SHA-256 of the query text —
 the query paradigm, a separate normalized surface (D11) this contract does not model.
 
-Measured, not just reasoned: 60 real BigQuery jobs from `neocarta-rajvardhan` driven through
-the production `parse_sql_query` yielded 35 parsed queries → 38 table ids, 38 schema ids and
-22 column ids, all of which this contract re-derived from the frame's natural keys with **zero
-mismatches** and **zero rows needing an override**.
-
 Two projection traps the parity suite pins, both of which mean a raw query-log frame must be
 **projected** rather than validated directly:
 
 - `table_info.dataset_id` is the **generated schema id** (`my_proj.sales`), not a dataset
   name — and `SCHEMA_NAME_SYNONYMS` absorbs `dataset_id` because in BigQuery and Dataplex
   frames that column *is* the name. A raw row carries neither `schema_name` nor
-  `table_schema`, so a direct validate binds the id as the name. This is not a corner case:
-  it fired on **38 of 38** real table rows in the live run above.
+  `table_schema`, so a direct validate binds the id as the name — on every row, not as a
+  corner case.
 - `column_info.table_name` is the SQL **alias** (`o`), and the frame carries no container
   path at all, so a column's key is recoverable only by joining back to `table_info` on
   `table_id`.
@@ -222,11 +201,10 @@ nothing is regenerated; pandas reads the cell as `NaN`, and that `numpy.float64`
   of truth at this layer."
 - **Uniqueness is the supplier's to own.** Two rows of the *same* kind sharing an explicit id
   is the alignment feature working — that is the whole point. Across *different* kinds it is
-  not checked and not rejected: verified live, a `ColumnRecord` and a `TableRecord` supplying
-  one id yield **two** nodes, because the writer's `MERGE` is label-scoped, plus a
-  self-referential-looking `HAS_COLUMN` between them. Nothing is corrupted and this is exactly
-  today's connector behavior, unchanged here. The index makes the same distinction for the same
-  reason — it is keyed by *record class*, so a `DatabaseRecord` and a `GlossaryRecord` with one
+  neither checked nor rejected: the writer's `MERGE` is label-scoped, so one id supplied for
+  both a column and a table yields two nodes rather than a conflict. Nothing is corrupted, and
+  this is today's connector behavior unchanged. The index makes the same distinction for the
+  same reason — keyed by *record class*, so a `DatabaseRecord` and a `GlossaryRecord` sharing a
   key never collide.
 - **A bundle-level "explicit ids on/off" switch** is deliberately *not* offered. That is the
   file-level all-or-nothing model this ticket widens away from, and it would be a second
@@ -234,16 +212,14 @@ nothing is regenerated; pandas reads the cell as `NaN`, and that `numpy.float64`
 - **An override costs convergence with OSI, and that is the real price of using it.** OSI is
   the graph/semantic paradigm (D11): it never passes through this contract, and
   `OsiTransformer._make_column_id` derives every `:Column` id by *generating* — re-splitting
-  the dotted table id and calling `generate_column_id` — so it has no override to consult.
-  Measured against a real Neo4j with the shipped `datasets/osi/acme_semantic_model.yaml`:
-  a CSV with **no** explicit id converges with OSI on one `:Column`
-  (`acme_warehouse.acme_corp.offices.office_id`), and the same CSV **with** an explicit id
-  yields **two** nodes for that one physical column. So the escape hatch buys alignment with
-  whichever source minted the id and spends alignment with OSI. This is today's behavior
-  unchanged — but it is why the override is *rare* rather than a general-purpose knob, and it
-  is the same shape of OSI/tabular divergence [merge-contract.md](merge-contract.md) records
-  for the key flags. Closing it means giving the graph/semantic transform its own override
-  seam, which is S5's to decide, not this contract's.
+  the dotted table id and calling `generate_column_id` — so it has no override to consult. A
+  physical column that a tabular connector overrides and an OSI model also describes therefore
+  lands as **two** `:Column` nodes, where without the override the two converge on one. The
+  escape hatch buys alignment with whichever source minted the id and spends alignment with
+  OSI. Today's behavior unchanged — but it is why the override is *rare* rather than a
+  general-purpose knob, and it is the same shape of OSI/tabular divergence
+  [merge-contract.md](merge-contract.md) records for the key flags. Closing it means giving the
+  graph/semantic transform its own override seam: S5's to decide, not this contract's.
 - **`LineageRecord` has no producer** and its graph target is declared but not implemented,
   so its endpoint resolution is specified here and exercised by nothing.
 - **The index is specified, not implemented.** Building it needs a per-type natural key —

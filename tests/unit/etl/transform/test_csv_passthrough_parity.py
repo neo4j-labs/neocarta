@@ -1,18 +1,12 @@
 """Parity: the CSV connector's id passthrough, reproduced through the contract (S1.4, #295).
 
-The ticket's parity check is *"passthrough IDs must match today's values exactly"*, so
-the oracle here is the **real** ``CSVExtractor`` — never a hand-written expected string.
-Each case drives the shipped extractor over a one-row CSV and asserts that validating
-the same row as a normalized record and resolving it through
-:func:`~neocarta.etl.transform.resolve_id` lands on the identical id, in both directions:
+The ticket's parity check is *"passthrough IDs must match today's values exactly"*, so the
+oracle here is the **real** ``CSVExtractor`` — never a hand-written expected string. Each
+case drives the shipped extractor over a one-row CSV and asserts the same row, validated as
+a normalized record and resolved, lands on the identical id — both when the ``*_id`` column
+is absent (generated) and when it is present (the override wins, verbatim).
 
-- **auto-generated** — no ``*_id`` column, so ``explicit_id`` is ``None`` and the
-  generated id must match today's ``generate_*_id`` output;
-- **explicit** — the ``*_id`` column present, so the override must win and survive
-  verbatim, exactly as ``CSVExtractor`` passes it through today.
-
-Nothing here flips the connector; that is S4. This pins the id *values* S4 must not
-change, which is the part a flip can actually break.
+Nothing here flips the connector; that is S4. This pins the id *values* S4 must not change.
 """
 
 from __future__ import annotations
@@ -54,15 +48,11 @@ if TYPE_CHECKING:
 # `generate_business_term_id`'s docstring tells users to align a CSV onto.
 EXPLICIT = "projects/p/locations/us/entries/Custom-ID"
 
-# --- The CSV connector's ten distinct id columns, from the audit of
-# `connectors/csv/extract.py` (twenty `if "<x>_id" not in df.columns: generate` sites).
-# The eight below are the *entity-owning* ones — each case carries the CSV cells, the
-# extractor method that resolves the id today, the normalized record those same cells
-# validate as, and the generator the KeySpec builder replaces. The remaining two
-# (`source_column_id` / `target_column_id`) and every *parent* column a child file
-# repeats (`schema_info.database_id`, `column_info.table_id`, …) are covered by the
-# endpoint class below instead, because under the contract they resolve through the
-# parent's own record rather than this row's.
+# --- The eight *entity-owning* id columns, from the audit of `connectors/csv/extract.py`.
+# Each case: the CSV cells, the extractor method that resolves the id today, the record those
+# cells validate as, and the generator the KeySpec builder replaces. The two reference
+# endpoints and every *parent* column a child file repeats are covered by the endpoint class
+# below, since under the contract they resolve through the parent's own record.
 ENTITY_CASES: dict[str, dict] = {
     "database": {
         "filename": "database_info.csv",
@@ -210,11 +200,10 @@ class TestExplicitIdColumnsReproduceTodaysValues:
         )
 
     def test_the_parity_assertion_has_teeth(self, tmp_path: Path) -> None:
-        # Negative control, the way the #291 harness's reference pattern demands:
-        # degenerate the resolver to ignore the override and the explicit case must break.
-        # Without this, a resolver that always generated would still look green on the
-        # auto-generated half of the suite. One case is enough — every case runs the same
-        # single-line resolver, so this checks the suite's wiring, not each generator.
+        # Negative control per the #291 harness's reference pattern: degenerate the resolver to
+        # ignore the override, and the explicit case must break — otherwise a resolver that
+        # always generated would still look green on the auto-generated half. One case suffices,
+        # since every case runs the same single-line resolver.
         case = ENTITY_CASES["column"]
         cells = {**case["cells"], case["id_column"]: EXPLICIT}
         today = _todays_id(tmp_path, case, cells)

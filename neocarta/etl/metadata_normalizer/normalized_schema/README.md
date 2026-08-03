@@ -237,17 +237,11 @@ pre-folds the slug instead, exactly as it must already pre-fold `column_mode`.
   canonical names). The CSV *format* allows optional columns, so a CSV that omits
   the path columns cannot populate the required natural-key fields — that is a
   malformed input for this contract, not something it silently accepts.
-  It is also the one connector with a real **explicit-ID** path: ten optional
-  `*_id` columns across its files, used verbatim when supplied and generated
-  otherwise. Those project onto `explicit_id` at S4 (never by alias). Two changes
-  come due with them: a *parent* id column (`schema_info.csv`'s `database_id`, and
-  the like) has no home on the child record — the override belongs on the parent's
-  own row and the child resolves through it, which discharges the "must be
-  consistent across files" burden the extractor's docstring places on the user —
-  and the choice becomes per **row** rather than per file, since a blank cell now
-  falls back to generation instead of reaching the loader as a required-`str`
-  `None`. The shipped `datasets/csv/*.csv` carry no `*_id` columns at all, so **S4
-  needs a captured explicit-ID golden first**, exactly as the Dataplex glossary does.
+  It is also the one connector with a real **explicit-ID** path — ten optional
+  `*_id` columns, used verbatim when supplied — so it owns the S4 reconciliations
+  that come with the override (parent id columns, per-row granularity, and the
+  golden it needs captured first), enumerated in
+  [`explicit-id-override.md`](../../../../docs/refactor/explicit-id-override.md).
 - **Dataplex** — currently fabricates `is_primary_key=False` / `is_foreign_key=False`
   (it exposes no key metadata); under this contract those become `None` (honest
   "unknown"). That is a deliberate behavior change to reconcile at the S4 flip
