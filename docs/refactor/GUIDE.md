@@ -118,7 +118,8 @@ These are **settled** decisions. A ticket citing `D#` means "this constraint is 
   **identity-agnostic**; one generic ID builder replaces the per-connector `generate_*_id` functions; a
   rare explicit-ID override exists for cross-source alignment. The override is specified and tested in
   `docs/refactor/explicit-id-override.md` (`S1-4`).
-- **D7** — normalization needs value coercions (not just field renames).
+- **D7** — normalization needs value coercions (not just field renames). The standardized field
+  vocabulary both halves resolve onto is ratified in `docs/refactor/field-vocabulary.md` (`S1-5`).
 - **D10** — sparse rows are supported with a **non-clobber merge** contract (partial data never erases
   fuller data). Specified and tested in `docs/refactor/merge-contract.md` (`S1-3`).
 - **D11** — two ingestion paradigms: **tabular** (→ normalized schema) and **graph/semantic** (OSI now),

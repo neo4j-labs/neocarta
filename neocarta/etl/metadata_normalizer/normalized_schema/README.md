@@ -182,46 +182,22 @@ An edge between a key path and one of its own prefixes needs no table:
 with no matching definition is a free-form value — so a fabricated `is_governed`
 flag could only disagree with the authoritative join.
 
-## Standardized vocabulary (proposed; #296 to ratify)
+## Standardized vocabulary
 
-Each canonical token — the field name, and what `model_dump()` emits — accepts
-the known source synonyms via `AliasChoices` (canonical listed first), so a
-connector's **raw** source row validates directly and a spin-out connector can
-always emit canonical names without editing this contract (D17).
+Each canonical token — the field name, and what `model_dump()` emits — accepts the
+known source synonyms via `AliasChoices` (canonical listed first), so a connector's
+**raw** source row validates directly and a spin-out connector can always emit
+canonical names without editing this contract (D17).
 
-| Concept | Canonical token | Source synonyms absorbed |
-|---|---|---|
-| container | `database_name` | `project_id`, `table_catalog`, `catalog_name`, `database`, `catalog` |
-| schema | `schema_name` | `table_schema`, `dataset_id` |
-| table | `table_name` | `table_id` (Dataplex identity segment) |
-| data type (×4) | `data_type` | `column_data_type`, `type`, `column_type` |
-| nullability (×3) | `nullable` | `is_nullable`, `column_mode` |
-| description | `description` | `comment`, `table_description`, `column_description`, `term_description`, `tag_description` |
-| table label | `display_name` | `table_display_name` |
-| sampled value | `value` | `unique_value` |
-| glossary label | `display_name` | `name` (the CSV label-override column) |
-| source resource path | `resource_path` | `glossary_resource_path` |
-| tag namespace | `tag_namespace` | `source` |
-| tag value | `tag_value` | `value_name` |
+The **shared** sets live in [`_vocabulary.py`](_vocabulary.py) (one owner, GUIDE §4);
+role-scoped (`ForeignKeyRecord`'s `source_*` / `target_*`) and record-scoped
+(`description`, `TableRecord.display_name`, `GlossaryRecord.resource_path`) sets stay
+inline at their declaration site.
 
-`ForeignKeyRecord` uses **role-scoped** aliases so a connector's FK frame that
-names the two sides separately (`table_*` vs `referenced_*`) or shares one
-(`constraint_*` / `database_name`) still resolves source and target distinctly.
-`LineageRecord` uses the same role scoping for its two sides.
-
-`tag_namespace` is canonically named rather than borrowing Databricks' `source`
-column because `source_*` already means "the referencing side of an edge" on
-`ForeignKeyRecord`; the raw column still validates via the alias (D17).
-
-The synonym sets are collision-free within a single source row (no connector
-emits two names for the same concept in one row) — with one deliberate omission
-that keeps it that way. `AliasChoices` resolves to the first alias **present** in
-the input, not the first non-null one, and Dataplex's glossary frames are the
-*inverse* of CSV's: identity lives in `glossary_id` / `category_id` / `term_id`
-while `glossary_name` / `term_name` hold the **display label**. Aliasing those
-`*_id` columns onto the identity fields would therefore silently bind the label as
-identity for any raw Dataplex row, so they are **not** absorbed: the connector
-pre-folds the slug instead, exactly as it must already pre-fold `column_mode`.
+The ratified vocabulary — all three tables, the three rules, why that boundary falls
+where it does, the per-connector parity projection, and the collision-free omission
+that stops a raw Dataplex row binding its label as identity — is in
+[`field-vocabulary.md`](../../../../docs/refactor/field-vocabulary.md).
 
 ## Connector notes (verified against real connector data)
 
