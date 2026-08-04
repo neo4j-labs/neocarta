@@ -1,0 +1,159 @@
+{
+  "nodes": [
+    {
+      "labels": [
+        "Database"
+      ],
+      "properties": {
+        "id": "dbms",
+        "name": "dbms",
+        "service": "NEO4J"
+      }
+    },
+    {
+      "labels": [
+        "Node"
+      ],
+      "properties": {
+        "id": "dbms.neo4j.person",
+        "label": "Person"
+      }
+    },
+    {
+      "labels": [
+        "Person"
+      ],
+      "properties": {
+        "email": "a@x.com",
+        "name": "A"
+      }
+    },
+    {
+      "labels": [
+        "Person"
+      ],
+      "properties": {
+        "email": "b@x.com",
+        "name": "B"
+      }
+    },
+    {
+      "labels": [
+        "Property"
+      ],
+      "properties": {
+        "existence": false,
+        "id": "dbms.neo4j.knows.since",
+        "indexed": false,
+        "name": "since",
+        "nullable": true,
+        "type": "INTEGER",
+        "unique": false
+      }
+    },
+    {
+      "labels": [
+        "Property"
+      ],
+      "properties": {
+        "existence": false,
+        "id": "dbms.neo4j.person.email",
+        "indexed": true,
+        "name": "email",
+        "nullable": true,
+        "type": "STRING",
+        "unique": true
+      }
+    },
+    {
+      "labels": [
+        "Property"
+      ],
+      "properties": {
+        "existence": false,
+        "id": "dbms.neo4j.person.name",
+        "indexed": false,
+        "name": "name",
+        "nullable": true,
+        "type": "STRING",
+        "unique": false
+      }
+    },
+    {
+      "labels": [
+        "Relationship"
+      ],
+      "properties": {
+        "id": "dbms.neo4j.knows",
+        "type": "KNOWS"
+      }
+    },
+    {
+      "labels": [
+        "Schema"
+      ],
+      "properties": {
+        "id": "dbms.neo4j",
+        "name": "neo4j"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "dst": "dbms.neo4j",
+      "properties": {},
+      "src": "dbms",
+      "type": "HAS_SCHEMA"
+    },
+    {
+      "dst": "dbms.neo4j.knows",
+      "properties": {},
+      "src": "dbms.neo4j",
+      "type": "HAS_RELATIONSHIP"
+    },
+    {
+      "dst": "dbms.neo4j.knows.since",
+      "properties": {},
+      "src": "dbms.neo4j.knows",
+      "type": "HAS_PROPERTY"
+    },
+    {
+      "dst": "dbms.neo4j.person",
+      "properties": {},
+      "src": "dbms.neo4j",
+      "type": "HAS_NODE"
+    },
+    {
+      "dst": "dbms.neo4j.person",
+      "properties": {},
+      "src": "dbms.neo4j.knows",
+      "type": "HAS_SOURCE_NODE"
+    },
+    {
+      "dst": "dbms.neo4j.person",
+      "properties": {},
+      "src": "dbms.neo4j.knows",
+      "type": "HAS_TARGET_NODE"
+    },
+    {
+      "dst": "dbms.neo4j.person.email",
+      "properties": {},
+      "src": "dbms.neo4j.person",
+      "type": "HAS_PROPERTY"
+    },
+    {
+      "dst": "dbms.neo4j.person.name",
+      "properties": {},
+      "src": "dbms.neo4j.person",
+      "type": "HAS_PROPERTY"
+    },
+    {
+      "dst": null,
+      "properties": {
+        "since": 2020
+      },
+      "src": null,
+      "type": "KNOWS"
+    }
+  ]
+}

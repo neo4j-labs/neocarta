@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -11,6 +12,7 @@ from neo4j.exceptions import ClientError
 
 from ...._logging import log_stage
 from ....errors import ConfigError
+from ....warnings import Neo4jSchemaWarning
 from .._errors import wrap_neo4j_errors
 
 if TYPE_CHECKING:
@@ -117,10 +119,14 @@ class Neo4jSchemaExtractor:
         )
 
     def _ensure_apoc(self, source_database: str) -> None:
-        """Pre-flight: APOC (Core) must be installed on the source."""
+        """Pre-flight: APOC (Core) must be installed on the source.
+
+        ``apoc.version()`` is a function (not a procedure), so it is called with
+        ``RETURN``; an unknown-function ``ClientError`` means APOC is absent.
+        """
         try:
-            self._read("CALL apoc.version()", source_database)
-        except ClientError as exc:  # procedure-not-found => APOC absent
+            self._read("RETURN apoc.version() AS version", source_database)
+        except ClientError as exc:  # unknown function => APOC absent
             raise ConfigError(
                 "APOC (Core) is required on the source Neo4j but was not found.",
                 suggestion="Install the APOC (Core) plugin on the source Neo4j instance.",
@@ -192,4 +198,10 @@ class Neo4jSchemaExtractor:
         rows = self._read("CALL apoc.meta.schema() YIELD value RETURN value", source_database)
         schema_map = rows[0]["value"] if rows else {}
         _flatten_schema(schema_map, self._cache)
+        if self._cache["node_info"].empty:
+            warnings.warn(
+                "Source database has no node labels; only Database/Schema will be written.",
+                Neo4jSchemaWarning,
+                stacklevel=2,
+            )
         return self._cache.get("node_property_info", pd.DataFrame())
