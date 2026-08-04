@@ -11,7 +11,8 @@ downstream by the KeySpec-driven ID builder from these raw key segments; the
 precedence rule that lets an override displace it.
 
 Each record standardises the divergent field vocabulary every connector's
-``transform.py`` uses today: the x4 container name, x4 data type, and x3
+``transform.py`` uses today: the x6 container name (x4 of which appear in a
+table/column-grain frame, x2 only at database grain), x4 data type, and x3
 nullability names all resolve onto one canonical token per concept. Connectors'
 raw source rows validate directly because each divergent field accepts its known
 source synonyms via :class:`pydantic.AliasChoices` (canonical token first, so it
@@ -24,8 +25,9 @@ facets share so the two halves cannot drift (GUIDE §4). Value coercions (GUIDE 
 Containment edges (``HAS_SCHEMA`` / ``HAS_TABLE`` / ``HAS_COLUMN``) are *not*
 modelled here: they are fully derivable from the natural-key hierarchy each row
 carries. Only the non-derivable cross-hierarchy foreign-key reference is a table
-(:class:`ForeignKeyRecord`). See ``README.md`` for the vocabulary rationale and
-the Graph Spec ``sources`` mapping sketch.
+(:class:`ForeignKeyRecord`). See ``docs/refactor/field-vocabulary.md`` for the
+ratified vocabulary and its rationale, and ``README.md`` for the Graph Spec
+``sources`` mapping sketch.
 
 The optional facets that hang off this core — values, lineage, glossary and
 governance — live in ``facets.py`` and surface as further sparse tables on
@@ -152,7 +154,7 @@ class TableRecord(BaseModel):
 class ColumnRecord(BaseModel):
     """A row of the normalized Column table.
 
-    Resolves the x4 container / x4 data-type / x3 nullability source-name
+    Resolves the x6 container / x4 data-type / x3 nullability source-name
     divergence onto canonical tokens, and coerces the nullability value (GUIDE
     D7). Key metadata defaults to ``None`` ("source said nothing") rather than
     ``False`` (GUIDE D10 sparse rows); ``nullable`` keeps the permissive ``True``

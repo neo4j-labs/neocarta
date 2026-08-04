@@ -1,21 +1,30 @@
 """The standardized field vocabulary shared by every normalized-schema record.
 
 Canonical token (the public field name) ⟵ the known source-column synonyms every
-connector emits for that concept. Documented here pending #296 ratification; this
-module is the single owner of that mapping (GUIDE §4, "one owner per piece of
-state") so the structural core (``models.py``) and the optional facets
-(``facets.py``) cannot drift apart.
+connector emits for that concept. Ratified by S1.5 (#296); this module is the single
+owner of the **shared** mapping (GUIDE §4, "one owner per piece of state") so the
+structural core (``models.py``) and the optional facets (``facets.py``) cannot drift
+apart.
+
+It is deliberately **not** the owner of every alias set: a set is shared only when
+*every* record that has the field accepts the same names, so role-scoped
+(``ForeignKeyRecord``'s ``source_*`` / ``target_*``) and record-scoped
+(``description``, ``TableRecord.display_name``, ``GlossaryRecord.resource_path``) sets
+stay inline at their declaration site. ``docs/refactor/field-vocabulary.md`` has the
+full vocabulary and the reason that boundary is where it is.
 
 Three rules every set keeps:
 
 - **Canonical token first**, so it wins when both it and a synonym are present and
   a spin-out connector can always emit canonical names (GUIDE D17).
-- **Collision-free within a single source row** — no connector row carries two
-  names for one concept, so ``AliasChoices`` never has to arbitrate. This matters
-  more than it looks: ``AliasChoices`` picks the first alias *present*, not the
-  first non-null one, so a concept whose canonical token means something else in
-  another source must **not** absorb that source's column (see the glossary note
-  in ``facets.py``).
+- **Collision-free across source columns**, and arbitrated by the rule above where
+  an extractor frame adds its own: no connector's *source* columns spell one concept
+  two ways, but ``CSVExtractor`` generates ``*_id`` columns, so a real CSV frame
+  carries both ``table_name`` and a precomputed ``table_id``. Canonical-first is what
+  makes that safe, because ``AliasChoices`` picks the first alias *present*, not the
+  first non-null one — which is also why a concept whose canonical token means
+  something else in another source must **not** absorb that source's column (see the
+  glossary note in ``facets.py``).
 - **Every synonym has a real producer** — each is a name some connector or shipped
   dataset actually emits, never one invented from plausibility. Enforced by
   ``test_no_invented_aliases``.

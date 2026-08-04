@@ -347,7 +347,7 @@ pipeline. The scaffold generates this correctly.
 
 ## 14. Style and id generation
 
-- Code style: numpy docstrings, ruff format + lint (see project `CLAUDE.md`).
+- Code style: Google docstrings, ruff format + lint (see project `CLAUDE.md`).
 - **All node id generation must route through
   [neocarta/connectors/utils/generate_id.py](neocarta/connectors/utils/generate_id.py)** —
   never inline an f-string for an id. Add a new function there if none fits.
@@ -407,3 +407,20 @@ The scaffold wires this up: generated extractors decorate `extract()` with
 `log_transform_counts`, and logs each phase through the module logger — no
 `print()`. `verify` warns on any stray `print()` in connector code, so don't
 introduce any.
+
+## 17. Field vocabulary
+
+The names a connector gives the metadata it emits are **not** a per-connector
+choice: one canonical token per concept, and the source spellings each already
+absorbs, are ratified in
+[docs/refactor/field-vocabulary.md](docs/refactor/field-vocabulary.md). Read it
+before naming a frame column. This governs naming today; emitting the normalized
+records themselves is the S4 flip.
+
+- **Emit canonical tokens.** A frame already spelling a concept one of the absorbed
+  ways needs no rename. A *new* spelling for an existing concept is a divergence,
+  not a preference — adding a synonym is a reviewed change to `_vocabulary.py`.
+- **Source-specific *values* stay yours to pre-fold.** The contract folds the
+  standardized nullability tokens (`YES`/`NO`, `NULLABLE`/`REQUIRED`, native bools)
+  and rejects anything else rather than guessing, so e.g. a `REPEATED` mode must be
+  resolved in the connector.

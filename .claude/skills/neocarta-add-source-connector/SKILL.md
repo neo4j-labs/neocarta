@@ -76,6 +76,8 @@ run but should be fixed.
    (call `self.loader.load_*` for your node / relationship types). Fill
    `_TRANSFORM_COUNTS` so `log_transform_counts` reports per-type counts — see
    logging conventions in [contract §16](.claude/skills/neocarta-add-source-connector/connector-contract.md#16-logging).
+   Name the metadata fields you emit from the canonical vocabulary, not ad hoc — see
+   [contract §17](.claude/skills/neocarta-add-source-connector/connector-contract.md#17-field-vocabulary).
 3. Fill in the `README.md` (see [contract §12](.claude/skills/neocarta-add-source-connector/connector-contract.md#12-required-readme)).
 4. `verify` until green. Add behavior-specific unit tests beyond conformance.
 5. Run the full unit suite + ruff (see Test), update `CHANGELOG.md`.

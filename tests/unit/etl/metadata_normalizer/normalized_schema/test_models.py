@@ -30,6 +30,16 @@ from neocarta.etl.metadata_normalizer.normalized_schema import (
     TableRecord,
     ValueRecord,
 )
+from neocarta.etl.metadata_normalizer.normalized_schema._vocabulary import (
+    DATA_TYPE_SYNONYMS,
+    DATABASE_NAME_SYNONYMS,
+    NULLABLE_SYNONYMS,
+)
+
+# Each divergence class below also pins its synonym tuple by full equality. The
+# `parametrize` lists are literals, so on their own they would stay green while a new
+# synonym staled the x6/x4/x3 counts `docs/refactor/field-vocabulary.md` quotes — which
+# is exactly how models.py's "x4 container" went wrong once the tuple grew to six.
 
 ALL_MODELS = [
     DatabaseRecord,
@@ -370,6 +380,9 @@ class TestDataTypeDivergence:
         }
         assert ColumnRecord.model_validate(row).data_type == "STRING"
 
+    def test_synonym_set_is_exactly_the_documented_four(self) -> None:
+        assert DATA_TYPE_SYNONYMS == ("data_type", "column_data_type", "type", "column_type")
+
 
 class TestNullabilityDivergenceAndCoercion:
     """The x3 nullability names + value coercion (D7)."""
@@ -384,6 +397,9 @@ class TestNullabilityDivergenceAndCoercion:
             source_name: "NO" if source_name != "column_mode" else "REQUIRED",
         }
         assert ColumnRecord.model_validate(row).nullable is False
+
+    def test_synonym_set_is_exactly_the_documented_three(self) -> None:
+        assert NULLABLE_SYNONYMS == ("nullable", "is_nullable", "column_mode")
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -451,7 +467,11 @@ class TestCoerceNullableUnit:
 
 
 class TestContainerDivergence:
-    """The x4 container names resolve onto ``database_name`` across frames."""
+    """The x6 container names resolve onto ``database_name`` across frames.
+
+    x4 appear in a table/column-grain frame; the remaining x2 only in a
+    database-grain frame, which is why the two parametrized cases are separate.
+    """
 
     @pytest.mark.parametrize(
         "source_name", ["database_name", "project_id", "table_catalog", "catalog_name"]
@@ -466,6 +486,17 @@ class TestContainerDivergence:
     def test_database_frame_names_map(self, source_name: str) -> None:
         # Snowflake ("database") / Databricks ("catalog") database-frame names.
         assert DatabaseRecord.model_validate({source_name: "db"}).database_name == "db"
+
+    def test_synonym_set_is_exactly_the_documented_six(self) -> None:
+        # The x4-vs-x2 split above is about which *frames* carry which name, not the tuple.
+        assert DATABASE_NAME_SYNONYMS == (
+            "database_name",
+            "project_id",
+            "table_catalog",
+            "catalog_name",
+            "database",
+            "catalog",
+        )
 
 
 class TestDatabaseSchemaTableMapping:
