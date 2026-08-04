@@ -12,10 +12,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from neocarta.connectors._base import SourceConnectorProtocol
-from neocarta.connectors.neo4j.schema import Neo4jSchemaConnector
+from neocarta.connectors.neo4j import Neo4jSchemaConnector
 from neocarta.errors import StateError
 
-PACKAGE = "neocarta.connectors.neo4j.schema"
+PACKAGE = "neocarta.connectors.neo4j"
 
 
 def _make_connector() -> Neo4jSchemaConnector:
