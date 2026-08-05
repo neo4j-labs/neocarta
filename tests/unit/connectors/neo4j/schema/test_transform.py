@@ -61,3 +61,95 @@ def test_build_all_excludes_property_when_filtered(extractor_with_cache):
     assert t.node_nodes  # NODE included
     assert t.property_nodes == []  # PROPERTY excluded
     assert t.node_has_property_relationships == []
+
+
+def _full_extractor():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        database_info=pd.DataFrame([{"source_name": "dbms"}]),
+        schema_info=pd.DataFrame([{"source_name": "dbms", "database": "neo4j"}]),
+        node_info=pd.DataFrame([{"label": "Person"}]),
+        relationship_info=pd.DataFrame([{"type": "KNOWS"}]),
+        node_property_info=pd.DataFrame(
+            [
+                {
+                    "label": "Person",
+                    "property": "name",
+                    "type": "STRING",
+                    "unique": False,
+                    "indexed": False,
+                    "existence": False,
+                }
+            ]
+        ),
+        relationship_property_info=pd.DataFrame(
+            [
+                {
+                    "rel_type": "KNOWS",
+                    "property": "since",
+                    "type": "INTEGER",
+                    "unique": False,
+                    "indexed": False,
+                    "existence": False,
+                }
+            ]
+        ),
+        relationship_endpoint_info=pd.DataFrame(
+            [{"type": "KNOWS", "source_label": "Person", "target_label": "Person"}]
+        ),
+    )
+
+
+def test_property_only_filter_has_no_owners():
+    t = Neo4jSchemaTransformer()
+    t.build_all(
+        _full_extractor(),
+        source_name="dbms",
+        source_database="neo4j",
+        include_nodes=[NodeLabel.PROPERTY],
+    )
+    assert t.property_nodes == []
+    assert t.node_has_property_relationships == []
+    assert t.relationship_has_property_relationships == []
+
+
+def test_node_property_filter_excludes_relationship_owned_props():
+    t = Neo4jSchemaTransformer()
+    t.build_all(
+        _full_extractor(),
+        source_name="dbms",
+        source_database="neo4j",
+        include_nodes=[NodeLabel.NODE, NodeLabel.PROPERTY],
+    )
+    assert [p.name for p in t.property_nodes] == ["name"]  # node-owned only
+    assert t.node_has_property_relationships
+    assert t.relationship_has_property_relationships == []
+
+
+def test_relationship_property_filter_excludes_node_owned_props():
+    t = Neo4jSchemaTransformer()
+    t.build_all(
+        _full_extractor(),
+        source_name="dbms",
+        source_database="neo4j",
+        include_nodes=[NodeLabel.RELATIONSHIP, NodeLabel.PROPERTY],
+    )
+    assert [p.name for p in t.property_nodes] == ["since"]  # rel-owned only
+    assert t.relationship_has_property_relationships
+    assert t.node_has_property_relationships == []
+
+
+def test_repeated_run_resets_stale_caches():
+    t = Neo4jSchemaTransformer()
+    t.build_all(_full_extractor(), source_name="dbms", source_database="neo4j")  # full run
+    assert t.node_nodes
+    assert t.relationship_nodes
+    assert t.property_nodes
+    # second run keeps only the roots -> earlier lists must not persist
+    t.build_all(_full_extractor(), source_name="dbms", source_database="neo4j", include_nodes=[])
+    assert t.node_nodes == []
+    assert t.relationship_nodes == []
+    assert t.property_nodes == []
+    assert t.has_node_relationships == []
+    assert t.node_has_property_relationships == []

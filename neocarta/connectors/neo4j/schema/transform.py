@@ -187,21 +187,27 @@ class Neo4jSchemaTransformer:
 
     def transform_to_property_nodes(
         self,
-        node_property_info: pd.DataFrame,
-        relationship_property_info: pd.DataFrame,
+        node_property_info: pd.DataFrame | None,
+        relationship_property_info: pd.DataFrame | None,
         *,
         source_name: str,
         source_database: str,
         cache: bool = True,
     ) -> list[Property]:
-        """Build Property nodes for node- and relationship-owned properties."""
+        """Build Property nodes for node- and relationship-owned properties.
+
+        A ``None`` frame skips that owner type (used by ``build_all`` filtering so a
+        property is only produced when its owning Node/Relationship is included).
+        """
         nodes: list[Property] = []
-        for _, row in node_property_info.iterrows():
-            owner_id = generate_node_id(source_name, source_database, row["label"])
-            nodes.append(_build_property(owner_id, row))
-        for _, row in relationship_property_info.iterrows():
-            owner_id = generate_relationship_id(source_name, source_database, row["rel_type"])
-            nodes.append(_build_property(owner_id, row))
+        if node_property_info is not None:
+            for _, row in node_property_info.iterrows():
+                owner_id = generate_node_id(source_name, source_database, row["label"])
+                nodes.append(_build_property(owner_id, row))
+        if relationship_property_info is not None:
+            for _, row in relationship_property_info.iterrows():
+                owner_id = generate_relationship_id(source_name, source_database, row["rel_type"])
+                nodes.append(_build_property(owner_id, row))
         if cache:
             self._node_cache["property_nodes"] = nodes
         return nodes
@@ -345,6 +351,10 @@ class Neo4jSchemaTransformer:
         include_relationships: list[RelationshipType] | None = None,
     ) -> None:
         """Build every LPG node/relationship list from the extractor caches, honoring filters."""
+        # Independent runs (contract §9): clear prior state so a filtered run can't
+        # leak stale lists from an earlier run on the same transformer.
+        self._node_cache = NodesCache()
+        self._relationships_cache = RelationshipsCache()
 
         def included(label: NodeLabel) -> bool:
             return include_nodes is None or label in include_nodes
@@ -387,22 +397,25 @@ class Neo4jSchemaTransformer:
                 source_database=source_database,
             )
         if prop_inc:
+            # A property is only produced when its owning Node/Relationship is included.
             self.transform_to_property_nodes(
-                extractor.node_property_info,
-                extractor.relationship_property_info,
+                extractor.node_property_info if node_inc else None,
+                extractor.relationship_property_info if rel_inc else None,
                 source_name=source_name,
                 source_database=source_database,
             )
-            self.transform_to_node_has_property_relationships(
-                extractor.node_property_info,
-                source_name=source_name,
-                source_database=source_database,
-            )
-            self.transform_to_relationship_has_property_relationships(
-                extractor.relationship_property_info,
-                source_name=source_name,
-                source_database=source_database,
-            )
+            if node_inc:
+                self.transform_to_node_has_property_relationships(
+                    extractor.node_property_info,
+                    source_name=source_name,
+                    source_database=source_database,
+                )
+            if rel_inc:
+                self.transform_to_relationship_has_property_relationships(
+                    extractor.relationship_property_info,
+                    source_name=source_name,
+                    source_database=source_database,
+                )
 
         if include_relationships is not None:
             for key, rel_type in _REL_TYPE_BY_CACHE.items():

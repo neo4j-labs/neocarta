@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 from neo4j import RoutingControl
-from neo4j.exceptions import ClientError
 
 from ...._logging import log_stage
-from ....errors import ConfigError
+from ....enums import NodeLabel
+from ....errors import ConfigError, TransformError
 from ....warnings import Neo4jSchemaWarning
 from .._errors import wrap_neo4j_errors
 
@@ -33,6 +33,21 @@ def _property_row(owner_key: str, owner: str, prop_name: str, meta: dict) -> dic
         "indexed": bool(meta.get("indexed", meta.get("index", False))),
         "existence": bool(meta.get("existence", False)),
     }
+
+
+def _property_rows(owner_key: str, owner: str, properties: dict) -> list[dict]:
+    """Build property rows for one owner, skipping malformed (non-dict) metas."""
+    rows = []
+    for prop_name, meta in properties.items():
+        if not isinstance(meta, dict):
+            warnings.warn(
+                f"Skipping malformed property {prop_name!r} on {owner!r}.",
+                Neo4jSchemaWarning,
+                stacklevel=2,
+            )
+            continue
+        rows.append(_property_row(owner_key, owner, prop_name, meta))
+    return rows
 
 
 def _endpoint_rows(label: str, rel_type: str, rel_meta: dict) -> list[dict]:
@@ -66,18 +81,38 @@ def _flatten_schema(schema_map: dict, cache: SchemaExtractorCache) -> None:
     endpoints: list[dict] = []
 
     for name, entry in schema_map.items():
+        if name == NodeLabel.NEOCARTA_GRAPH:
+            # Never describe neocarta's own metadata singleton — it appears when the
+            # source and target share a database (see the connector README).
+            continue
+        if not isinstance(entry, dict):
+            warnings.warn(
+                f"Skipping malformed apoc.meta.schema() entry for {name!r}.",
+                Neo4jSchemaWarning,
+                stacklevel=2,
+            )
+            continue
         kind = entry.get("type")
-        properties = entry.get("properties", {}) or {}
+        properties = entry.get("properties", {})
+        if not isinstance(properties, dict):
+            properties = {}
         if kind == "node":
             nodes.append({"label": name})
-            for prop_name, meta in properties.items():
-                node_props.append(_property_row("label", name, prop_name, meta))
-            for rel_type, rel_meta in (entry.get("relationships", {}) or {}).items():
-                endpoints.extend(_endpoint_rows(name, rel_type, rel_meta))
+            node_props.extend(_property_rows("label", name, properties))
+            relationships = entry.get("relationships", {})
+            if not isinstance(relationships, dict):
+                warnings.warn(
+                    f"Skipping malformed relationships on {name!r}.",
+                    Neo4jSchemaWarning,
+                    stacklevel=2,
+                )
+                relationships = {}
+            for rel_type, rel_meta in relationships.items():
+                if isinstance(rel_meta, dict):
+                    endpoints.extend(_endpoint_rows(name, rel_type, rel_meta))
         elif kind == "relationship":
             rels.append({"type": name})
-            for prop_name, meta in properties.items():
-                rel_props.append(_property_row("rel_type", name, prop_name, meta))
+            rel_props.extend(_property_rows("rel_type", name, properties))
 
     cache["node_info"] = pd.DataFrame(nodes, columns=["label"])
     cache["relationship_info"] = pd.DataFrame(rels, columns=["type"])
@@ -119,18 +154,22 @@ class Neo4jSchemaExtractor:
         )
 
     def _ensure_apoc(self, source_database: str) -> None:
-        """Pre-flight: APOC (Core) must be installed on the source.
+        """Pre-flight: the source must expose the ``apoc.meta.schema`` procedure.
 
-        ``apoc.version()`` is a function (not a procedure), so it is called with
-        ``RETURN``; an unknown-function ``ClientError`` means APOC is absent.
+        Checks procedure existence via ``SHOW PROCEDURES`` rather than catching an
+        error, so a genuine privilege failure (which raises) propagates to
+        ``wrap_neo4j_errors`` as an ``ExtractionError`` instead of being misreported
+        as a missing plugin.
         """
-        try:
-            self._read("RETURN apoc.version() AS version", source_database)
-        except ClientError as exc:  # unknown function => APOC absent
+        rows = self._read(
+            "SHOW PROCEDURES YIELD name WHERE name = 'apoc.meta.schema' RETURN count(*) AS c",
+            source_database,
+        )
+        if not rows or rows[0].get("c", 0) < 1:
             raise ConfigError(
-                "APOC (Core) is required on the source Neo4j but was not found.",
+                "APOC (Core) is required on the source Neo4j but 'apoc.meta.schema' was not found.",
                 suggestion="Install the APOC (Core) plugin on the source Neo4j instance.",
-            ) from exc
+            )
 
     # --- property accessors ---
     @property
@@ -196,7 +235,14 @@ class Neo4jSchemaExtractor:
         """
         self._ensure_apoc(source_database)
         rows = self._read("CALL apoc.meta.schema() YIELD value RETURN value", source_database)
-        schema_map = rows[0]["value"] if rows else {}
+        if not rows or "value" not in rows[0]:
+            raise TransformError(
+                "Unexpected apoc.meta.schema() result shape (no 'value' returned).",
+                suggestion="Check the APOC version on the source Neo4j.",
+            )
+        schema_map = rows[0]["value"]
+        if not isinstance(schema_map, dict):
+            raise TransformError("Unexpected apoc.meta.schema() 'value' shape (not a map).")
         _flatten_schema(schema_map, self._cache)
         if self._cache["node_info"].empty:
             warnings.warn(

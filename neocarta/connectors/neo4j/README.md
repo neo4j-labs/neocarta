@@ -107,5 +107,13 @@ absent. APOC Core ships with the official Neo4j Docker image and is enabled with
   no `Value` nodes.
 - **Re-ingest is additive.** Loads MERGE by id and never delete, so re-running
   updates the description in place.
+- **Use a separate database (or instance) for the target.** For idempotent
+  re-runs, write the neocarta graph to a **different database or instance** than the
+  source. When the source and target are the same database, a *re*-ingest also sees
+  the connector's own LPG labels (`Node` / `Relationship` / `Property` / `Database` /
+  `Schema`) from the previous run and describes them as source schema. The
+  `__neocarta_graph__` metadata singleton is excluded automatically, but the LPG
+  labels are not (they may collide with real source labels). On Neo4j Community
+  (single database), use a separate instance for the target.
 - **The caller owns both drivers.** `close()` is a no-op and never closes either
   driver; the caller is responsible for their lifecycle.
