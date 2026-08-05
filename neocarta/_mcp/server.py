@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable
 
 from dotenv import load_dotenv
@@ -135,7 +136,7 @@ async def create_mcp_server(
 This is an MCP server that facilitates context retrieval from a Neo4j semantic layer.
 The retrieved context may be used for query generation, query routing or data discovery.
 """
-    server = FastMCP(name=name, instructions=instructions, log_level="DEBUG")
+    server = FastMCP(name=name, instructions=instructions)
 
     await _validate_graph_version(neo4j_driver, neo4j_database)
 
@@ -219,7 +220,9 @@ async def main() -> None:
 def run() -> None:
     """Load environment variables and run the MCP server."""
     load_dotenv()
-    logger.setLevel(logging.INFO)
+    debug = os.getenv("NEOCARTA_DEBUG", "").lower() in ("1", "true")
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    logging.getLogger("fastmcp").setLevel(logging.DEBUG if debug else logging.WARNING)
     asyncio.run(main())
 
 

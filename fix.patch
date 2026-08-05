@@ -1,0 +1,35 @@
+diff --git a/typescript/src/transport/rest.ts b/typescript/src/transport/rest.ts
+index 0000000..0000000 100644
+--- a/typescript/src/transport/rest.ts
++++ b/typescript/src/transport/rest.ts
+@@ -1,6 +1,7 @@
+ import {
+   AuthenticationError,
+   ConnectionError,
+   TransportError,
++  NotFoundError,
+ } from "../errors.js";
+
+ async function request(...) {
+   const response = await fetch(url, options);
+
+   if (!response.ok) {
+     let message = "";
+
+     try {
+       message = await response.text();
+     } catch {
+       message = `HTTP ${response.status}`;
+     }
+
+     if (response.status === 404) {
+       throw new NotFoundError(message || "entity not found");
+     }
+
+     throw new TransportError(message || `HTTP ${response.status}`, {
+       statusCode: response.status,
+     });
+   }
+
+   return response;
+ }
