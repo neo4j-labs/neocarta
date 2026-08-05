@@ -451,6 +451,12 @@ def generate_custom_extension_id(semantic_model: str, vendor: str, data: str) ->
 def generate_node_id(database: str, schema: str, label: str) -> str:
     """Generate a Node id (an LPG node label) scoped by database and schema.
 
+    Neo4j labels are case-sensitive (``Person`` and ``person`` are distinct
+    labels), so the ``label`` segment is kept verbatim rather than normalized —
+    lowercasing would collapse distinct labels onto the same id. The
+    ``database`` / ``schema`` segments are caller-supplied container names and
+    are still normalized.
+
     Args:
         database: The source DBMS identifier (``source_name``).
         schema: The source database name introspected.
@@ -461,13 +467,17 @@ def generate_node_id(database: str, schema: str, label: str) -> str:
 
     Examples:
         >>> generate_node_id("my-dbms", "neo4j", "Person")
-        'my_dbms.neo4j.person'
+        'my_dbms.neo4j.Person'
     """
-    return f"{_normalize(database)}.{_normalize(schema)}.{_normalize(label)}"
+    return f"{_normalize(database)}.{_normalize(schema)}.{label}"
 
 
 def generate_relationship_id(database: str, schema: str, relationship_type: str) -> str:
     """Generate a Relationship id (an LPG relationship type) scoped by database and schema.
+
+    Neo4j relationship types are case-sensitive, so the ``relationship_type``
+    segment is kept verbatim (see :func:`generate_node_id`). The ``database`` /
+    ``schema`` segments are still normalized.
 
     Args:
         database: The source DBMS identifier (``source_name``).
@@ -479,9 +489,9 @@ def generate_relationship_id(database: str, schema: str, relationship_type: str)
 
     Examples:
         >>> generate_relationship_id("my-dbms", "neo4j", "KNOWS")
-        'my_dbms.neo4j.knows'
+        'my_dbms.neo4j.KNOWS'
     """
-    return f"{_normalize(database)}.{_normalize(schema)}.{_normalize(relationship_type)}"
+    return f"{_normalize(database)}.{_normalize(schema)}.{relationship_type}"
 
 
 def generate_property_id(owner_id: str, property_name: str) -> str:
@@ -493,6 +503,10 @@ def generate_property_id(owner_id: str, property_name: str) -> str:
     intentionally not re-normalized (it already is, and contains dotted segments),
     mirroring :func:`generate_governance_tag_instance_id`.
 
+    Neo4j property keys are case-sensitive (``firstName`` and ``firstname`` are
+    distinct keys), so ``property_name`` is kept verbatim — lowercasing would
+    collapse distinct keys onto the same id.
+
     Args:
         owner_id: A pre-built node or relationship id.
         property_name: The property key name.
@@ -501,7 +515,7 @@ def generate_property_id(owner_id: str, property_name: str) -> str:
         The property id in format ``{owner_id}.{property_name}``.
 
     Examples:
-        >>> generate_property_id("my_dbms.neo4j.person", "firstName")
-        'my_dbms.neo4j.person.firstname'
+        >>> generate_property_id("my_dbms.neo4j.Person", "firstName")
+        'my_dbms.neo4j.Person.firstName'
     """
-    return f"{owner_id}.{_normalize(property_name)}"
+    return f"{owner_id}.{property_name}"

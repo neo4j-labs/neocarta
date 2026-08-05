@@ -58,6 +58,17 @@ def test_create_name_range_index_routes_write_to_named_db():
     assert kwargs["database_"] == "catalog"
 
 
+def test_create_name_range_index_third_positional_arg_is_database_name():
+    """A positional third argument is the database, not the property (signature order)."""
+    driver = _mock_driver()
+
+    create_name_range_index(driver, "Table", "catalog")
+
+    kwargs = driver.execute_query.call_args.kwargs
+    assert kwargs["database_"] == "catalog"
+    assert "ON (n.name)" in kwargs["query_"]
+
+
 def test_loader_creates_name_index_after_constraint():
     """The Schema loader emits the name range index, ordered after the id constraint."""
     driver = _mock_driver()
