@@ -40,9 +40,15 @@ report_format = "coverage.xml (Cobertura)"
 #     the 8 CSV id columns.
 #   S1.5 (#296) +3 unit / +0 integration — the synonym-tuple set-pins that stop the ratified
 #     ×6/×4/×3 counts going stale (the existing divergence tests iterate hardcoded literals).
-gated_unit = 1045   # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1289     # full tests/unit (includes _mcp/_cli/agent)
-all = 1399          # tests/ (unit + integration + smoke)
+#   S1.6 (#297) +100 unit / +2 integration — the mapping-mechanism spike: the Graph-Spec
+#     expressiveness ceiling asserted against the vendored rc21 schema, the three-connector
+#     parity proof + sensitivity controls, the Layer R record goldens, the binder suite, the gate
+#     metric, and harness-discovery coverage for all ten tabular transformers. The prototype
+#     itself lives under `tests/support/` (uncollected, outside `coverage source`), so it adds
+#     tests without moving any [packages.*] measurement.
+gated_unit = 1145   # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1389     # full tests/unit (includes _mcp/_cli/agent)
+all = 1501          # tests/ (unit + integration + smoke)
 
 [total]
 # Measured refreshed by S1.4 (#295): line 68.53 -> 69.43, branch 49.30 -> 50.25. Floors

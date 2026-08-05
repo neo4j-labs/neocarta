@@ -194,12 +194,21 @@ relationship `target` keyed on the natural-key columns the row already carries. 
 the [`normalized_schema` README](../../neocarta/etl/metadata_normalizer/normalized_schema/README.md)
 (*Not precluding a Graph Spec `sources` expression*) and is not duplicated here.
 
-Two honest boundaries. First, `neo4j-pe-refs/README.md` — the external Graph Spec `sources` field-naming
-reference this ticket cites — is **not vendored in this repo**, so the tokens here were not diffed
-field-by-field against it; the alignment claim is structural (flat tables → `sources`), not name-level.
-Second, per GUIDE §6 Graph Spec is an *"evolving external dependency (it is RC) — adapt behind our
-boundary, don't block on it"*, so nothing above is pinned to a Graph Spec release. The substrate is
-decided by the S1 spike, not here.
+The structural claim stands, and **S1.6 (#297) settled how far it goes**: Graph Spec is *not* the
+normalization standard, because a `source` is `{type, name, …additionalProperties: true}` — a
+connection/query descriptor whose real shape lives behind a Java SPI — and carries no field vocabulary,
+so it cannot express the ×6 / ×4 / ×3 resolution this document ratifies. "Describable as a `source`" is
+not "is the standard". The full verdict, including why Graph Spec is not the *mapping* mechanism either,
+is in [`mapping-mechanism.md`](mapping-mechanism.md).
+
+One boundary remains open, and one closed. `neo4j-pe-refs/README.md` — the external Graph Spec `sources`
+field-naming reference the S1.5 ticket cited — is still **not vendored in this repo**, so the tokens here
+were never diffed field-by-field against it. What *is* now vendored is the normative artifact: the
+upstream `spec.v1.json`, pinned at `v1.0.0-rc21` in `tests/support/graph_spec/`, which the S1.6 verdict
+rests on and `tests/unit/etl/test_graph_spec_ceiling.py` asserts against. Per GUIDE §6, Graph Spec stays
+an *"evolving external dependency (it is RC) — adapt behind our boundary, don't block on it"*: nothing in
+this document is pinned to a release, and the pinned copy exists to keep a decision re-checkable rather
+than to couple us to a version.
 
 ## Documented limits
 

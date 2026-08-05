@@ -424,3 +424,47 @@ records themselves is the S4 flip.
   standardized nullability tokens (`YES`/`NO`, `NULLABLE`/`REQUIRED`, native bools)
   and rejects anything else rather than guessing, so e.g. a `REPEATED` mode must be
   resolved in the connector.
+
+## 18. Mapping: what you declare instead of writing
+
+The mapping mechanism is ratified in
+[docs/refactor/mapping-mechanism.md](docs/refactor/mapping-mechanism.md) (S1.6). Read it before
+writing a `transform.py`. **This describes the post-S4 shape**; until the cutover, keep writing
+a transform — but write it knowing what it becomes, because the declaration is the reviewable
+artifact afterwards.
+
+**What you no longer write.** Field renaming (`_vocabulary.py` already absorbs your source's
+spellings), value coercion, node/relationship construction, id generation, and the containment
+edges — `HAS_SCHEMA` / `HAS_TABLE` / `HAS_COLUMN` / `HAS_VALUE` are derived from the natural-key
+path each row already carries. Measured across three connectors, that is 1 467 lines of
+transform replaced by 52 lines of declaration.
+
+**What you declare.** Which cached collection feeds which normalized table, plus the source
+constants no row carries (`platform` / `service`). A table you leave out is not emitted, which
+is how a sparse source (**D10**) is expressed — omit `values` if you do not sample data.
+
+**What you may still write, and must name.** Four escape hatches. Each is a named field on the
+declaration, so using one is a reviewable decision rather than a detail:
+
+- `property_scope` — which properties reach Neo4j. **A D10 obligation, not an optimization:**
+  writing `description: null` erases another connector's description, and
+  `is_primary_key: false` asserts a falsehood for a source that exposes no key metadata. Prefer
+  omission over a wrong value.
+- `row_filter` — drop a row on a source-field predicate.
+- `drop_self_references` — drop a foreign key whose endpoints resolve to the same column.
+  Per-connector, because sources genuinely differ on whether this appears.
+- `pre_fold` — a source-specific value transform that may raise. Slug parsing, path recovery.
+
+Neither of these is a hatch: the rare **D6** `explicit_id` override is a field on the *records*
+([docs/refactor/explicit-id-override.md](docs/refactor/explicit-id-override.md)), which you opt
+into by projecting onto it; and a source the tabular paradigm does not fit at all (OSI) keeps a
+hand-written transform, which is a scope boundary (**D11**) rather than an exception.
+
+**Two traps worth knowing before you design an extractor.** Both cost a connector real work:
+
+- **Do not mint graph ids in `extract`.** They are private (**D5**) and the contract will not
+  accept them, so a connector that resolves ids early has to be unwound to emit natural-key
+  segments instead. Emit the *names*; identity is assigned downstream.
+- **Carry the full natural-key path on every frame**, including facet frames. A value or
+  assignment row addressed only by a precomputed id forces a `pre_fold` to reconstruct the path
+  it should simply have carried.

@@ -296,46 +296,39 @@ additive when its producer lands (GUIDE §4), which is why none is guessed at no
   `referenced_*` — wrong for a cross-schema FK, and a golden-guarded fix either
   way, since the target aliases reproduce whichever the frame supplies.)
 
-## Not precluding a Graph Spec `sources` expression (D14)
+## Describable as a Graph Spec `source` — and where that stops (D14)
 
-Every table — core **and** facet — maps cleanly onto a Neo4j-native Graph Spec
-(import-spec) `sources → targets → actions` lineage: the natural-key-addressed
-tabular shape *is* a Graph Spec tabular `source`, and a facet table whose rows
-imply a relationship becomes a relationship `target`.
+Every table — core **and** facet — is flat: each record's fields are all scalars
+(asserted by `test_every_field_is_a_scalar`), so each *can* be described as one
+Neo4j-native Graph Spec (import-spec) tabular `source` with no flattening step.
+That structural claim holds.
 
-```jsonc
-// sketch — neutral-but-compatible, not a committed format (Graph Spec is RC; see S1-SPIKE-1)
-// `explicit_id` is omitted below on purpose: it is a source column that *selects* the
-// key rather than a node property, so it belongs to the target's identity expression.
-{
-  "sources": [
-    { "name": "columns", "type": "table",
-      "columns": ["database_name","schema_name","table_name","column_name","data_type","nullable"] },
-    { "name": "business_term_assignments", "type": "table",
-      "columns": ["database_name","schema_name","table_name","column_name",
-                  "glossary_name","category_name","term_name"] }
-  ],
-  "targets": {
-    "nodes": [
-      { "source": "columns", "labels": ["Column"],
-        "key_properties": ["database_name","schema_name","table_name","column_name"],
-        "properties": ["data_type","nullable"] }
-    ],
-    "relationships": [
-      // Both endpoints are keyed on natural-key columns the row already carries —
-      // no graph ids, and no source_label: the start node's label follows from
-      // which key segments are populated (the row's grain).
-      { "source": "business_term_assignments", "type": "TAGGED_WITH",
-        "start_node": { "labels": ["Column"],
-                        "key_properties": ["database_name","schema_name","table_name","column_name"] },
-        "end_node":   { "labels": ["BusinessTerm"],
-                        "key_properties": ["glossary_name","category_name","term_name"] } }
-    ]
-    // ForeignKeyRecord and LineageRecord → the same shape, keyed on their source/target columns
-  }
-}
-```
+**S1.6 (#297) established that it does not go further**, and the sketch this
+section used to carry was wrong about the format in three ways worth recording,
+because each is a real limit rather than a notation slip. Measured against the
+vendored `spec.v1.json` at `v1.0.0-rc21` (`tests/support/graph_spec/`):
 
-Every table stays flat — each record's fields are all scalars — so each is one
-`source` with no flattening step. We stay behind our own boundary and adapt (D14:
-"don't block on it"); the final substrate is decided by the S1 spike, not here.
+- A node target's properties are `[{source_field, target_property}]`, **not** a
+  bare name list, and `additionalProperties: false` forbids anything else — the
+  mapping surface is rename plus optional cast, full stop.
+- Keys are declared in the target's `schema.key_constraints`, not as a
+  `key_properties` list on the target.
+- A relationship endpoint is a `start_node_reference` that **names one declared
+  node target** (optionally with `key_mappings`); it cannot be an inline
+  `{labels, key_properties}` object. So the old comment — *"no `source_label`: the
+  start node's label follows from which key segments are populated"* — describes
+  something Graph Spec **cannot express**. `BusinessTermAssignmentRecord`'s
+  grain-by-depth needs one relationship target per grain, and the format has no
+  `where` clause to split a mixed-grain source.
+
+The decisive limit is elsewhere again: a static `properties` array under
+`write_mode: merge` writes every declared property on every row, and
+`SET n.p = null` *removes* a property — so it would erase another connector's
+value, violating the D10 non-clobber contract (`docs/refactor/merge-contract.md`).
+
+**Verdict, per D14's own deferral to this spike:** Graph Spec is not the mapping
+mechanism and not the normalization standard; it is retained as a possible
+**emit-only** expression of the ontology half, with zero runtime dependency,
+reconciled through D13 (adapt behind our boundary). The mechanism that *was*
+chosen — this vocabulary plus a record binder and a per-connector declaration —
+is specified in **`docs/refactor/mapping-mechanism.md`**.

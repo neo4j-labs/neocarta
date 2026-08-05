@@ -137,8 +137,17 @@ def seed_bigquery_schema_cache(extractor: BigQuerySchemaExtractor) -> BigQuerySc
         ]
     )
 
-    # Mirrors the real extractor: value rows carry the table's name-parts so the
-    # normalizer's ``values`` mapping can build value records without re-deriving them.
+    # Exactly the four columns the real extractor produces — see the empty-frame column list in
+    # ``extract_column_unique_values_for_table``, which declares
+    # ``["column_name", "unique_value", "column_id", "value_id"]`` and adds nothing else.
+    #
+    # This seed previously also carried ``project_id`` / ``dataset_id`` / ``table_name`` under a
+    # comment claiming it "mirrors the real extractor". It does not: the extractor has those
+    # values in scope when it mints ``column_id`` but never writes them to the frame. Nothing
+    # read them, so removing them changes no golden — but leaving them would have been a parity
+    # trap, because a normalizer built against this fixture would work here and fail on live
+    # data. The container path a value record needs is recovered from ``column_id`` instead,
+    # which is the projection ``normalized_schema/README.md`` records as the connector's to own.
     extractor._cache["column_unique_values"] = pd.DataFrame(
         [
             {
@@ -146,18 +155,12 @@ def seed_bigquery_schema_cache(extractor: BigQuerySchemaExtractor) -> BigQuerySc
                 "unique_value": "1",
                 "column_id": "test_project_id.test_dataset.customers.customer_id",
                 "value_id": "test_project_id.test_dataset.customers.customer_id.c4ca4238a0b923820dcc509a6f75849b",
-                "project_id": "test-project-id",
-                "dataset_id": "test_dataset",
-                "table_name": "customers",
             },
             {
                 "column_name": "customer_id",
                 "unique_value": "2",
                 "column_id": "test_project_id.test_dataset.customers.customer_id",
                 "value_id": "test_project_id.test_dataset.customers.customer_id.c81e728d9d4c2f636f067f89cc14862c",
-                "project_id": "test-project-id",
-                "dataset_id": "test_dataset",
-                "table_name": "customers",
             },
         ]
     )
