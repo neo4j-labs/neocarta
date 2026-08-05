@@ -1,0 +1,502 @@
+{
+  "business_term_assignments": [
+    {
+      "category_name": "revenue_metrics",
+      "column_name": "total_amount",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders",
+      "term_name": "Gross Merchandise Value"
+    },
+    {
+      "category_name": "revenue_metrics",
+      "column_name": "total_amount",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders",
+      "term_name": "Average Order Value"
+    },
+    {
+      "category_name": "customer_metrics",
+      "column_name": "customer_id",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers",
+      "term_name": "Customer Acquisition Cost"
+    },
+    {
+      "category_name": "customer_metrics",
+      "column_name": "customer_id",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers",
+      "term_name": "Customer Lifetime Value"
+    },
+    {
+      "category_name": "product_metrics",
+      "column_name": "product_id",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "term_name": "Sell-Through Rate"
+    },
+    {
+      "category_name": "product_metrics",
+      "column_name": "quantity",
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items",
+      "term_name": "Sell-Through Rate"
+    },
+    {
+      "category_name": "revenue_metrics",
+      "column_name": null,
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders",
+      "term_name": "Average Order Value"
+    },
+    {
+      "category_name": "revenue_metrics",
+      "column_name": null,
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items",
+      "term_name": "Gross Merchandise Value"
+    },
+    {
+      "category_name": "customer_metrics",
+      "column_name": null,
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers",
+      "term_name": "Customer Lifetime Value"
+    },
+    {
+      "category_name": "product_metrics",
+      "column_name": null,
+      "database_name": "Demo E-commerce",
+      "glossary_name": "ecommerce_glossary",
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "term_name": "Sell-Through Rate"
+    }
+  ],
+  "business_terms": [
+    {
+      "category_name": "revenue_metrics",
+      "description": "Total sales value of merchandise sold through the platform",
+      "display_name": null,
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null,
+      "term_name": "Gross Merchandise Value"
+    },
+    {
+      "category_name": "revenue_metrics",
+      "description": "Average dollar amount spent per order",
+      "display_name": null,
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null,
+      "term_name": "Average Order Value"
+    },
+    {
+      "category_name": "customer_metrics",
+      "description": "Average cost to acquire a new customer",
+      "display_name": null,
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null,
+      "term_name": "Customer Acquisition Cost"
+    },
+    {
+      "category_name": "customer_metrics",
+      "description": "Predicted total revenue from a customer over their lifetime",
+      "display_name": null,
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null,
+      "term_name": "Customer Lifetime Value"
+    },
+    {
+      "category_name": "product_metrics",
+      "description": "Percentage of inventory sold within a specific time period",
+      "display_name": null,
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null,
+      "term_name": "Sell-Through Rate"
+    }
+  ],
+  "categories": [
+    {
+      "category_name": "revenue_metrics",
+      "description": "Key revenue and financial metrics",
+      "display_name": "Revenue Metrics",
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null
+    },
+    {
+      "category_name": "customer_metrics",
+      "description": "Customer behavior and engagement metrics",
+      "display_name": "Customer Metrics",
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null
+    },
+    {
+      "category_name": "product_metrics",
+      "description": "Product performance and inventory metrics",
+      "display_name": "Product Metrics",
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null
+    }
+  ],
+  "columns": [
+    {
+      "column_name": "customer_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Unique identifier for the customer",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "customer_name",
+      "data_type": "STRING",
+      "database_name": "Demo E-commerce",
+      "description": "Full name of the customer",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "email",
+      "data_type": "STRING",
+      "database_name": "Demo E-commerce",
+      "description": "Customer's email address",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "TIMESTAMP",
+      "database_name": "Demo E-commerce",
+      "description": "Timestamp when the customer record was created",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "product_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Unique identifier for the product",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "column_name": "product_name",
+      "data_type": "STRING",
+      "database_name": "Demo E-commerce",
+      "description": "Name of the product",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "column_name": "category",
+      "data_type": "STRING",
+      "database_name": "Demo E-commerce",
+      "description": "Product category (e.g., Electronics, Clothing)",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "column_name": "price",
+      "data_type": "NUMERIC",
+      "database_name": "Demo E-commerce",
+      "description": "Product price in USD",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "column_name": "order_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Unique identifier for the order",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "customer_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Foreign key reference to customers table",
+      "explicit_id": null,
+      "is_foreign_key": true,
+      "is_primary_key": false,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "order_date",
+      "data_type": "TIMESTAMP",
+      "database_name": "Demo E-commerce",
+      "description": "Timestamp when the order was placed",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "total_amount",
+      "data_type": "NUMERIC",
+      "database_name": "Demo E-commerce",
+      "description": "Total order amount in USD",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "order_item_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Unique identifier for the order line item",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "order_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Foreign key reference to orders table",
+      "explicit_id": null,
+      "is_foreign_key": true,
+      "is_primary_key": false,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "product_id",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Foreign key reference to products table",
+      "explicit_id": null,
+      "is_foreign_key": true,
+      "is_primary_key": false,
+      "nullable": false,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "quantity",
+      "data_type": "INT64",
+      "database_name": "Demo E-commerce",
+      "description": "Quantity of the product ordered",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "price",
+      "data_type": "NUMERIC",
+      "database_name": "Demo E-commerce",
+      "description": "Price per unit at time of order in USD",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    }
+  ],
+  "databases": [
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Demo e-commerce dataset with foreign key relationships for testing",
+      "explicit_id": null,
+      "platform": "GCP",
+      "service": "BIGQUERY"
+    }
+  ],
+  "foreign_keys": [
+    {
+      "criteria": "orders.customer_id = customers.customer_id",
+      "source_column_name": "customer_id",
+      "source_database_name": "Demo E-commerce",
+      "source_schema_name": "demo_ecommerce",
+      "source_table_name": "orders",
+      "target_column_name": "customer_id",
+      "target_database_name": "Demo E-commerce",
+      "target_schema_name": "demo_ecommerce",
+      "target_table_name": "customers"
+    },
+    {
+      "criteria": "order_items.order_id = orders.order_id",
+      "source_column_name": "order_id",
+      "source_database_name": "Demo E-commerce",
+      "source_schema_name": "demo_ecommerce",
+      "source_table_name": "order_items",
+      "target_column_name": "order_id",
+      "target_database_name": "Demo E-commerce",
+      "target_schema_name": "demo_ecommerce",
+      "target_table_name": "orders"
+    },
+    {
+      "criteria": "order_items.product_id = products.product_id",
+      "source_column_name": "product_id",
+      "source_database_name": "Demo E-commerce",
+      "source_schema_name": "demo_ecommerce",
+      "source_table_name": "order_items",
+      "target_column_name": "product_id",
+      "target_database_name": "Demo E-commerce",
+      "target_schema_name": "demo_ecommerce",
+      "target_table_name": "products"
+    }
+  ],
+  "glossaries": [
+    {
+      "description": "Standard business terms and metrics for e-commerce analytics",
+      "display_name": "E-commerce Business Glossary",
+      "explicit_id": null,
+      "glossary_name": "ecommerce_glossary",
+      "resource_path": null
+    }
+  ],
+  "schemas": [
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Demo e-commerce dataset with foreign key relationships for testing",
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce"
+    }
+  ],
+  "tables": [
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Customer master table containing all registered customers",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "customers"
+    },
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Product catalog containing all available products",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Orders placed by customers, links to customers via customer_id foreign key",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "database_name": "Demo E-commerce",
+      "description": "Individual line items for each order, links to orders and products via foreign keys",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    }
+  ],
+  "values": [
+    {
+      "column_name": "category",
+      "database_name": "Demo E-commerce",
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "value": "Electronics"
+    },
+    {
+      "column_name": "category",
+      "database_name": "Demo E-commerce",
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "value": "Home & Office"
+    },
+    {
+      "column_name": "category",
+      "database_name": "Demo E-commerce",
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "value": "Clothing"
+    },
+    {
+      "column_name": "category",
+      "database_name": "Demo E-commerce",
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products",
+      "value": "Sports"
+    }
+  ]
+}
