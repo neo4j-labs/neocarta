@@ -92,8 +92,8 @@ CREATE FULLTEXT INDEX {"_".join(labels_lower_sorted) + "_full_text_index"} IF NO
 def create_name_range_index(
     neo4j_driver: Driver,
     node_label: str,
-    property_name: str = "name",
     database_name: str = "neo4j",
+    property_name: str = "name",
 ) -> dict:
     """
     Create a range index on a node's name-like property.
@@ -108,13 +108,13 @@ def create_name_range_index(
         The Neo4j driver to use.
     node_label: str
         The label of the node to create a range index for.
+    database_name: str
+        The name of the database to create the index in.
     property_name: str
         The property that holds the searchable name. Defaults to ``"name"``; pass ``"label"``
         for ``Node`` and ``"type"`` for ``Relationship`` (LPG), whose searchable name is not
         ``name``. The default keeps the generated index name (e.g. ``table_name_index``) and
         Cypher identical to before, so existing callers are unaffected.
-    database_name: str
-        The name of the database to create the index in.
 
     Returns:
     -------

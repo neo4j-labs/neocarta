@@ -74,20 +74,39 @@ def test_generate_value_id_float():
     assert value_id
 
 
-def test_generate_node_id_normalizes():
-    assert generate_node_id("My-DBMS", "neo4j", "Person") == "my_dbms.neo4j.person"
+def test_generate_node_id_normalizes_container_but_preserves_label_case():
+    # The database/schema segments are normalized; the case-sensitive Neo4j label is verbatim.
+    assert generate_node_id("My-DBMS", "neo4j", "Person") == "my_dbms.neo4j.Person"
 
 
-def test_generate_relationship_id_normalizes():
-    assert generate_relationship_id("My-DBMS", "neo4j", "KNOWS") == "my_dbms.neo4j.knows"
+def test_generate_relationship_id_preserves_type_case():
+    assert generate_relationship_id("My-DBMS", "neo4j", "KNOWS") == "my_dbms.neo4j.KNOWS"
 
 
-def test_generate_property_id_is_owner_scoped_and_not_double_normalized():
-    node_id = generate_node_id("dbms", "neo4j", "Person")  # "dbms.neo4j.person"
-    assert generate_property_id(node_id, "firstName") == "dbms.neo4j.person.firstname"
+def test_generate_property_id_is_owner_scoped_and_preserves_property_case():
+    node_id = generate_node_id("dbms", "neo4j", "Person")  # "dbms.neo4j.Person"
+    assert generate_property_id(node_id, "firstName") == "dbms.neo4j.Person.firstName"
 
 
 def test_property_id_distinct_across_owners_for_same_name():
     node_id = generate_node_id("dbms", "neo4j", "Person")
     rel_id = generate_relationship_id("dbms", "neo4j", "KNOWS")
     assert generate_property_id(node_id, "since") != generate_property_id(rel_id, "since")
+
+
+def test_case_variant_labels_produce_distinct_node_ids():
+    # Neo4j labels are case-sensitive: Person and person must not collapse onto one id.
+    assert generate_node_id("dbms", "neo4j", "Person") != generate_node_id(
+        "dbms", "neo4j", "person"
+    )
+
+
+def test_case_variant_relationship_types_produce_distinct_ids():
+    assert generate_relationship_id("dbms", "neo4j", "KNOWS") != generate_relationship_id(
+        "dbms", "neo4j", "Knows"
+    )
+
+
+def test_case_variant_property_names_produce_distinct_ids():
+    node_id = generate_node_id("dbms", "neo4j", "Person")
+    assert generate_property_id(node_id, "firstName") != generate_property_id(node_id, "firstname")
