@@ -107,13 +107,25 @@ absent. APOC Core ships with the official Neo4j Docker image and is enabled with
   no `Value` nodes.
 - **Re-ingest is additive.** Loads MERGE by id and never delete, so re-running
   updates the description in place.
-- **Use a separate database (or instance) for the target.** For idempotent
-  re-runs, write the neocarta graph to a **different database or instance** than the
-  source. When the source and target are the same database, a *re*-ingest also sees
-  the connector's own LPG labels (`Node` / `Relationship` / `Property` / `Database` /
-  `Schema`) from the previous run and describes them as source schema. The
-  `__neocarta_graph__` metadata singleton is excluded automatically, but the LPG
-  labels are not (they may collide with real source labels). On Neo4j Community
-  (single database), use a separate instance for the target.
+- **Reserved LPG namespace (repeated ingest is idempotent).** The Neo4j connector
+  reserves neocarta's own graph vocabulary and **never ingests it as source schema** —
+  always, regardless of how the drivers or databases are configured. Reserved are the
+  six node labels `Database` / `Schema` / `Node` / `Relationship` / `Property` /
+  `__neocarta_graph__`, the six relationship types `HAS_SCHEMA` / `HAS_NODE` /
+  `HAS_RELATIONSHIP` / `HAS_SOURCE_NODE` / `HAS_TARGET_NODE` / `HAS_PROPERTY`, and any
+  relationship endpoint touching either set. This guarantees that pointing the
+  connector at a source that shares a database with the target — or re-ingesting a
+  previous run's output — is idempotent: re-running never accumulates a description of
+  neocarta's own metadata. On single-database editions (Neo4j Community) the source and
+  target are necessarily the same database, so this protection is what keeps ingest
+  stable there. The single source of truth for the reserved set is
+  `neocarta.ingest.lpg.RESERVED_NODE_LABELS` / `RESERVED_RELATIONSHIP_TYPES`. The
+  trade-off is a genuine reservation: a source that legitimately uses one of these
+  names is indistinguishable from neocarta's metadata and is **dropped, with a
+  `Neo4jSchemaWarning`** — using a separate database or instance does **not** exempt it.
+- **Case-sensitive identifiers.** Neo4j labels, relationship types, and property
+  keys are case-sensitive, so `Person` and `person` map to distinct `Node`s and
+  their ids preserve case verbatim. The `source_name` and source database name that
+  scope those ids are normalized (lower-cased).
 - **The caller owns both drivers.** `close()` is a no-op and never closes either
   driver; the caller is responsible for their lifecycle.

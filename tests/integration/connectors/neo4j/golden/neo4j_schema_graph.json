@@ -15,7 +15,7 @@
         "Node"
       ],
       "properties": {
-        "id": "dbms.neo4j.person",
+        "id": "dbms.neo4j.Person",
         "label": "Person"
       }
     },
@@ -43,7 +43,7 @@
       ],
       "properties": {
         "existence": false,
-        "id": "dbms.neo4j.knows.since",
+        "id": "dbms.neo4j.KNOWS.since",
         "indexed": false,
         "name": "since",
         "nullable": true,
@@ -57,7 +57,7 @@
       ],
       "properties": {
         "existence": false,
-        "id": "dbms.neo4j.person.email",
+        "id": "dbms.neo4j.Person.email",
         "indexed": true,
         "name": "email",
         "nullable": true,
@@ -71,7 +71,7 @@
       ],
       "properties": {
         "existence": false,
-        "id": "dbms.neo4j.person.name",
+        "id": "dbms.neo4j.Person.name",
         "indexed": false,
         "name": "name",
         "nullable": true,
@@ -84,7 +84,7 @@
         "Relationship"
       ],
       "properties": {
-        "id": "dbms.neo4j.knows",
+        "id": "dbms.neo4j.KNOWS",
         "type": "KNOWS"
       }
     },
@@ -106,45 +106,45 @@
       "type": "HAS_SCHEMA"
     },
     {
-      "dst": "dbms.neo4j.knows",
+      "dst": "dbms.neo4j.KNOWS",
       "properties": {},
       "src": "dbms.neo4j",
       "type": "HAS_RELATIONSHIP"
     },
     {
-      "dst": "dbms.neo4j.knows.since",
+      "dst": "dbms.neo4j.KNOWS.since",
       "properties": {},
-      "src": "dbms.neo4j.knows",
+      "src": "dbms.neo4j.KNOWS",
       "type": "HAS_PROPERTY"
     },
     {
-      "dst": "dbms.neo4j.person",
+      "dst": "dbms.neo4j.Person",
       "properties": {},
       "src": "dbms.neo4j",
       "type": "HAS_NODE"
     },
     {
-      "dst": "dbms.neo4j.person",
+      "dst": "dbms.neo4j.Person",
       "properties": {},
-      "src": "dbms.neo4j.knows",
+      "src": "dbms.neo4j.KNOWS",
       "type": "HAS_SOURCE_NODE"
     },
     {
-      "dst": "dbms.neo4j.person",
+      "dst": "dbms.neo4j.Person",
       "properties": {},
-      "src": "dbms.neo4j.knows",
+      "src": "dbms.neo4j.KNOWS",
       "type": "HAS_TARGET_NODE"
     },
     {
-      "dst": "dbms.neo4j.person.email",
+      "dst": "dbms.neo4j.Person.email",
       "properties": {},
-      "src": "dbms.neo4j.person",
+      "src": "dbms.neo4j.Person",
       "type": "HAS_PROPERTY"
     },
     {
-      "dst": "dbms.neo4j.person.name",
+      "dst": "dbms.neo4j.Person.name",
       "properties": {},
-      "src": "dbms.neo4j.person",
+      "src": "dbms.neo4j.Person",
       "type": "HAS_PROPERTY"
     },
     {

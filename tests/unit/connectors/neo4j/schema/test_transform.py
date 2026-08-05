@@ -19,10 +19,11 @@ def test_one_node_per_label_no_additional_labels():
     assert all(n.additional_labels is None for n in t.node_nodes)
 
 
-def test_node_id_normalized_from_label():
+def test_node_id_preserves_label_case():
     t = Neo4jSchemaTransformer()
     _seed(t, [{"label": "Person"}])
-    assert t.node_nodes[0].id == "dbms.neo4j.person"
+    # Neo4j labels are case-sensitive, so the id keeps the label verbatim.
+    assert t.node_nodes[0].id == "dbms.neo4j.Person"
 
 
 def test_property_flags_and_nullable_from_existence():
@@ -43,7 +44,7 @@ def test_property_flags_and_nullable_from_existence():
         node_props, pd.DataFrame(), source_name="dbms", source_database="neo4j"
     )
     prop = t.property_nodes[0]
-    assert prop.id == "dbms.neo4j.person.email"
+    assert prop.id == "dbms.neo4j.Person.email"
     assert prop.unique is True
     assert prop.indexed is True
     assert prop.existence is True
