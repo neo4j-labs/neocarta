@@ -188,7 +188,7 @@ different clusters validate into `ColumnRecord` with **zero** renames, coercions
 | `{project_id, dataset_id, table_id, column_name, column_data_type, column_mode: "REQUIRED"}` (Dataplex) | `nullable=False` |
 | `{database_name, schema_name, table_name, column_name, type, nullable: False}` (JDBC) | `data_type="int4"` |
 
-Pinned in `tests/unit/etl/mapping_spike/test_binder.py`.
+Pinned in `tests/unit/etl/metadata_normalizer/test_binder.py`.
 
 ### 4.2 The two missing pieces
 
@@ -272,7 +272,7 @@ for declarative mapping over divergent ones. That is what §5 measures.
 The ticket arms a **⚠ negative-outcome trigger**: *if the chosen mapping is as complex as or
 more complex than today's per-connector shape, principle 2 has failed → escalate, don't silently
 proceed.* GUIDE §9 wants that objectively checkable, so it is measured and asserted in
-`tests/unit/etl/mapping_spike/test_gate_metric.py`.
+`tests/unit/etl/metadata_normalizer/test_gate_metric.py`.
 
 | Connector | Declaration | Replaces | Ratio | Hatches used |
 |---|---|---|---|---|
@@ -327,7 +327,7 @@ Three connectors, three seams. Every oracle was committed **before** this ticket
 
 | Seam | What is compared | Where |
 |---|---|---|
-| **Layer R** (new) | The normalized records each connector emits | `tests/unit/etl/mapping_spike/test_normalized_records.py` + `golden/` |
+| **Layer R** (new) | The normalized records each connector emits | `tests/unit/etl/metadata_normalizer/test_normalized_records.py` + `golden/` |
 | **Layer A** | The graph models, against the **existing** committed goldens, unchanged | `tests/unit/etl/mapping_spike/test_parity.py` |
 | **Layer B** | Post-ingest Neo4j graph state, against the **existing** graph goldens | `tests/integration/etl/test_mapping_spike_graph_IT.py` |
 
@@ -356,6 +356,14 @@ reported rather than glossed.
 implementation under `neocarta/` would be a second owner (GUIDE §4). The **goldens** are the
 permanent half and do live in the production test tree: when S4 rewrites a connector to emit
 records directly, those files are what prove it emits the same ones.
+
+> **Superseded in part by S1.7 (#298).** That ticket promoted the prototype's *record* half —
+> the binder, the declaration types, the hatches and the per-connector declarations — into
+> `neocarta/etl/metadata_normalizer/` and `neocarta/connectors/<source>/mapping.py`, and this
+> package now re-exports them so there is still exactly one implementation. What remains a
+> prototype here is `transform.py`, the record→graph half, which is **S3**'s. The three Layer R
+> goldens moved with their suite to `tests/unit/etl/metadata_normalizer/golden/` and are
+> reproduced by the production component byte for byte.
 
 ### 6.1 Connectors deliberately not in the proof set
 
@@ -484,9 +492,9 @@ Also, and stated where they arise rather than repeated here: `neo4j-pe-refs` rem
 | Layer A parity for all three connectors, plus file equality with the BigQuery golden | `tests/unit/etl/mapping_spike/test_parity.py` |
 | Per-connector sensitivity controls (a collapsed id helper must break parity) | same file, `TestSensitivity` |
 | Property-scope equality against JDBC's and CSV's production reductions | same file, `TestPropertyScopeParity` |
-| Layer R goldens + dropped-field and reordering negative controls | `tests/unit/etl/mapping_spike/test_normalized_records.py` |
+| Layer R goldens + dropped-field and reordering negative controls | `tests/unit/etl/metadata_normalizer/test_normalized_records.py` |
 | Layer B post-ingest graph parity (Docker) | `tests/integration/etl/test_mapping_spike_graph_IT.py` |
-| The binder: no-rename binding per cluster, raw pandas values, non-pandas caches, hatch order | `tests/unit/etl/mapping_spike/test_binder.py` |
-| The gate metric and its trigger conditions | `tests/unit/etl/mapping_spike/test_gate_metric.py` |
+| The binder: no-rename binding per cluster, raw pandas values, non-pandas caches, hatch order | `tests/unit/etl/metadata_normalizer/test_binder.py` |
+| The gate metric and its trigger conditions | `tests/unit/etl/metadata_normalizer/test_gate_metric.py` |
 | Harness discovery for all ten tabular transformers | `tests/unit/etl/test_characterization_discovery.py` |
 | The BigQuery value seed matches the extractor's declared columns | `tests/unit/etl/test_characterization_fixtures.py` |

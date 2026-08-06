@@ -1,31 +1,25 @@
-"""Offline drivers for the three connectors in the S1.6 proof set.
+"""Before/after pairs for the three connectors in the S1.6 Layer A parity proof.
 
-Each fixture returns a :class:`Case` holding both halves of the comparison: the object
-today's hand-written ``transform.py`` produces, and the one the candidate mechanism produces
-from the *same* extractor. Every driver runs fully offline against an oracle already committed
-to the repo — the shared BigQuery cache seed, the SchemaCrawler JSON fixture, and the
-``datasets/csv`` sample — so no fixture had to be invented for this spike.
+Each fixture returns a :class:`Case` holding both halves of the comparison: the object today's
+hand-written ``transform.py`` produces, and the one the mechanism produces from the *same*
+extractor. The extractors themselves come from ``tests/support/connectors/offline.py``, shared
+with the ``metadata_normalizer`` suite so both drive the same objects rather than two lookalikes.
+
+The mechanism's record half is production as of S1.7 (#298); only the record→graph transform is
+still a prototype, and it is what these fixtures exist to compare.
 """
 
 from __future__ import annotations
 
-import pathlib
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from neocarta.connectors.bigquery.schema.extract import BigQuerySchemaExtractor
 from neocarta.connectors.bigquery.schema.transform import BigQuerySchemaTransformer
-from neocarta.connectors.csv import CSVConnector
-from neocarta.connectors.jdbc.schema.extract import JdbcSchemaExtractor
 from neocarta.connectors.jdbc.schema.transform import JdbcSchemaTransformer
-from tests.support.characterization import DATASETS_CSV, serialize_transform
-from tests.support.characterization.bigquery_cache import (
-    make_mock_bigquery_client,
-    seed_bigquery_schema_cache,
-)
+from tests.support.characterization import serialize_transform
+from tests.support.connectors.offline import build_extractor, csv_connector
 from tests.support.mapping_spike import (
     BIGQUERY_SCHEMA,
     CSV,
@@ -34,18 +28,6 @@ from tests.support.mapping_spike import (
     observed_columns,
     transformer_for,
 )
-
-_JDBC_FIXTURE = (
-    pathlib.Path(__file__).parents[3]
-    / "unit"
-    / "connectors"
-    / "jdbc"
-    / "schema"
-    / "fixtures"
-    / "schemacrawler_postgres.json"
-)
-_JAVA_CHECK = "neocarta.connectors.jdbc.schema.extract._assert_java_available"
-_SUBPROCESS_RUN = "neocarta.connectors.jdbc.schema.extract.subprocess.run"
 
 
 @dataclass
@@ -89,9 +71,7 @@ def _prototype(extractor: Any, mapping: Any) -> Any:
 @pytest.fixture
 def bigquery_case() -> Case:
     """BigQuery schema: the hardest tabular case (derived-value row drop, values facet)."""
-    extractor = seed_bigquery_schema_cache(
-        BigQuerySchemaExtractor(client=make_mock_bigquery_client(), dataset_id="test_dataset")
-    )
+    extractor = build_extractor("bigquery/schema")
     legacy = BigQuerySchemaTransformer()
     legacy.transform_to_database_nodes(extractor.database_info)
     legacy.transform_to_schema_nodes(extractor.schema_info)
@@ -115,19 +95,7 @@ def bigquery_case() -> Case:
 @pytest.fixture
 def jdbc_case() -> Case:
     """JDBC schema: whole-collection property scope, and Layer A's blindness to it."""
-    catalog = _JDBC_FIXTURE.read_text(encoding="utf-8")
-    with patch(_JAVA_CHECK):
-        extractor = JdbcSchemaExtractor(
-            jdbc_url="jdbc:postgresql://localhost:5432/neocarta_test",
-            jdbc_driver="org.postgresql.Driver",
-            jdbc_driver_jar="schemacrawler-jars/postgresql.jar",
-            schemacrawler_jar="schemacrawler-jars/schemacrawler.jar",
-            source_database_name="neocarta_test",
-        )
-        completed = MagicMock(returncode=0, stdout=catalog, stderr="")
-        with patch(_SUBPROCESS_RUN, return_value=completed):
-            extractor.extract()
-
+    extractor = build_extractor("jdbc/schema")
     legacy = JdbcSchemaTransformer()
     legacy.transform_to_database_nodes(extractor.database_info)
     legacy.transform_to_schema_nodes(extractor.schema_info)
@@ -143,8 +111,7 @@ def jdbc_case() -> Case:
 @pytest.fixture
 def csv_case() -> Case:
     """CSV: the widest type surface, column-presence property scope, two-frame assignments."""
-    connector = CSVConnector(csv_directory=str(DATASETS_CSV), neo4j_driver=MagicMock())
-    connector.extract()
+    connector = csv_connector()
     connector.transform()
     return Case(
         "csv",

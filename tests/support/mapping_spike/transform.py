@@ -63,16 +63,15 @@ from neocarta.data_model.schema.rdbms import (
     Schema,
     Table,
 )
+from neocarta.etl.metadata_normalizer import ScopeContext
 from neocarta.etl.transform import resolve_id
-
-from .declaration import ScopeContext
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from pydantic import BaseModel
 
-    from .declaration import ConnectorMapping
+    from neocarta.etl.metadata_normalizer import ConnectorMapping
 
 #: Normalized table → the families declaring it produces, and each family's docstring. A
 #: containment edge belongs to its **child** table: it is one-per-child-row, and a

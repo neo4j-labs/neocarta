@@ -93,7 +93,7 @@ tests/unit/connectors/csv/test_transform_golden.py               + golden/csv_tr
 tests/unit/connectors/bigquery/schema/test_transform_golden.py   + golden/bigquery_schema_transform.json  (Layer A)
 tests/integration/connectors/csv/test_graph_golden_IT.py         + golden/csv_graph.json                  (Layer B)
 tests/integration/connectors/bigquery/schema/test_graph_golden_IT.py + golden/bigquery_schema_graph.json  (Layer B)
-tests/unit/etl/mapping_spike/test_normalized_records.py          + golden/*_records.json                  (Layer R)
+tests/unit/etl/metadata_normalizer/test_normalized_records.py          + golden/*_records.json                  (Layer R)
 ```
 
 ## Self-validation (why the goldens can't falsely pass)

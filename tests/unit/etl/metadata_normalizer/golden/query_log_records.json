@@ -1,0 +1,167 @@
+{
+  "columns": [
+    {
+      "column_name": "order_id",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "order_item_id",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "product_name",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    },
+    {
+      "column_name": "quantity",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "price",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "order_id",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "product_id",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "column_name": "product_id",
+      "data_type": null,
+      "database_name": "example_project_id",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": null,
+      "is_primary_key": null,
+      "nullable": true,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    }
+  ],
+  "databases": [
+    {
+      "database_name": "example-project-id",
+      "description": null,
+      "explicit_id": null,
+      "platform": "GCP",
+      "service": "BIGQUERY"
+    }
+  ],
+  "foreign_keys": [
+    {
+      "criteria": "o.order_id = oi.order_id",
+      "source_column_name": "order_id",
+      "source_database_name": "example_project_id",
+      "source_schema_name": "demo_ecommerce",
+      "source_table_name": "order_items",
+      "target_column_name": "order_id",
+      "target_database_name": "example_project_id",
+      "target_schema_name": "demo_ecommerce",
+      "target_table_name": "orders"
+    },
+    {
+      "criteria": "oi.product_id = p.product_id",
+      "source_column_name": "product_id",
+      "source_database_name": "example_project_id",
+      "source_schema_name": "demo_ecommerce",
+      "source_table_name": "products",
+      "target_column_name": "product_id",
+      "target_database_name": "example_project_id",
+      "target_schema_name": "demo_ecommerce",
+      "target_table_name": "order_items"
+    }
+  ],
+  "schemas": [
+    {
+      "database_name": "example-project-id",
+      "description": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce"
+    }
+  ],
+  "tables": [
+    {
+      "database_name": "example-project-id",
+      "description": null,
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "orders"
+    },
+    {
+      "database_name": "example-project-id",
+      "description": null,
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "order_items"
+    },
+    {
+      "database_name": "example-project-id",
+      "description": null,
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "demo_ecommerce",
+      "table_name": "products"
+    }
+  ]
+}
