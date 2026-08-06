@@ -265,3 +265,18 @@ class TestSensitivity:
 
         assert dropped.references_relationships == []
         assert len(kept.references_relationships) == 1
+
+
+class TestRecordsAreIdentityAgnostic:
+    """CSV's frames carry precomputed ids, and the mechanism reproduces them by *generation*.
+
+    The sharpest form of the identity-agnostic claim, and the reason it lives here rather than
+    with the Layer R goldens: it needs both halves at once — the records must ignore the
+    extractor's `*_id` columns, *and* the graph the transform builds from them must still land on
+    those exact ids. Only the prototype half has node ids to compare.
+    """
+
+    def test_generated_ids_still_match_the_precomputed_ones(self, csv_case: Case) -> None:
+        precomputed = set(csv_case.extractor.column_info["column_id"])
+        generated = {node.id for node in csv_case.prototype.column_nodes}
+        assert generated == precomputed

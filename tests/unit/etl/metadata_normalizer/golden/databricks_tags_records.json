@@ -1,0 +1,54 @@
+{
+  "governance_tag_keys": [
+    {
+      "description": "Owning department",
+      "explicit_id": null,
+      "tag_key": "department",
+      "tag_namespace": "aws:us-west-2:abc-123"
+    },
+    {
+      "description": "Finance cost center",
+      "explicit_id": null,
+      "tag_key": "cost_center",
+      "tag_namespace": "aws:us-west-2:abc-123"
+    },
+    {
+      "description": "Free-form governed tag",
+      "explicit_id": null,
+      "tag_key": "free_form",
+      "tag_namespace": "aws:us-west-2:abc-123"
+    }
+  ],
+  "governance_tag_values": [
+    {
+      "explicit_id": null,
+      "tag_key": "department",
+      "tag_namespace": "aws:us-west-2:abc-123",
+      "tag_value": "finance"
+    },
+    {
+      "explicit_id": null,
+      "tag_key": "department",
+      "tag_namespace": "aws:us-west-2:abc-123",
+      "tag_value": "hr"
+    },
+    {
+      "explicit_id": null,
+      "tag_key": "department",
+      "tag_namespace": "aws:us-west-2:abc-123",
+      "tag_value": "sales"
+    },
+    {
+      "explicit_id": null,
+      "tag_key": "cost_center",
+      "tag_namespace": "aws:us-west-2:abc-123",
+      "tag_value": "alpha"
+    },
+    {
+      "explicit_id": null,
+      "tag_key": "cost_center",
+      "tag_namespace": "aws:us-west-2:abc-123",
+      "tag_value": "beta"
+    }
+  ]
+}

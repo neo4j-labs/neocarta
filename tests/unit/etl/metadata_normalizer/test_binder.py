@@ -14,12 +14,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from neocarta.etl.metadata_normalizer import (
+    ConnectorMapping,
+    SourceTable,
+    bind,
+    observed_columns,
+)
+from neocarta.etl.metadata_normalizer.binder import bind_table
 from neocarta.etl.metadata_normalizer.normalized_schema import (
     ColumnRecord,
     DatabaseRecord,
     SchemaRecord,
 )
-from tests.support.mapping_spike import ConnectorMapping, SourceTable, bind, bind_table
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -209,10 +215,64 @@ class TestSparseDeclarations:
     """An undeclared table is absent, which is a different claim from empty (**D10**)."""
 
     def test_only_declared_tables_appear(self) -> None:
-        from tests.support.mapping_spike import bind_all
+        from neocarta.etl.metadata_normalizer import bind_all
 
         mapping = ConnectorMapping(
             tables={"databases": SourceTable(record=DatabaseRecord, source="database_info")}
         )
         bound = bind_all({"database_info": [{"database_name": "db"}]}, mapping)
         assert set(bound) == {"databases"}
+
+
+class TestObservedColumns:
+    """``source_columns`` is half the component's output and the only input to a
+    column-presence ``property_scope`` hatch — but the Layer R goldens cannot see it
+    (``dump_records`` serializes only ``.records``), so its two documented semantics are
+    pinned here."""
+
+    def test_a_frame_reports_declared_columns_even_with_no_rows(self):
+        """A header-only source must still report its columns.
+
+        Otherwise a column-presence scope collapses to an empty allowlist for that family, which
+        every layer downstream reads as "write the loader defaults" — a **D10** clobber.
+        """
+        mapping = ConnectorMapping(
+            tables={"databases": SourceTable(record=DatabaseRecord, source="database_info")}
+        )
+        empty = pd.DataFrame(columns=["database_name", "platform", "service"])
+        assert observed_columns({"database_info": empty}, mapping) == {
+            "databases": ("database_name", "platform", "service")
+        }
+
+    def test_a_multi_source_table_de_duplicates_across_its_sources(self):
+        """CSV feeds ``business_term_assignments`` from two frames that share most columns."""
+        mapping = ConnectorMapping(
+            tables={
+                "databases": SourceTable(record=DatabaseRecord, source=("first", "second")),
+            }
+        )
+        cache = {
+            "first": pd.DataFrame(columns=["database_name", "platform"]),
+            "second": pd.DataFrame(columns=["database_name", "service"]),
+        }
+        assert observed_columns(cache, mapping) == {
+            "databases": ("database_name", "platform", "service")
+        }
+
+
+class TestRowPreparationOrderIsFixed:
+    """``project`` runs before ``row_filter``, so a filter can test a derived field.
+
+    The docstring promises this composition; without a test the two steps could be swapped in a
+    refactor and every existing declaration would still pass, because none uses both hatches on
+    one table.
+    """
+
+    def test_a_row_filter_sees_the_projected_row(self):
+        kept = bind(
+            [{"database_name": "a"}, {"database_name": "b"}],
+            DatabaseRecord,
+            project=lambda row: {**row, "keep": row["database_name"] == "a"},
+            row_filter=lambda row: row["keep"],
+        )
+        assert [record.database_name for record in kept] == ["a"]
