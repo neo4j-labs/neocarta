@@ -23,16 +23,13 @@ from neocarta.errors import ConfigError
 
 from .declaration import ScopeContext
 
-#: A ``pre_fold`` hatch: one source row in, one source row out, before validation.
-RowProjection = Callable[[dict[str, Any]], dict[str, Any]]
-
 
 def container_path_from(
     id_field: str,
     fields: Sequence[str | None],
     *,
     id_segments: int | None = None,
-) -> RowProjection:
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """Build a ``pre_fold`` that recovers a row's container path from a precomputed id.
 
     Several extractors compute a dotted graph id during extraction but do not carry the natural
@@ -82,12 +79,8 @@ def container_path_from(
         raise ConfigError(message)
 
     def project(row: dict[str, Any]) -> dict[str, Any]:
-        # Split from the RIGHT. The trailing segments are the ones whose count is known; the
-        # leading one is a database name, which legitimately contains dots — a domain-scoped GCP
-        # project is `example.com:my-project`, and `generate_id`'s `_normalize` maps `-` and space
-        # to `_` but leaves `.` and `:` alone. Splitting left-to-right counts those dots as
-        # separators and rejects the row, which would abort the whole connector on a source the
-        # hand-written transforms handle today.
+        # rsplit, not split: only the trailing segment count is known, and the leading segment is
+        # a database name that legitimately contains dots — see the docstring above.
         segments = str(row[id_field]).rsplit(".", expected - 1)
         if len(segments) != expected:
             message = (

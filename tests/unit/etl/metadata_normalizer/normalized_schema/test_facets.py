@@ -34,6 +34,8 @@ from neocarta.etl.metadata_normalizer.normalized_schema import (
     ValueRecord,
 )
 
+from . import _accepted_input_names
+
 FACET_MODELS = [
     ValueRecord,
     GlossaryRecord,
@@ -67,19 +69,6 @@ FACET_TABLES = [
     "lineage",
     "foreign_keys",
 ]
-
-
-def _accepted_input_names(model: type[BaseModel]) -> set[str]:
-    """Every input key ``model`` accepts: field names plus all validation aliases."""
-    names: set[str] = set()
-    for field_name, info in model.model_fields.items():
-        names.add(field_name)
-        alias = info.validation_alias
-        if isinstance(alias, AliasChoices):
-            names.update(choice for choice in alias.choices if isinstance(choice, str))
-        elif isinstance(alias, str):
-            names.add(alias)
-    return names
 
 
 # --- Raw source rows, keyed by their real per-connector column names (from the audit).

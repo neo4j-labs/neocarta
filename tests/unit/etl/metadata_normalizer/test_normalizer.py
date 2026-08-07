@@ -101,10 +101,22 @@ class TestAsSchema:
         assert schema.governance_tag_keys == []
 
     def test_the_projection_loses_the_sparseness_the_records_keep(self):
-        """Stated as a test so the tradeoff cannot be quietly forgotten."""
-        output = normalize(CACHE, SPARSE)
-        assert set(output.records) == {"databases"}
-        assert len(output.as_schema().model_dump()) == len(NormalizedStructuralSchema.model_fields)
+        """Stated as a test so the tradeoff cannot be quietly forgotten.
+
+        Declaring ``columns`` with no rows differs from omitting it in ``records`` and does not
+        once projected, so a projection that kept sparseness fails the second assertion.
+        """
+        declares_columns = ConnectorMapping(
+            tables={
+                "databases": SourceTable(record=DatabaseRecord, source="database_info"),
+                "columns": SourceTable(record=ColumnRecord, source="column_info"),
+            }
+        )
+        omits_columns = normalize(CACHE, SPARSE)
+        empty_columns = normalize({**CACHE, "column_info": []}, declares_columns)
+
+        assert set(omits_columns.records) != set(empty_columns.records)
+        assert omits_columns.as_schema() == empty_columns.as_schema()
 
 
 class TestNormalizedRecordsRejectsAnUnknownTable:
