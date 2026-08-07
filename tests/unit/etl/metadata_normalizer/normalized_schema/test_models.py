@@ -10,7 +10,7 @@ connector flip is S4; here we prove the contract only.
 from __future__ import annotations
 
 import pytest
-from pydantic import AliasChoices, BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from neocarta.data_model._validators import coerce_nullable
 from neocarta.etl.metadata_normalizer import normalized_schema
@@ -35,6 +35,8 @@ from neocarta.etl.metadata_normalizer.normalized_schema._vocabulary import (
     DATABASE_NAME_SYNONYMS,
     NULLABLE_SYNONYMS,
 )
+
+from . import _accepted_input_names
 
 # Each divergence class below also pins its synonym tuple by full equality. The
 # `parametrize` lists are literals, so on their own they would stay green while a new
@@ -116,19 +118,6 @@ MINIMAL_ENTITY_ROWS: dict[str, dict] = {
     "GovernanceTagKeyRecord": {"tag_namespace": "ns", "tag_key": "k"},
     "GovernanceTagValueRecord": {"tag_namespace": "ns", "tag_key": "k", "tag_value": "v"},
 }
-
-
-def _accepted_input_names(model: type[BaseModel]) -> set[str]:
-    """Every input key ``model`` accepts: field names plus all validation aliases."""
-    names: set[str] = set()
-    for field_name, info in model.model_fields.items():
-        names.add(field_name)
-        alias = info.validation_alias
-        if isinstance(alias, AliasChoices):
-            names.update(choice for choice in alias.choices if isinstance(choice, str))
-        elif isinstance(alias, str):
-            names.add(alias)
-    return names
 
 
 # --- Raw source rows, keyed by their real per-connector column names (from the audit).

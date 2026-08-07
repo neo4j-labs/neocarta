@@ -162,7 +162,7 @@ above — sparse→full under the shipped default leaves `customers.customer_id`
 
 ## Documented limits
 
-Three cases the contract deliberately does not cover, each a different owner:
+Five cases the contract deliberately does not cover, each a different owner:
 
 - **Two sources asserting different non-`NULL` values for the same property** → last write wins.
   D10 is about *loss*, not *disagreement*; arbitrating conflicting authorities is a provenance
