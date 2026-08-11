@@ -1,6 +1,7 @@
 """Utility functions for ingesting data into Neo4j."""
 
 import logging
+from enum import Enum
 
 from neo4j import Driver, RoutingControl
 from pydantic import BaseModel
@@ -9,6 +10,68 @@ from ..enums import NodeLabel, RelationshipType
 from ..errors import ConfigError
 
 logger = logging.getLogger(__name__)
+
+
+class MergePolicy(str, Enum):
+    """How a write reconciles an incoming row with an entity that already exists.
+
+    These three policies partition the whole space of "what happens to a property
+    when the ``MERGE`` matches an entity that an earlier write — a previous run, or
+    another connector — already created":
+
+    - ``CREATE_ONLY`` — properties are written only when the entity is created, so a
+      later, fuller row can never enrich it (first writer wins).
+    - ``OVERWRITE`` — properties are written on every merge, ``NULL`` included, so an
+      incoming ``NULL`` erases a stored value.
+    - ``COALESCE`` — properties are written on every merge, but an incoming ``NULL``
+      never replaces a stored value. This is the GUIDE D10 **non-clobber** merge: a
+      sparse row and a full row for the same entity accumulate, in either order.
+
+    ``COALESCE`` is the value-level half of the contract only. Which properties are in
+    scope for a write at all remains the caller's ``properties_list``, and that
+    property-scope layer is what a source with no tri-state for a field (e.g.
+    ``Column.nullable``, whose ``True`` default is indistinguishable from an asserted
+    ``True``) needs in order to stay non-clobbering.
+
+    See ``docs/refactor/merge-contract.md`` for the full contract.
+    """
+
+    CREATE_ONLY = "create_only"
+    OVERWRITE = "overwrite"
+    COALESCE = "coalesce"
+
+
+def _resolve_merge_policy(merge_policy: bool | str | MergePolicy) -> MergePolicy:
+    """Normalize a merge policy, accepting the legacy ``overwrite_existing`` flag.
+
+    Args:
+        merge_policy: A :class:`MergePolicy` (or its string value), or the legacy
+            ``overwrite_existing`` flag, where a truthy value means ``OVERWRITE`` and a
+            falsy one ``CREATE_ONLY``.
+
+    Returns:
+        The resolved :class:`MergePolicy`.
+
+    Raises:
+        ConfigError: If ``merge_policy`` is a string that is not a known policy value.
+    """
+    if isinstance(merge_policy, MergePolicy):
+        return merge_policy
+    if isinstance(merge_policy, str):
+        # Checked before the legacy branch, and strictly: a string is unambiguously
+        # meant as a policy name, so a misspelling must fail loudly rather than fall
+        # through to the truthy branch and silently select destructive OVERWRITE.
+        try:
+            return MergePolicy(merge_policy)
+        except ValueError as e:
+            raise ConfigError(
+                f"Unknown merge policy {merge_policy!r}; expected one of "
+                f"{[policy.value for policy in MergePolicy]}."
+            ) from e
+    # The legacy ``overwrite_existing`` flag, resolved by truthiness rather than a strict
+    # bool check: the parameter was annotated ``bool`` but accepted anything truthy, and
+    # connectors read pandas frames, so a numpy bool must keep behaving as it did.
+    return MergePolicy.OVERWRITE if merge_policy else MergePolicy.CREATE_ONLY
 
 
 def is_enterprise_edition(neo4j_driver: Driver, database_name: str = "neo4j") -> bool:
@@ -163,20 +226,22 @@ def _relationship_pattern(
 
 def _build_node_ingest_query(
     node_label: NodeLabel,
-    overwrite_existing: bool,
+    merge_policy: bool | str | MergePolicy,
     properties_list: list[str],
     secondary_labels: list[NodeLabel] | None = None,
 ) -> str:
     """
-    Build a node ingest query for a given node label, overwrite existing flag, and properties list.
+    Build a node ingest query for a given node label, merge policy, and properties list.
     Will return a MERGE query that sets properties according to the configuration.
 
     Parameters
     ----------
     node_label: str
         The label of the node to ingest.
-    overwrite_existing: bool
-        Whether to overwrite existing nodes on MATCH.
+    merge_policy: bool | str | MergePolicy
+        How to reconcile a row against a node that already exists — see
+        :class:`MergePolicy`. The legacy boolean spelling is accepted, where
+        ``True`` means ``OVERWRITE`` and ``False`` means ``CREATE_ONLY``.
     properties_list: list[str]
         The list of properties to set on the node.
     secondary_labels: list[NodeLabel] | None
@@ -189,6 +254,7 @@ def _build_node_ingest_query(
     str
         The MERGE query to ingest the nodes.
     """
+    policy = _resolve_merge_policy(merge_policy)
     query = f"""
 UNWIND $rows as row
 MERGE (n:{node_label} {{id: row.id}})
@@ -199,18 +265,24 @@ MERGE (n:{node_label} {{id: row.id}})
         return query.rstrip()
 
     label_items = [f"n:{label}" for label in secondary_labels]
-    prop_items = [f"n.{prop} = row.{prop}" for prop in properties_list]
+    if policy is MergePolicy.COALESCE:
+        # Non-clobber (D10): an incoming NULL keeps whatever is already stored, so a
+        # sparse row can never erase a fuller one and both feed orders converge on the
+        # same node. Re-emitting a row rewrites identical values, so it is a no-op on stored
+        # state (the SET still executes, so Neo4j still counts a property write).
+        prop_items = [f"n.{prop} = coalesce(row.{prop}, n.{prop})" for prop in properties_list]
+    else:
+        prop_items = [f"n.{prop} = row.{prop}" for prop in properties_list]
 
-    if overwrite_existing:
+    if policy is not MergePolicy.CREATE_ONLY:
         # Apply labels AND properties on every MERGE.
         all_items = label_items + prop_items
         query += "SET " + (",\n    ").join(all_items)
         return query
 
-    # overwrite_existing=False: properties only fire on first create, but secondary
-    # labels must apply regardless so the OSI subtype label sticks even when the
-    # node was created by a prior call or another connector. This requires both
-    # ON CREATE SET and ON MATCH SET clauses.
+    # CREATE_ONLY: properties only fire on first create, but secondary labels must apply
+    # regardless so the OSI subtype label sticks even when the node was created by a
+    # prior call or another connector. This requires both ON CREATE SET and ON MATCH SET.
     create_items = label_items + prop_items
     query += "ON CREATE\n    SET " + (",\n        ").join(create_items)
     if label_items:
@@ -224,10 +296,37 @@ def _build_relationship_ingest_query(
     target_node_label: NodeLabel,
     source_id_column_name: str,
     target_id_column_name: str,
-    overwrite_existing: bool,
+    merge_policy: bool | str | MergePolicy,
     properties_list: list[str],
 ) -> str:
-    """Build a relationship ingest query for a given relationship type, source node label, target node label, source id column name, target id column name, overwrite existing flag, and properties list."""
+    """
+    Build a relationship ingest query, mirroring :func:`_build_node_ingest_query`.
+
+    Parameters
+    ----------
+    relationship_type: RelationshipType
+        The type of the relationship to ingest.
+    source_node_label: NodeLabel
+        The label of the relationship's start node.
+    target_node_label: NodeLabel
+        The label of the relationship's end node.
+    source_id_column_name: str
+        The row key holding the start node's ``id``.
+    target_id_column_name: str
+        The row key holding the end node's ``id``.
+    merge_policy: bool | str | MergePolicy
+        How to reconcile a row against a relationship that already exists — see
+        :class:`MergePolicy`. The legacy boolean spelling is accepted, where
+        ``True`` means ``OVERWRITE`` and ``False`` means ``CREATE_ONLY``.
+    properties_list: list[str]
+        The list of properties to set on the relationship.
+
+    Returns:
+    -------
+    str
+        The MERGE query to ingest the relationships.
+    """
+    policy = _resolve_merge_policy(merge_policy)
     query = f"""
 UNWIND $rows as row
 MATCH (n1:{source_node_label} {{id: row.{source_id_column_name}}})
@@ -238,8 +337,8 @@ MERGE (n1)-[r:{relationship_type}]->(n2)
     if len(properties_list) == 0:
         return query.rstrip()
 
-    # Determine indentation based on overwrite setting
-    if not overwrite_existing:
+    # Determine indentation based on when the properties fire
+    if policy is MergePolicy.CREATE_ONLY:
         query += "ON CREATE\n    SET "
         indent = " " * 8  # 8 spaces for continuation lines
     else:
@@ -247,7 +346,11 @@ MERGE (n1)-[r:{relationship_type}]->(n2)
         indent = " " * 4  # 4 spaces for continuation lines
 
     for idx, prop in enumerate(properties_list):
-        query += f"r.{prop} = row.{prop}"
+        if policy is MergePolicy.COALESCE:
+            # Non-clobber (D10) — see the note in _build_node_ingest_query.
+            query += f"r.{prop} = coalesce(row.{prop}, r.{prop})"
+        else:
+            query += f"r.{prop} = row.{prop}"
         if idx < len(properties_list) - 1:
             query += ",\n" + indent
 

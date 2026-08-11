@@ -32,32 +32,65 @@ report_format = "coverage.xml (Cobertura)"
 # Re-baselined against `main` for the 0.8.1 safety net: the 0.9.x normalization stack (and
 # its ~50 tests) is not present on this branch, so these counts sit below an EKL-tree run.
 # Only `all` is enforced by the gate — the others are reference.
-gated_unit = 878    # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
-all_unit = 1122     # full tests/unit (includes _mcp/_cli/agent)
-all = 1218          # tests/ (unit + integration + smoke)
+# Ratcheted up by each PR's own delta, which keeps that main-vs-branch margin intact
+# rather than silently absorbing another branch's tests into the floor:
+#   S1.3 (#294) +59 unit / +14 integration — the merge-contract tests.
+#   S1.4 (#295) +105 unit / +0 integration — the explicit-ID override contract guards and the
+#     csv / query_log passthrough parity suites, parametrized over the 10 entity records and
+#     the 8 CSV id columns.
+#   S1.5 (#296) +3 unit / +0 integration — the synonym-tuple set-pins that stop the ratified
+#     ×6/×4/×3 counts going stale (the existing divergence tests iterate hardcoded literals).
+#   S1.6 (#297) +100 unit / +2 integration — the mapping-mechanism spike: the Graph-Spec
+#     expressiveness ceiling asserted against the vendored rc21 schema, the three-connector
+#     parity proof + sensitivity controls, the Layer R record goldens, the binder suite, the gate
+#     metric, and harness-discovery coverage for all ten tabular transformers. The prototype
+#     itself lives under `tests/support/` (uncollected, outside `coverage source`), so it adds
+#     tests without moving any [packages.*] measurement.
+#   S1.7 (#298) +91 unit / +0 integration — the generic metadata_normalizer: the binder,
+#     declaration and hatch suites, the component facade, the AST boundary guard (Graph Spec has
+#     no runtime dependency; `normalized_schema/` names no frame library), and a five-connector
+#     sweep over the declarations that now exist. Net of the S1.6 spike tests that moved into this
+#     package rather than being added (moves preserve the collected set, GUIDE §4). Unlike S1.6,
+#     this PR *does* move [packages.*]: the component is production code under `neocarta/etl/` (an
+#     ungated bucket with no floor of its own) and the five declarations land in `connectors`.
+#     Both are fully covered, so [total] and [packages.connectors] rose — see the measurements.
+gated_unit = 1236   # `make test-cov` scope (tests/unit minus _mcp/_cli/agent) — pairs with [packages.*] below
+all_unit = 1480     # full tests/unit (includes _mcp/_cli/agent)
+all = 1592          # tests/ (unit + integration + smoke)
 
 [total]
-line_measured = 68.53
+# Measured refreshed by S1.7 (#298): line 69.43 -> 70.21, branch 50.25 -> 51.47. The new
+# `neocarta/etl/metadata_normalizer` component and the five connector `mapping.py` declarations
+# are 100% line- and branch-covered, so adding production code *raised* the aggregate rather
+# than diluting it. Floors unchanged — same policy as the ingest note below.
+line_measured = 70.21
 line_floor = 68
-branch_measured = 49.30
+branch_measured = 51.47
 branch_floor = 49
 
 # --- Enforceable per-package floors (packages the `make test-cov` scope exercises) ---
 
 [packages.connectors]
-line_measured = 78.45
+# Measured refreshed by S1.7 (#298): line 78.45 -> 78.75, branch 60.41 -> 60.62 — the five
+# per-connector `mapping.py` declarations land in this package and are fully covered.
+line_measured = 78.75
 line_floor = 78
-branch_measured = 60.41
+branch_measured = 60.62
 branch_floor = 60
 
 # data_model branch is lower here than on the EKL tree: the normalization stack's
 # 100%-covered `data_model/normalized/*` subpackage (a 0.9.x-band addition) is not on
 # this branch, so the aggregate reflects only main's data_model. This is a re-baseline
 # to actual behavior, not a hand-lowered floor.
+#
+# Measured refreshed by S1.4 (#295), whose blank/NaN override parametrization exercises the
+# remaining `_validators.py` branches: line 99.66 -> 99.69, branch 83.33 -> 96.15. Floors are
+# deliberately NOT ratcheted in the same PR — the policy raises them after a *sustained* gain,
+# and a 13pp jump driven by one suite is exactly the case to let settle first.
 [packages.data_model]
-line_measured = 99.66
+line_measured = 99.69
 line_floor = 99
-branch_measured = 83.33
+branch_measured = 96.15
 branch_floor = 83
 
 [packages.enrichment]
@@ -67,9 +100,14 @@ branch_measured = 63.64
 branch_floor = 63
 
 [packages.ingest]
-line_measured = 65.44
+# Measured refreshed by S1.3 (#294), which added ingest merge-contract unit tests:
+# line 65.44 -> 67.73, branch 37.23 -> 43.14. Floors are deliberately NOT ratcheted in the
+# same PR: the policy raises floors after a *sustained* gain, and trunc(43.14) = 43 would
+# leave 0.14pp of headroom, the zero-margin fragility that turned the #290 gate red before.
+# Ratchet to 67 / 43 once these numbers hold across a few PRs.
+line_measured = 67.73
 line_floor = 65
-branch_measured = 37.23
+branch_measured = 43.14
 branch_floor = 37
 
 [packages.root]

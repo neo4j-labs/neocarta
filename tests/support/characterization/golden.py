@@ -56,8 +56,7 @@ def assert_matches_golden(path: str | Path, data: Any, *, update: bool | None = 
 
     if not path.exists():
         raise AssertionError(
-            f"Golden file missing: {path}\n"
-            "Generate it with UPDATE_GOLDENS=1 (or --update-goldens) and commit it."
+            f"Golden file missing: {path}\nGenerate it with UPDATE_GOLDENS=1 and commit it."
         )
 
     expected = path.read_text(encoding="utf-8")

@@ -30,18 +30,31 @@ enforceable floors #290 gates against.
 
 | Package (Cobertura name) | Line % | Line floor | Branch % | Branch floor |
 |---|---:|---:|---:|---:|
-| `data_model` | 99.66 | 99 | 83.33 | 83 |
+| `data_model` | 99.69 | 99 | **96.15** | 83 |
 | `root` (`neocarta/*.py` = `.`) | 95.50 | 95 | 86.84 | 86 |
 | `enrichment` | 79.57 | 79 | 63.64 | 63 |
 | `connectors` | 78.45 | 78 | 60.41 | 60 |
-| `ingest` | 65.44 | 65 | **37.23** | 37 |
-| **TOTAL** | **68.53** | **68** | **49.30** | **49** |
+| `ingest` | 67.73 | 65 | **43.14** | 37 |
+| **TOTAL** | **69.43** | **68** | **50.25** | **49** |
+
+`ingest`'s measured values were refreshed by S1.3 (#294), which added merge-contract unit tests
+(line 65.44 → 67.73, branch 37.23 → 43.14). Its floors are deliberately left at 65 / 37: the policy
+raises floors after a *sustained* gain, and `trunc(43.14) = 43` would leave 0.14pp of headroom —
+the zero-margin fragility that turned the #290 gate red before. Ratchet to 67 / 43 once these hold
+across a few PRs.
+
+`data_model` and TOTAL were refreshed the same way by S1.4 (#295), whose blank/NaN override
+parametrization exercises the remaining `_validators.py` branches (`data_model` line 99.66 → 99.69,
+branch 83.33 → 96.15; TOTAL line 68.53 → 69.43, branch 49.30 → 50.25). Floors held for the same
+reason: a 13pp branch jump driven by one suite is exactly the case to let settle before ratcheting.
 
 Measured against `main` for the 0.8.1 safety net: the 0.9.x normalization stack (its
 100%-covered `normalization` / `data_model/normalized` packages) is not on this branch, so
 there is no `normalization` row and `data_model`'s branch floor reflects main-only code.
-`connectors` dominates the total. `ingest`'s **37% branch coverage** is the weakest area and
-a refactor target (see [test-quality-inventory.md](test-quality-inventory.md) → gap list).
+`connectors` dominates the total. `ingest`'s **43% branch coverage** is still the weakest area and
+a refactor target (see [test-quality-inventory.md](test-quality-inventory.md) → gap list), though
+S1.3 (#294) closed that list's "golden-master the emitted merge patterns" gap for the shared
+node/relationship query builders.
 
 ## Scope caveat — `_mcp` and `_cli` (read this before trusting a `_mcp`/`_cli` number)
 
@@ -73,9 +86,14 @@ was stale):
 
 | Scope | Collected |
 |---|---:|
-| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 878 |
-| full `tests/unit` | 1,122 |
-| all `tests/` (unit + integration + smoke) | 1,218 |
+| `make test-cov` (tests/unit minus `_mcp`/`_cli`/`agent`) | 1,042 |
+| full `tests/unit` | 1,286 |
+| all `tests/` (unit + integration + smoke) | 1,396 |
+
+Ratcheted by each PR's own delta, which keeps the main-vs-branch margin intact rather than absorbing
+another branch's tests into the floor: the `main` baseline was 878 / 1,122 / 1,218, S1.3 (#294)
+added +59 unit / +14 integration, and S1.4 (#295) added +105 unit / +0 integration (the
+explicit-ID override guards plus the csv / query_log passthrough parity suites).
 
 ## Reproduce
 

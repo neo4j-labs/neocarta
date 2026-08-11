@@ -1001,7 +1001,7 @@ The project is organized into the following dependency groups:
 
 ### Adding a New Connector
 
-Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/neocarta-add-source-connector/connector-contract.md). Read it before designing a connector.
+Every connector under [`neocarta/connectors/`](./neocarta/connectors/) follows a shared standard — directory layout, the `extract` / `transform` / `load` / `ingest` (and `export` for format connectors) public API, error/warning conventions, id generation, field naming, and a required README. The full contract is documented in [`connector-contract.md`](./.claude/skills/neocarta-add-source-connector/connector-contract.md). Read it before designing a connector; the field names it must emit are the canonical vocabulary in [`docs/refactor/field-vocabulary.md`](./docs/refactor/field-vocabulary.md).
 
 The repository ships a `neocarta-add-source-connector` [Claude Code skill](https://code.claude.com/docs/en/skills) to build connectors against that contract. In Claude Code, run `/neocarta-add-source-connector`; the skill scaffolds a conformant connector package (plus its conformance test) and verifies it. The underlying tooling is also usable directly:
 

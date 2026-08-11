@@ -1,0 +1,150 @@
+{
+  "columns": [
+    {
+      "column_name": "day",
+      "data_type": "date",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "analytics",
+      "table_name": "daily_revenue"
+    },
+    {
+      "column_name": "revenue",
+      "data_type": "numeric",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "analytics",
+      "table_name": "daily_revenue"
+    },
+    {
+      "column_name": "id",
+      "data_type": "int4",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "public",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "email",
+      "data_type": "varchar",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "public",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "id",
+      "data_type": "int4",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "public",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "customer_id",
+      "data_type": "int4",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": true,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "public",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "total",
+      "data_type": "numeric",
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "public",
+      "table_name": "orders"
+    }
+  ],
+  "databases": [
+    {
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "platform": null,
+      "service": "POSTGRESQL"
+    }
+  ],
+  "foreign_keys": [
+    {
+      "criteria": null,
+      "source_column_name": "customer_id",
+      "source_database_name": "neocarta_test",
+      "source_schema_name": "public",
+      "source_table_name": "orders",
+      "target_column_name": "id",
+      "target_database_name": "neocarta_test",
+      "target_schema_name": "public",
+      "target_table_name": "customers"
+    }
+  ],
+  "schemas": [
+    {
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "schema_name": "analytics"
+    },
+    {
+      "database_name": "neocarta_test",
+      "description": null,
+      "explicit_id": null,
+      "schema_name": "public"
+    }
+  ],
+  "tables": [
+    {
+      "database_name": "neocarta_test",
+      "description": "Aggregated daily revenue",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "analytics",
+      "table_name": "daily_revenue"
+    },
+    {
+      "database_name": "neocarta_test",
+      "description": "Customer master records",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "public",
+      "table_name": "customers"
+    },
+    {
+      "database_name": "neocarta_test",
+      "description": "Customer orders",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "public",
+      "table_name": "orders"
+    }
+  ]
+}

@@ -14,17 +14,34 @@ proof is only possible if current behavior is frozen first. This harness provide
 freeze + compare mechanism at two layers. Milestone **0.8.1** → test-infra only, **zero
 production behavior change**.
 
-## The two layers
+## The three layers
 
 | Layer | Captures | Runtime | Helper |
 |---|---|---|---|
-| **A — transform-level** | the node/relationship model lists a connector's transformer produces (`*_nodes` / `*_relationships` accessors) + the `get_properties` allowlist | **no Docker** (unit) | `serialize_transform` |
+| **A — transform-level** | the node/relationship model lists a connector's transformer produces (`*_nodes` / `*_relationships` families) + the `get_properties` allowlist | **no Docker** (unit) | `serialize_transform` |
+| **R — normalized records** | the flat normalized records a connector emits, *before* any graph shaping | **no Docker** (unit) | `dump_records` |
 | **B — post-ingest graph** | every node (labels + properties) and relationship (endpoint `id`s + type + properties) after ingest into Neo4j | Docker (`Neo4jContainer`, integration) | `dump_graph` |
 
-Both compare against committed JSON goldens via `assert_matches_golden`. The reusable
+All three compare against committed JSON goldens via `assert_matches_golden`. The reusable
 code lives in **`tests/support/characterization/`** (not collected as tests — no marker,
 outside `coverage source`); the per-connector golden tests and their `.json` goldens
 live next to the connector they cover.
+
+**Layer R** was added by S1.6 (#297) — the S1-band target
+[`test-quality-inventory.md`](test-quality-inventory.md) reserves ("golden-master the normalized
+schema each connector emits (the flat records) so the S1 split holds parity"). Pick it when the
+change touches what a connector *emits* rather than how it is shaped: a Layer A diff says the
+graph changed, a Layer R diff says whether the connector stopped supplying a field or the
+record→graph mapping changed meaning. During the S4 cutover, when connectors are rewritten one
+at a time, that is the difference between a local fix and bisecting a pipeline.
+
+> **Family discovery covers both conventions.** `serialize_transform` finds `*_nodes` /
+> `*_relationships` exposed as `@property` accessors **and** as plain list attributes assigned in
+> `__init__`. Both are common — BigQuery/CSV/JDBC/query-log use properties; Unity Catalog, both
+> Dataplex connectors and Databricks tags use attributes. Until S1.6 only properties were found,
+> so those four serialized to `{}`, which compares equal to an empty golden: the failure mode was
+> a golden that passed while guarding nothing. All ten counts are pinned in
+> `tests/unit/etl/test_characterization_discovery.py`; if you add a transformer, add it there.
 
 ## Decisions (Latitude items, per GUIDE §9 — recorded here as the PR justification)
 
@@ -33,11 +50,11 @@ live next to the connector they cover.
    compared with `difflib`. No snapshot-library dependency (fits the 0.8.1 safety-net
    band), fully git-diffable so a reviewer reads the parity delta directly, and total
    control over ordering + nondeterminism exclusion. It is the natural scale-up of the
-   in-code `_EXPECTED_GRAPH` literal in `test_normalized_parity.py`, which does not scale
+   in-code expected-graph literals a hand-written parity test uses, which do not scale
    to the full CSV dataset or a post-ingest graph dump.
 2. **Connectors → CSV + BigQuery.** Deliberately divergent shapes: CSV (`CSVTransformer`,
    glossary/query/tagging families + a `get_properties` allowlist) and BigQuery (the
-   shared `NormalizedGraphTransformer`, relational family, no allowlist). Both run fully
+   `BigQuerySchemaTransformer`, relational family, no allowlist). Both run fully
    offline for Layer A (mock driver + committed `datasets/csv`; seeded extractor cache).
 3. **Edition → Community `neo4j:5.26.23`** (the testcontainer). The Layer B goldens are
    **node/rel data only**, which is identical on Community and Enterprise (they differ
@@ -65,16 +82,18 @@ live next to the connector they cover.
 
 ```
 tests/support/characterization/
-  serialize.py       serialize_transform                       (Layer A)
-  graph_dump.py      dump_graph                                (Layer B)
-  golden.py          assert_matches_golden, canonical_json
-  bigquery_cache.py  make_mock_bigquery_client, seed_bigquery_schema_cache
-  __init__.py        public re-exports + DATASETS_CSV
+  serialize.py        serialize_transform                      (Layer A)
+  normalized_dump.py  dump_records                             (Layer R)
+  graph_dump.py       dump_graph                               (Layer B)
+  golden.py           assert_matches_golden, canonical_json
+  bigquery_cache.py   make_mock_bigquery_client, seed_bigquery_schema_cache
+  __init__.py         public re-exports + DATASETS_CSV
 
 tests/unit/connectors/csv/test_transform_golden.py               + golden/csv_transform.json              (Layer A)
 tests/unit/connectors/bigquery/schema/test_transform_golden.py   + golden/bigquery_schema_transform.json  (Layer A)
 tests/integration/connectors/csv/test_graph_golden_IT.py         + golden/csv_graph.json                  (Layer B)
 tests/integration/connectors/bigquery/schema/test_graph_golden_IT.py + golden/bigquery_schema_graph.json  (Layer B)
+tests/unit/etl/metadata_normalizer/test_normalized_records.py          + golden/*_records.json                  (Layer R)
 ```
 
 ## Self-validation (why the goldens can't falsely pass)
@@ -84,9 +103,9 @@ A golden test that cannot fail guards nothing. Each **Layer A** test pairs a
 production rule (an id helper — `generate_table_id` for CSV, `generate_value_id` for
 BigQuery) and asserts the comparison **raises** (FAIL on an injected change). That
 demonstrates "PASS on a no-op, FAIL on an injected change, across ≥2 connectors" and is
-CI-enforced. The in-tree `test_normalized_parity.py` (which froze the pre-#271 bespoke
-BigQuery graph and stayed green through the shared-normalizer rewrite) is a real
-no-op-refactor this harness generalizes.
+CI-enforced. S1.6 (#297) is the worked example of what that buys: it swapped the entire
+connector→graph mechanism for three connectors and proved parity against these goldens
+*unchanged* (`tests/unit/etl/mapping_spike/test_parity.py`).
 
 ## Regenerating goldens
 

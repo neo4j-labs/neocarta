@@ -1,0 +1,118 @@
+{
+  "columns": [
+    {
+      "column_name": "customer_id",
+      "data_type": "INT64",
+      "database_name": "test-project-id",
+      "description": "Customer ID",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "test_dataset",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "customer_name",
+      "data_type": "STRING",
+      "database_name": "test-project-id",
+      "description": "Customer name",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": false,
+      "nullable": true,
+      "schema_name": "test_dataset",
+      "table_name": "customers"
+    },
+    {
+      "column_name": "order_id",
+      "data_type": "INT64",
+      "database_name": "test-project-id",
+      "description": "Order ID",
+      "explicit_id": null,
+      "is_foreign_key": false,
+      "is_primary_key": true,
+      "nullable": false,
+      "schema_name": "test_dataset",
+      "table_name": "orders"
+    },
+    {
+      "column_name": "customer_id",
+      "data_type": "INT64",
+      "database_name": "test-project-id",
+      "description": "Customer ID reference",
+      "explicit_id": null,
+      "is_foreign_key": true,
+      "is_primary_key": false,
+      "nullable": false,
+      "schema_name": "test_dataset",
+      "table_name": "orders"
+    }
+  ],
+  "databases": [
+    {
+      "database_name": "test-project-id",
+      "description": null,
+      "explicit_id": null,
+      "platform": "GCP",
+      "service": "BIGQUERY"
+    }
+  ],
+  "foreign_keys": [
+    {
+      "criteria": null,
+      "source_column_name": "customer_id",
+      "source_database_name": "test-project-id",
+      "source_schema_name": "test_dataset",
+      "source_table_name": "orders",
+      "target_column_name": "customer_id",
+      "target_database_name": "test-project-id",
+      "target_schema_name": "test_dataset",
+      "target_table_name": "customers"
+    }
+  ],
+  "schemas": [
+    {
+      "database_name": "test-project-id",
+      "description": "Test dataset description",
+      "explicit_id": null,
+      "schema_name": "test_dataset"
+    }
+  ],
+  "tables": [
+    {
+      "database_name": "test-project-id",
+      "description": "Customer table",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "test_dataset",
+      "table_name": "customers"
+    },
+    {
+      "database_name": "test-project-id",
+      "description": "Order table",
+      "display_name": null,
+      "explicit_id": null,
+      "schema_name": "test_dataset",
+      "table_name": "orders"
+    }
+  ],
+  "values": [
+    {
+      "column_name": "customer_id",
+      "database_name": "test_project_id",
+      "explicit_id": null,
+      "schema_name": "test_dataset",
+      "table_name": "customers",
+      "value": "1"
+    },
+    {
+      "column_name": "customer_id",
+      "database_name": "test_project_id",
+      "explicit_id": null,
+      "schema_name": "test_dataset",
+      "table_name": "customers",
+      "value": "2"
+    }
+  ]
+}
