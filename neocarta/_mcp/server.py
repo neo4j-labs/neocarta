@@ -20,6 +20,7 @@ from .inventory import (
 )
 from .settings import mcp_server_settings
 from .tools import (
+    capture_task_memory,
     catalog,
     full_text_search,
     hybrid_business_term_search,
@@ -27,6 +28,7 @@ from .tools import (
     osi_catalog,
     osi_definitions,
     osi_domain,
+    recall_task_memory,
     vector_search,
 )
 
@@ -128,7 +130,9 @@ async def create_mcp_server(
     Catalog tools (schema/table listing, full metadata dump) are always registered. When an
     OSI semantic model is present, the OSI reference (list_domains,
     list_metrics_by_domain), domain-context (get_domain_context), and definition
-    (get_metric_expression) tools are registered as well.
+    (get_metric_expression) tools are registered as well. The semantic-memory tools
+    (capture_task_memory, recall_task_memory) register when the phrase vector index is present,
+    i.e. once ``neocarta memory init-indexes`` has enabled the memory feature on the graph.
     """
     name = "Neocarta MCP Server"
     instructions = """
@@ -157,6 +161,28 @@ The retrieved context may be used for query generation, query routing or data di
     logger.info("OSI semantic model nodes present=%s", osi_nodes_present)
 
     catalog.register(server, neo4j_driver, neo4j_database)
+
+    # Semantic-memory tools register together, gated on the phrase vector index.
+    # capture is the only writer of Task:Memory nodes, so gating on node presence
+    # would deadlock the first capture; `neocarta memory init-indexes` (which
+    # builds phrase_vector_index) is the operator's explicit opt-in instead.
+    if ("Phrase", "VECTOR") in inventory:
+        capture_task_memory.register(
+            server,
+            neo4j_driver,
+            neo4j_database,
+            embedder,
+            sql_dialect=mcp_server_settings.sql_dialect,
+            default_project_id=mcp_server_settings.default_project_id,
+            default_schema_id=mcp_server_settings.default_schema_id,
+        )
+        recall_task_memory.register(server, neo4j_driver, neo4j_database, embedder)
+        logger.info("Registered semantic-memory capture and recall tools")
+    else:
+        logger.info(
+            "No phrase_vector_index found; semantic-memory tools not registered. "
+            "Run `neocarta memory init-indexes` to enable them."
+        )
 
     if osi_nodes_present:
         osi_catalog.register(server, neo4j_driver, neo4j_database)
