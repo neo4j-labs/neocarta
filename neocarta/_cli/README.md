@@ -284,6 +284,26 @@ QUERY_LOG_FILE=./query_logs.json neocarta query-log ingest --dry-run --json
 
 ---
 
+### `neocarta memory init-indexes`
+
+Creates the `phrase_vector_index` and `phrase_full_text_index` that back the [MCP server](../_mcp/README.md)'s semantic-memory tools (`recall_task_memory` / `capture_task_memory`). Those tools register only once these indexes exist, so run this once per graph, then (re)start the server. The vector index is built at the dimension the embedding model returns — probed with a single embedding call — so it needs an embedding-provider key, and that model/dimension **must match the MCP server's** `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS`, or vector recall will error at query time.
+
+- **Flags:**
+  - `--embedding-model TEXT` — LiteLLM embedding model id (default: `text-embedding-3-small`). Must match the model the MCP server embeds phrasings with. Overrides `EMBEDDING_MODEL`.
+  - `--embedding-dimensions INT` — Dimension to request from the model (default: the model's native size). Optional; omit for native. Must match the server's `EMBEDDING_DIMENSIONS`. Overrides `EMBEDDING_DIMENSIONS`.
+  - `--dry-run` — Print the plan as JSON; do not touch Neo4j.
+  - `--json` — Emit JSON on stdout.
+- **Config:** `NEO4J_*` plus an embedding-provider key (e.g. `OPENAI_API_KEY`) for the dimension probe.
+- **Use when:** enabling semantic memory on a graph for the first time, or rebuilding the phrase vector index after an embedding-model / dimension change (drop `phrase_vector_index` first, then re-run).
+
+```bash
+neocarta memory init-indexes
+neocarta memory init-indexes --embedding-dimensions 768
+neocarta memory init-indexes --dry-run --json
+```
+
+---
+
 ### `neocarta tool <tool>`
 
 Mirrors the [Neocarta MCP server](../_mcp/README.md) tools as read-only CLI commands, one per tool, with the **same names, arguments, and documentation**. Use these to query the semantic graph from a shell or a non-MCP agent without running the server. They reuse the server's Cypher, result models, and embedder, but run synchronously against the CLI's Neo4j driver — so only the `[cli]` install is needed (no `fastmcp` / `[mcp]` extra).

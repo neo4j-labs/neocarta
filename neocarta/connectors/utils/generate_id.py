@@ -1,6 +1,7 @@
 """Utility functions for generating hierarchical IDs for graph entities."""
 
 import hashlib
+import re
 from typing import Any
 
 
@@ -334,6 +335,38 @@ def generate_governance_tag_instance_id(source_id: str, key: str, value: str) ->
 def create_query_id(query: str) -> str:
     """Create a query ID from a query string."""
     return hashlib.sha256(query.encode()).hexdigest()
+
+
+def generate_task_id(name: str) -> str:
+    """Create a Task memory id from its CamelCase name.
+
+    The name is the merge key for a captured Task, so the id is a plain SHA-256
+    of the case-folded, trimmed name: re-capturing under the same name (any
+    casing/whitespace) merges onto the one Task rather than duplicating it.
+
+    Examples:
+    --------
+    >>> generate_task_id("WinRateBySegment") == generate_task_id(" winratebysegment ")
+    True
+    """
+    return hashlib.sha256(name.strip().lower().encode()).hexdigest()
+
+
+def generate_phrase_id(question: str) -> str:
+    """Create a Phrase memory id from a verbatim question.
+
+    Normalizes the question (lowercase, punctuation stripped, whitespace
+    collapsed) before hashing so trivially-different renderings of the same
+    wording map to one Phrase, while genuinely different phrasings stay distinct
+    and each raises recall for its Task.
+
+    Examples:
+    --------
+    >>> generate_phrase_id("What is the win rate?") == generate_phrase_id("what is the win rate")
+    True
+    """
+    normalized = re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", question.lower().strip()))
+    return hashlib.sha256(normalized.encode()).hexdigest()
 
 
 def generate_cte_id(query_id: str, cte_name: str) -> str:

@@ -208,6 +208,25 @@ Relationships
 * `(:Column)-[:HAS_VALUE]->(:Value)`
 * `(:Column)-[:REFERENCES]->(:Column)`
 
+### Semantic memory (Optional)
+
+The MCP server can also **learn** from confirmed question→SQL pairs, extending the same graph with a memory subgraph — written by the `capture_task_memory` tool and read by `recall_task_memory` (see the [MCP server README](neocarta/_mcp/README.md)). A remembered `Task` owns the embedded question wordings (`Phrase`) and the canonical SQL (`Query`) that answered it; the `Query` links into the live catalog through the same lineage relationships the connectors already write, so recalled answers stay grounded in the current schema.
+
+![The semantic-memory subgraph grafted onto the catalog: a Task owns embedded Phrase wordings via HAS_PHRASE and canonical Query nodes via HAS_QUERY, and each Query links to the Table and Column nodes it uses via USES_TABLE and USES_COLUMN](assets/images/architecture/semantic-memory.png)
+
+Memory nodes
+* `Task` — a remembered analytical task, keyed by a PascalCase name, carrying free-form `observations` (the analytical notes each capture recorded; returned by `recall_task_memory` and accumulated across captures)
+* `Phrase` — a verbatim question wording attached to a Task; embedded so paraphrases recall the task
+* `Query` — a canonical (surface-variant-deduplicated) SQL statement
+
+Memory relationships
+* `(:Task)-[:HAS_PHRASE]->(:Phrase)`
+* `(:Task)-[:HAS_QUERY]->(:Query)`
+* `(:Query)-[:USES_TABLE]->(:Table)`
+* `(:Query)-[:USES_COLUMN]->(:Column)`
+
+`Query`, `HAS_QUERY`, `USES_TABLE`, and `USES_COLUMN` are the same lineage vocabulary the query-log connectors emit, so memory reuses (rather than duplicates) the catalog's existing structure.
+
 
 ## Graph Generation
 
