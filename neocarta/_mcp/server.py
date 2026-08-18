@@ -163,7 +163,7 @@ The retrieved context may be used for query generation, query routing or data di
     catalog.register(server, neo4j_driver, neo4j_database)
 
     # Semantic-memory tools register together, gated on the phrase vector index.
-    # capture is the only writer of Task:Memory nodes, so gating on node presence
+    # capture is the only writer of Task nodes, so gating on node presence
     # would deadlock the first capture; `neocarta memory init-indexes` (which
     # builds phrase_vector_index) is the operator's explicit opt-in instead.
     if ("Phrase", "VECTOR") in inventory:

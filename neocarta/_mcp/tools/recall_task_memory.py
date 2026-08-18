@@ -99,8 +99,15 @@ def register(
         [0, 1] by its own branch max) and an optional `diagnostics` string. Each
         candidate carries `matched_phrase` (the stored phrasing that best
         matched), `phrasings` (all stored phrasings of the Task) with
-        `phrase_count`, the canonical SQL, its description, and the
-        tables/columns that SQL uses.
+        `phrase_count`, `observations`, the canonical SQL, its description, and
+        the tables/columns that SQL uses.
+
+        `observations` are the analytical notes recorded when the task was
+        captured — the chosen metric definition, join path or weighting. Read
+        them before reusing the SQL and honour them in any adaptation: they are
+        how a previously agreed definition survives into this answer. If an
+        observation contradicts what the user is now asking for, say so rather
+        than silently reusing the SQL.
 
         `hybrid_score` orders candidates but is NOT calibrated: its magnitude is
         relative to this query's result set. Use `vector_score` (the raw cosine
@@ -211,6 +218,7 @@ def register(
                         matched_phrase=branch_scores.get("matched_phrase"),
                         phrasings=phrasings,
                         phrase_count=len(phrasings),
+                        observations=[o for o in r["observations"] if o],
                         vector_score=round(branch_scores.get("vector", 0.0), 4),
                         hybrid_score=round(_hybrid(branch_scores), 4),
                         query_description=r["query_description"],

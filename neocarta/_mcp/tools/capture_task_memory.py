@@ -69,6 +69,9 @@ def register(
         same query dedupe onto a single canonical `Query` (HAS_QUERY). Only the
         Phrase carries an embedding; the Task and Query do not.
 
+        `observations` accumulate across captures of the same `name` rather than
+        replacing: pass only what this capture newly learned.
+
         The Query is linked to existing semantic-layer Table/Column nodes parsed
         from the canonical SQL (USES_TABLE / USES_COLUMN). If the result has
         non-empty `unmatched_tables`/`unmatched_columns`, surface them to the
@@ -85,11 +88,15 @@ def register(
         description: str
             One-sentence description of what the SQL computes.
         name: str
-            CamelCase task name, e.g. WinRateBySegment. This is the merge key:
+            PascalCase task name, e.g. WinRateBySegment. This is the merge key:
             reuse the same name to attach a new phrasing or update the SQL.
         observations: list[str] | None
             Analytical choices worth remembering (chosen metric definition,
-            join path, weighting).
+            join path, weighting). These accumulate across captures of the same
+            `name` — each capture appends what it was given, so do NOT restate
+            the question or the SQL description here (both are stored as their
+            own fields and returned by recall). Record only the reasoning a
+            future reader could not recover from the SQL itself.
         """
         canonical_sql = canonicalize_sql(sql.strip(), dialect=sql_dialect)
         query_id = create_query_id(canonical_sql)
@@ -130,11 +137,11 @@ def register(
                 "credentials (e.g. OPENAI_API_KEY) and that EMBEDDING_MODEL is valid."
             )
 
-        observations = [
-            f"Question: {question}",
-            f"Query description: {description}",
-            *(observations or []),
-        ]
+        # Store only the caller's analytical notes. 
+        # Recall returns `phrasings` and `query_description` as their own fields, 
+        # and observations accumulate across captures, so prepending them would 
+        # grow an unstructured duplicate of both on every re-capture.
+        observations = observations or []
 
         records, _, _ = await neo4j_driver.execute_query(
             query_=capture_task_memory_cypher(),

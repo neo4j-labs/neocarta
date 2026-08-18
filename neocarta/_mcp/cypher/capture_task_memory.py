@@ -4,6 +4,15 @@ Writes a user-confirmed question/SQL pair into semantic memory: a ``Task``
 (merge key: id derived from its name) with an embedded ``Phrase`` child, and a
 canonical ``Query`` linked to the ``Table`` / ``Column`` nodes it uses. Only the
 Phrase carries an embedding.
+
+The ``Task`` label is deliberately the node's only label. An earlier revision
+also stamped a secondary ``Memory`` label (plus a ``type`` property) so the
+generic ``mcp-neo4j-memory`` server could read these nodes as entities. That
+server walks one undirected hop out of every ``:Memory`` node and requires each
+neighbour to carry a ``name`` string, which ``Phrase`` and ``Query`` do not —
+so a single captured Task broke its ``read_graph`` / ``search_memories`` calls
+outright. Keeping the domain graph unlabelled avoids leaking that contract onto
+every connected node.
 """
 
 
@@ -17,6 +26,11 @@ def capture_task_memory_cypher() -> str:
     ``HAS_QUERY`` relationship stamps ``captured_at`` so recall can pick the
     latest query for a Task.
 
+    ``observations`` accumulate rather than replace: each capture appends the
+    notes it was given, minus any already present verbatim. A re-capture of an
+    existing Task therefore adds to the analytical record instead of erasing
+    what earlier captures learned, matching how Phrases accumulate.
+
     Notes:
     -----
     Expected Cypher parameters:
@@ -26,7 +40,7 @@ def capture_task_memory_cypher() -> str:
     name : str
         PascalCase task name.
     observations : list[str]
-        Analytical notes stored on the Task.
+        Analytical notes to merge into the Task's existing observations.
     phrase_id : str
         Deterministic Phrase id (``generate_phrase_id`` of the question).
     question : str
@@ -45,11 +59,11 @@ def capture_task_memory_cypher() -> str:
         Catalog ``Column`` ids parsed from the canonical SQL.
     """
     return """
-MERGE (t:Task:Memory {id: $task_id})
+MERGE (t:Task {id: $task_id})
 ON CREATE SET t.created_at = datetime()
 SET t.name = $name,
-    t.type = 'task',
-    t.observations = $observations
+    t.observations =
+        [o IN coalesce(t.observations, []) WHERE NOT o IN $observations] + $observations
 
 MERGE (p:Phrase {id: $phrase_id})
 ON CREATE SET p.created_at = datetime()

@@ -215,17 +215,19 @@ class ListMetricRecord(BaseModel):
 class RecalledMemory(BaseModel):
     """A previously captured Task recalled from semantic memory."""
 
-    task_name: str = Field(..., description="The CamelCase name of the recalled task")
+    task_name: str = Field(..., description="The PascalCase name of the recalled task")
     matched_phrase: str | None = Field(
         default=None,
         description="The stored phrasing that best matched the query in the vector branch; null "
         "when the Task matched only via full-text",
     )
-    phrasings: list[str] = Field(
-        default=[], description="All stored phrasings of the task"
-    )
-    phrase_count: int = Field(
-        default=0, description="The number of stored phrasings of the task"
+    phrasings: list[str] = Field(default=[], description="All stored phrasings of the task")
+    phrase_count: int = Field(default=0, description="The number of stored phrasings of the task")
+    observations: list[str] = Field(
+        default=[],
+        description="Analytical notes accumulated across captures of this task — the chosen "
+        "metric definition, join path or weighting. Read these before reusing the SQL: they "
+        "record why it is written the way it is",
     )
     vector_score: float = Field(
         default=0.0,
@@ -269,7 +271,7 @@ class CaptureMemoryResult(BaseModel):
     """The result of capturing a question/SQL pair into semantic memory."""
 
     task_id: str = Field(..., description="The deterministic id of the merged task")
-    task_name: str = Field(..., description="The CamelCase name of the merged task")
+    task_name: str = Field(..., description="The PascalCase name of the merged task")
     phrase_id: str = Field(..., description="The deterministic id of the attached phrasing")
     query_id: str = Field(..., description="The canonical-SQL hash id of the merged query")
     canonical_sql: str = Field(

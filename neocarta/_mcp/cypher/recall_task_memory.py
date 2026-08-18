@@ -84,11 +84,14 @@ RETURN options.indexConfig.`vector.dimensions` AS index_dim
 
 
 def recall_task_memory_expand_cypher() -> str:
-    """Expand one ranked Task to its phrasings and latest canonical Query.
+    """Expand one ranked Task to its phrasings, observations and canonical Query.
 
     Picks the most recently captured ``Query`` (by ``captured_at`` on the
-    ``HAS_QUERY`` relationship) and returns the Task's phrasings plus the
-    tables/columns that query uses.
+    ``HAS_QUERY`` relationship) and returns the Task's phrasings and accumulated
+    ``observations`` plus the tables/columns that query uses. The observations
+    are the analytical notes capture recorded (chosen metric definition, join
+    path, weighting) — the calling agent needs them to judge whether the stored
+    SQL answers *this* question, not just a similarly worded one.
 
     Notes:
     -----
@@ -103,6 +106,7 @@ MATCH (t)-[r:HAS_QUERY]->(q:Query)
 WITH t, q, r ORDER BY r.captured_at DESC
 WITH t, collect(q)[0] AS q
 RETURN t.name AS task_name,
+       coalesce(t.observations, []) AS observations,
        [(t)-[:HAS_PHRASE]->(p) | p.verbatim] AS phrasings,
        q.description AS query_description,
        q.query AS sql,
