@@ -11,7 +11,6 @@ from neo4j import RoutingControl
 
 from ...._logging import log_stage
 from ....errors import ConfigError, TransformError
-from ....ingest.lpg import RESERVED_NODE_LABELS, RESERVED_RELATIONSHIP_TYPES
 from ....warnings import Neo4jSchemaWarning
 from .._errors import wrap_neo4j_errors
 
@@ -62,35 +61,16 @@ def _endpoint_rows(label: str, rel_type: str, rel_meta: dict) -> list[dict]:
     return rows
 
 
-def _warn_reserved(kind: str, name: str) -> None:
-    """Warn that a reserved LPG label / relationship type is being excluded."""
-    warnings.warn(
-        f"Skipping reserved LPG {kind} {name!r}: it belongs to neocarta's own graph "
-        "vocabulary, which the Neo4j connector reserves and never ingests as source "
-        "schema (so repeated ingestion stays idempotent even when the source and target "
-        "are the same database). If the source genuinely uses this name, its objects "
-        "are not ingested (reserved namespace).",
-        Neo4jSchemaWarning,
-        stacklevel=3,
-    )
-
-
 def _flatten_schema(schema_map: dict, cache: SchemaExtractorCache) -> None:
     """Flatten an ``apoc.meta.schema()`` map into the extractor cache frames.
 
     APOC reports schema per single label / relationship type. Each ``type == "node"``
     entry yields a node-label row plus its properties (with ``unique`` / ``indexed`` /
     ``existence`` flags) and its relationship endpoints; each ``type == "relationship"``
-    entry yields a relationship-type row plus its properties.
-
-    Labels and relationship types in neocarta's own LPG vocabulary
-    (``RESERVED_NODE_LABELS`` / ``RESERVED_RELATIONSHIP_TYPES``) are always excluded —
-    together with any endpoint row touching them. The Neo4j connector reserves this
-    vocabulary unconditionally: when the source and target are the same database (which
-    they always are on single-database editions), re-describing neocarta's own metadata
-    would otherwise break ingest idempotency. A source that genuinely uses one of these
-    names is indistinguishable from neocarta's metadata and is dropped (reserved
-    namespace).
+    entry yields a relationship-type row plus its properties. A source's labels and
+    relationship types are ingested verbatim, including any that happen to match
+    neocarta's own LPG vocabulary (``Node`` / ``Database`` / ``HAS_*``); the connector's
+    same-database guard (see ``_guard``) prevents ingesting neocarta's own output.
 
     Args:
         schema_map: The value returned by ``CALL apoc.meta.schema()``.
@@ -115,9 +95,6 @@ def _flatten_schema(schema_map: dict, cache: SchemaExtractorCache) -> None:
         if not isinstance(properties, dict):
             properties = {}
         if kind == "node":
-            if name in RESERVED_NODE_LABELS:
-                _warn_reserved("node label", name)
-                continue
             nodes.append({"label": name})
             node_props.extend(_property_rows("label", name, properties))
             relationships = entry.get("relationships", {})
@@ -132,23 +109,8 @@ def _flatten_schema(schema_map: dict, cache: SchemaExtractorCache) -> None:
                 if isinstance(rel_meta, dict):
                     endpoints.extend(_endpoint_rows(name, rel_type, rel_meta))
         elif kind == "relationship":
-            if name in RESERVED_RELATIONSHIP_TYPES:
-                _warn_reserved("relationship type", name)
-                continue
             rels.append({"type": name})
             rel_props.extend(_property_rows("rel_type", name, properties))
-
-    # Drop endpoint rows referencing reserved vocabulary. A reserved node entry is
-    # skipped above (so its own edges never reach here), but a genuine source node in a
-    # shared database can still point at a reserved-label node or use a reserved
-    # relationship type; those edges have no emitted Node/Relationship to attach to.
-    endpoints = [
-        e
-        for e in endpoints
-        if e["type"] not in RESERVED_RELATIONSHIP_TYPES
-        and e["source_label"] not in RESERVED_NODE_LABELS
-        and e["target_label"] not in RESERVED_NODE_LABELS
-    ]
 
     cache["node_info"] = pd.DataFrame(nodes, columns=["label"])
     cache["relationship_info"] = pd.DataFrame(rels, columns=["type"])

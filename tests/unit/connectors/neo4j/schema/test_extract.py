@@ -68,87 +68,22 @@ def test_flatten_schema_skips_non_dict_relationships():
     assert cache["relationship_endpoint_info"].empty
 
 
-def test_flatten_schema_skips_neocarta_metadata_label():
-    schema_map = {
-        "__neocarta_graph__": {
-            "type": "node",
-            "properties": {"latest_version": {"type": "STRING"}},
-        },
-        "Person": {"type": "node"},
-    }
-    cache: dict = {}
-    with pytest.warns(Neo4jSchemaWarning, match="reserved LPG node label"):
-        _flatten_schema(schema_map, cache)
-    assert list(cache["node_info"]["label"]) == ["Person"]  # metadata singleton excluded
+def test_flatten_schema_keeps_reserved_looking_labels_and_types():
+    """A genuine source that reuses neocarta's vocabulary is ingested verbatim.
 
-
-def test_flatten_schema_excludes_reserved_lpg_vocabulary():
-    """A same-database re-ingest of neocarta's own output keeps only genuine source schema."""
-    # What apoc.meta.schema() reports after neocarta has written its LPG metadata into
-    # the same database that holds a genuine ``Person``/``KNOWS`` source graph.
+    The same-database guard (not the extractor) is what prevents ingesting neocarta's
+    own output, so the extractor no longer drops ``Node`` / ``Database`` / ``HAS_*``.
+    """
     schema_map = {
-        "__neocarta_graph__": {
-            "type": "node",
-            "properties": {"latest_version": {"type": "STRING"}},
-        },
         "Database": {
-            "type": "node",
-            "relationships": {"HAS_SCHEMA": {"direction": "out", "labels": ["Schema"]}},
-        },
-        "Schema": {
             "type": "node",
             "relationships": {"HAS_NODE": {"direction": "out", "labels": ["Node"]}},
         },
-        "Node": {
-            "type": "node",
-            "relationships": {"HAS_PROPERTY": {"direction": "out", "labels": ["Property"]}},
-        },
-        "Relationship": {"type": "node"},
-        "Property": {"type": "node"},
-        "HAS_SCHEMA": {"type": "relationship", "properties": {}},
+        "Node": {"type": "node"},
         "HAS_NODE": {"type": "relationship", "properties": {}},
-        "HAS_RELATIONSHIP": {"type": "relationship", "properties": {}},
-        "HAS_SOURCE_NODE": {"type": "relationship", "properties": {}},
-        "HAS_TARGET_NODE": {"type": "relationship", "properties": {}},
-        "HAS_PROPERTY": {"type": "relationship", "properties": {}},
-        "Person": {
-            "type": "node",
-            "properties": {"name": {"type": "STRING"}},
-            "relationships": {"KNOWS": {"direction": "out", "labels": ["Person"]}},
-        },
-        "KNOWS": {"type": "relationship", "properties": {}},
     }
     cache: dict = {}
-    with pytest.warns(Neo4jSchemaWarning):
-        _flatten_schema(schema_map, cache)
-
-    # Only the genuine source schema survives — none of neocarta's own vocabulary.
-    assert list(cache["node_info"]["label"]) == ["Person"]
-    assert list(cache["relationship_info"]["type"]) == ["KNOWS"]
-    assert list(cache["node_property_info"]["label"].unique()) == ["Person"]
-    ep = cache["relationship_endpoint_info"]
-    assert list(ep["type"]) == ["KNOWS"]
-
-
-def test_flatten_schema_drops_endpoints_touching_reserved_vocabulary():
-    """Genuine nodes that point at a reserved label or via a reserved type are dropped."""
-    schema_map = {
-        "Person": {
-            "type": "node",
-            "relationships": {
-                # genuine relationship whose endpoint is a reserved-label node
-                "OWNS": {"direction": "out", "labels": ["Database"]},
-                # genuine endpoint using a reserved relationship type
-                "HAS_NODE": {"direction": "out", "labels": ["Person"]},
-                # genuine, fully non-reserved edge — this one survives
-                "KNOWS": {"direction": "out", "labels": ["Person"]},
-            },
-        },
-        "Database": {"type": "node"},  # reserved label present (shared database)
-    }
-    cache: dict = {}
-    with pytest.warns(Neo4jSchemaWarning, match="reserved LPG node label"):
-        _flatten_schema(schema_map, cache)
-
-    assert list(cache["node_info"]["label"]) == ["Person"]
-    assert list(cache["relationship_endpoint_info"]["type"]) == ["KNOWS"]
+    _flatten_schema(schema_map, cache)
+    assert set(cache["node_info"]["label"]) == {"Database", "Node"}
+    assert list(cache["relationship_info"]["type"]) == ["HAS_NODE"]
+    assert list(cache["relationship_endpoint_info"]["type"]) == ["HAS_NODE"]
