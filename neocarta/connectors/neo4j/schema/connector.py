@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from ...._logging import log_transform_counts
 from ....errors import ConfigError, StateError
 from ....ingest.lpg import Neo4jLPGLoader
+from ._guard import ensure_distinct_databases, ensure_source_is_not_neocarta_graph
 from .extract import Neo4jSchemaExtractor
 from .transform import Neo4jSchemaTransformer
 
@@ -41,7 +42,11 @@ class Neo4jSchemaConnector:
     neocarta graph metadata node.
 
     Both drivers are caller-owned; :meth:`close` is a no-op and never closes either.
-    They may point at the same DBMS.
+    They may point at the same DBMS/instance, but must be **different databases** -- a
+    read-only preflight guard refuses ingest when the source and target resolve to the
+    same database (the connector never writes into the database it reads). Note this
+    validation runs in :meth:`extract`, so even a standalone ``extract()`` requires the
+    target to be online and identifiable.
 
     Args:
         source_neo4j_driver: Driver for the SOURCE Neo4j to introspect (read).
@@ -107,8 +112,12 @@ class Neo4jSchemaConnector:
         self._source_database = source_database
         self._include_nodes = include_nodes
         self._include_relationships = include_relationships
+        ensure_distinct_databases(
+            self.source_neo4j_driver, source_database, self.neo4j_driver, self.database_name
+        )
         self.extractor.extract_database_info(source_database)
         self.extractor.extract_schema(source_database)
+        ensure_source_is_not_neocarta_graph(self.extractor.node_info)
         self._extracted = True
 
     def transform(self) -> None:

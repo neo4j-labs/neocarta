@@ -1,6 +1,6 @@
 """Error-mapping tests for the Neo4j connector."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from neo4j.exceptions import AuthError as Neo4jAuthError
@@ -16,6 +16,22 @@ from neocarta.errors import (
     TransformError,
 )
 from neocarta.warnings import Neo4jSchemaWarning
+
+_CONNECTOR_MOD = "neocarta.connectors.neo4j.schema.connector"
+
+
+@pytest.fixture(autouse=True)
+def _bypass_same_database_guard():
+    """These tests exercise APOC extraction error-mapping, not the same-database guard.
+
+    The guard runs a real SHOW DATABASES against the mocked drivers, so bypass it here;
+    it has its own coverage in test_guard.py / test_connector.py.
+    """
+    with (
+        patch(f"{_CONNECTOR_MOD}.ensure_distinct_databases"),
+        patch(f"{_CONNECTOR_MOD}.ensure_source_is_not_neocarta_graph"),
+    ):
+        yield
 
 
 def _connector(source):
