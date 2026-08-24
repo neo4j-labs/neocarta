@@ -15,26 +15,31 @@
         "Node"
       ],
       "properties": {
+        "id": "dbms.neo4j.Database",
+        "label": "Database"
+      }
+    },
+    {
+      "labels": [
+        "Node"
+      ],
+      "properties": {
         "id": "dbms.neo4j.Person",
         "label": "Person"
       }
     },
     {
       "labels": [
-        "Person"
+        "Property"
       ],
       "properties": {
-        "email": "a@x.com",
-        "name": "A"
-      }
-    },
-    {
-      "labels": [
-        "Person"
-      ],
-      "properties": {
-        "email": "b@x.com",
-        "name": "B"
+        "existence": false,
+        "id": "dbms.neo4j.Database.name",
+        "indexed": false,
+        "name": "name",
+        "nullable": true,
+        "type": "STRING",
+        "unique": false
       }
     },
     {
@@ -106,6 +111,18 @@
       "type": "HAS_SCHEMA"
     },
     {
+      "dst": "dbms.neo4j.Database",
+      "properties": {},
+      "src": "dbms.neo4j",
+      "type": "HAS_NODE"
+    },
+    {
+      "dst": "dbms.neo4j.Database.name",
+      "properties": {},
+      "src": "dbms.neo4j.Database",
+      "type": "HAS_PROPERTY"
+    },
+    {
       "dst": "dbms.neo4j.KNOWS",
       "properties": {},
       "src": "dbms.neo4j",
@@ -146,14 +163,6 @@
       "properties": {},
       "src": "dbms.neo4j.Person",
       "type": "HAS_PROPERTY"
-    },
-    {
-      "dst": null,
-      "properties": {
-        "since": 2020
-      },
-      "src": null,
-      "type": "KNOWS"
     }
   ]
 }

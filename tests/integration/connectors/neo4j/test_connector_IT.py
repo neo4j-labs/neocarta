@@ -1,45 +1,41 @@
-"""End-to-end integration test: introspect a seeded source graph into the LPG graph."""
+"""End-to-end integration tests: introspect a seeded source graph into a separate target."""
 
 from collections import Counter
 
-from neocarta.connectors.neo4j import Neo4jSchemaConnector
+import pytest
 
-_RESERVED_LABELS = ["Database", "Schema", "Node", "Relationship", "Property"]
-_RESERVED_TYPES = [
-    "HAS_SCHEMA",
-    "HAS_NODE",
-    "HAS_RELATIONSHIP",
-    "HAS_SOURCE_NODE",
-    "HAS_TARGET_NODE",
-    "HAS_PROPERTY",
-]
+from neocarta.connectors.neo4j import Neo4jSchemaConnector
+from neocarta.errors import ConfigError
 
 
 def _graph_snapshot(driver):
-    """Fingerprint the whole graph: node counts by label set and edge counts by type."""
+    """Fingerprint the graph: node counts by label set, edge counts by type, and schema."""
     with driver.session(database="neo4j") as session:
         node_rows = session.run("MATCH (n) RETURN labels(n) AS labels").data()
         rel_rows = session.run("MATCH ()-[r]->() RETURN type(r) AS t").data()
+        constraints = sorted(r["name"] for r in session.run("SHOW CONSTRAINTS YIELD name").data())
+        indexes = sorted(r["name"] for r in session.run("SHOW INDEXES YIELD name").data())
     nodes = Counter(tuple(sorted(r["labels"])) for r in node_rows)
     rels = Counter(r["t"] for r in rel_rows)
-    return dict(nodes), dict(rels)
+    return dict(nodes), dict(rels), constraints, indexes
 
 
-def test_ingest_builds_lpg_graph(seeded_source):
-    """A full ingest describes the seeded source graph as LPG nodes/edges."""
-    driver = seeded_source
+def test_ingest_builds_lpg_graph(seeded_source, target_driver):
+    """A full ingest describes the seeded source graph as LPG nodes/edges in the target."""
     connector = Neo4jSchemaConnector(
-        source_neo4j_driver=driver,
-        neo4j_driver=driver,
+        source_neo4j_driver=seeded_source,
+        neo4j_driver=target_driver,
         source_name="dbms",
     )
     connector.ingest(source_database="neo4j")
 
-    with driver.session(database="neo4j") as session:
-        # The LPG description (:Node/:Relationship/:Property) coexists with the
-        # seeded source data (:Person/:KNOWS) -- disjoint labels, no collision.
+    with target_driver.session(database="neo4j") as session:
         assert (
             session.run("MATCH (n:Node {label:'Person'}) RETURN count(n) AS c").single()["c"] == 1
+        )
+        # Reservation is gone: a source label named :Database is ingested faithfully.
+        assert (
+            session.run("MATCH (n:Node {label:'Database'}) RETURN count(n) AS c").single()["c"] == 1
         )
         assert (
             session.run("MATCH (r:Relationship {type:'KNOWS'}) RETURN count(r) AS c").single()["c"]
@@ -62,34 +58,29 @@ def test_ingest_builds_lpg_graph(seeded_source):
         assert session.run("MATCH (g:__neocarta_graph__) RETURN count(g) AS c").single()["c"] == 1
 
 
-def test_repeated_ingest_is_idempotent(seeded_source):
-    """Re-ingesting into the same database does not accumulate neocarta's own metadata.
+def test_repeated_ingest_is_idempotent(seeded_source, target_driver):
+    """Re-ingesting source -> a separate target yields a byte-stable target graph."""
 
-    The target IS the source database here, so the second and third ingests also see
-    neocarta's own LPG output (``Database`` / ``Schema`` / ``Node`` / ``Relationship`` /
-    ``Property`` and the ``HAS_*`` edges) reported back by ``apoc.meta.schema()``. The
-    reserved-vocabulary exclusion must keep the graph byte-stable across re-runs.
-    """
-    driver = seeded_source
-
-    Neo4jSchemaConnector(
-        source_neo4j_driver=driver, neo4j_driver=driver, source_name="dbms"
-    ).ingest(source_database="neo4j")
-    baseline = _graph_snapshot(driver)
-
-    for _ in range(2):
+    def _ingest():
         Neo4jSchemaConnector(
-            source_neo4j_driver=driver, neo4j_driver=driver, source_name="dbms"
+            source_neo4j_driver=seeded_source, neo4j_driver=target_driver, source_name="dbms"
         ).ingest(source_database="neo4j")
-        assert _graph_snapshot(driver) == baseline
 
-    with driver.session(database="neo4j") as session:
-        # No :Node / :Relationship describes neocarta's own reserved vocabulary.
-        self_labels = session.run(
-            "MATCH (n:Node) WHERE n.label IN $r RETURN count(n) AS c", r=_RESERVED_LABELS
-        ).single()["c"]
-        self_types = session.run(
-            "MATCH (r:Relationship) WHERE r.type IN $r RETURN count(r) AS c", r=_RESERVED_TYPES
-        ).single()["c"]
-    assert self_labels == 0
-    assert self_types == 0
+    _ingest()
+    baseline = _graph_snapshot(target_driver)
+    for _ in range(2):
+        _ingest()
+        assert _graph_snapshot(target_driver) == baseline
+
+
+def test_same_database_ingest_is_refused(seeded_source):
+    """Pointing the target at the source database is refused before any write."""
+    driver = seeded_source  # source == target
+    before = _graph_snapshot(driver)
+    connector = Neo4jSchemaConnector(
+        source_neo4j_driver=driver, neo4j_driver=driver, source_name="dbms"
+    )
+    with pytest.raises(ConfigError):
+        connector.ingest(source_database="neo4j")
+    # No neocarta nodes, edges, indexes, or constraints were written on refusal.
+    assert _graph_snapshot(driver) == before

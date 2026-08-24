@@ -12,14 +12,13 @@ from tests.support.characterization import assert_matches_golden, dump_graph
 _GOLDEN = Path(__file__).parent / "golden" / "neo4j_schema_graph.json"
 
 
-def test_neo4j_ingest_graph_matches_golden(seeded_source):
-    """The post-ingest graph matches the committed golden."""
-    driver = seeded_source
+def test_neo4j_ingest_graph_matches_golden(seeded_source, target_driver):
+    """The post-ingest target graph matches the committed golden."""
     connector = Neo4jSchemaConnector(
-        source_neo4j_driver=driver,
-        neo4j_driver=driver,
+        source_neo4j_driver=seeded_source,
+        neo4j_driver=target_driver,
         source_name="dbms",
     )
     connector.ingest(source_database="neo4j")
 
-    assert_matches_golden(_GOLDEN, dump_graph(driver, "neo4j"))
+    assert_matches_golden(_GOLDEN, dump_graph(target_driver, "neo4j"))
