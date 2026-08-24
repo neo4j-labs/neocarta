@@ -1,0 +1,82 @@
+{
+  "database_nodes": [
+    {
+      "description": null,
+      "id": "dbms",
+      "name": "dbms",
+      "platform": null,
+      "service": "NEO4J"
+    }
+  ],
+  "has_node_relationships": [
+    {
+      "node_id": "dbms.neo4j.Person",
+      "schema_id": "dbms.neo4j"
+    }
+  ],
+  "has_relationship_relationships": [
+    {
+      "relationship_id": "dbms.neo4j.KNOWS",
+      "schema_id": "dbms.neo4j"
+    }
+  ],
+  "has_schema_relationships": [
+    {
+      "database_id": "dbms",
+      "schema_id": "dbms.neo4j"
+    }
+  ],
+  "has_source_node_relationships": [
+    {
+      "node_id": "dbms.neo4j.Person",
+      "relationship_id": "dbms.neo4j.KNOWS"
+    }
+  ],
+  "has_target_node_relationships": [
+    {
+      "node_id": "dbms.neo4j.Person",
+      "relationship_id": "dbms.neo4j.KNOWS"
+    }
+  ],
+  "node_has_property_relationships": [
+    {
+      "property_id": "dbms.neo4j.Person.name",
+      "source_id": "dbms.neo4j.Person"
+    }
+  ],
+  "node_nodes": [
+    {
+      "additional_labels": null,
+      "description": null,
+      "id": "dbms.neo4j.Person",
+      "label": "Person"
+    }
+  ],
+  "property_nodes": [
+    {
+      "description": null,
+      "existence": false,
+      "id": "dbms.neo4j.Person.name",
+      "indexed": false,
+      "name": "name",
+      "nullable": true,
+      "type": "STRING",
+      "unique": false
+    }
+  ],
+  "relationship_has_property_relationships": [],
+  "relationship_nodes": [
+    {
+      "description": null,
+      "id": "dbms.neo4j.KNOWS",
+      "type": "KNOWS"
+    }
+  ],
+  "schema_nodes": [
+    {
+      "description": null,
+      "id": "dbms.neo4j",
+      "name": "neo4j"
+    }
+  ]
+}

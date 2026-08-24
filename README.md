@@ -639,6 +639,18 @@ connector.ingest()
 
 A sample e-commerce dataset is provided in `datasets/csv/` that demonstrates the expected CSV file structure and can be used for testing the CSV connector.
 
+#### **Neo4j Connector**
+
+Connector for loading a **source Neo4j instance's schema** — its node labels, relationship types, and properties — into the graph, using the LPG (Labeled Property Graph) data model (`Node` / `Relationship` / `Property` under `Database` / `Schema`). The source schema is read via APOC (`apoc.meta.schema()`), so the source instance must have the APOC (Core) plugin installed.
+
+Because the source is itself a Neo4j instance, the connector takes **two drivers** — one to read the source, one to write the neocarta graph (they may be the same instance) — plus a `source_name` that identifies the source DBMS. It supports selective loading via `include_nodes` / `include_relationships`.
+
+This connector requires the following variables in the `.env` file:
+* `SOURCE_NEO4J_URI` / `SOURCE_NEO4J_USERNAME` / `SOURCE_NEO4J_PASSWORD` - the source instance
+* `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE` - the target neocarta graph
+
+See the [Neo4j Connector README](neocarta/connectors/neo4j/README.md) for the full data model and usage, and [`examples/neo4j_schema.py`](examples/neo4j_schema.py) for a runnable example.
+
 
 ### Embeddings 
 
