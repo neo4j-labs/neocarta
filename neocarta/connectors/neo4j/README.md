@@ -107,8 +107,17 @@ absent. APOC Core ships with the official Neo4j Docker image and is enabled with
   `False` against Community Edition (and `nullable` defaults to `True`).
 - **Schema only** — the connector reads the schema, not instance data; it produces
   no `Value` nodes.
-- **Re-ingest is additive.** Loads MERGE by id and never delete, so re-running
-  updates the description in place.
+- **Re-ingest is additive; changed metadata is not refreshed.** Loads MERGE by id and
+  never delete. If a source property's `type` / `unique` / `indexed` / `existence` changes
+  between runs, the existing catalog node is **not** updated — matching how neocarta's
+  other connectors keep re-ingest additive to preserve enrichment-owned fields
+  (`description` / `embedding`). Refreshing schema-owned fields while preserving enrichment
+  is a tracked follow-up.
+- **Dotted identifiers can collide.** Neo4j permits `.` in labels and property keys.
+  Because ids are dot-separated (`{database}.{schema}.{label}.{property}`), a label `A.B`
+  with property `C` and a label `A` with property `B.C` produce the same `Property` id and
+  would be merged onto one node. This is a property of neocarta's shared id scheme (not
+  specific to this connector); collision-free id-segment encoding is a tracked follow-up.
 - **Separate target required (never ingests the database it writes to).** Before any
   write, the connector runs a **read-only preflight** — comparing the source and target
   `databaseID` via `SHOW DATABASES` — and **refuses** (`ConfigError`) when the source and
