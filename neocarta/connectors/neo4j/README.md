@@ -112,12 +112,13 @@ absent. APOC Core ships with the official Neo4j Docker image and is enabled with
   between runs, the existing catalog node is **not** updated — matching how neocarta's
   other connectors keep re-ingest additive to preserve enrichment-owned fields
   (`description` / `embedding`). Refreshing schema-owned fields while preserving enrichment
-  is a tracked follow-up.
+  is a tracked follow-up (#535).
 - **Dotted identifiers can collide.** Neo4j permits `.` in labels and property keys.
   Because ids are dot-separated (`{database}.{schema}.{label}.{property}`), a label `A.B`
   with property `C` and a label `A` with property `B.C` produce the same `Property` id and
   would be merged onto one node. This is a property of neocarta's shared id scheme (not
-  specific to this connector); collision-free id-segment encoding is a tracked follow-up.
+  specific to this connector); collision-free id-segment encoding is a tracked follow-up
+  (#536).
 - **Separate target required (never ingests the database it writes to).** Before any
   write, the connector runs a **read-only preflight** — comparing the source and target
   `databaseID` via `SHOW DATABASES` — and **refuses** (`ConfigError`) when the source and
