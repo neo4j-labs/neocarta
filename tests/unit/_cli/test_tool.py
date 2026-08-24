@@ -264,9 +264,9 @@ def test_full_text_search_sanitises_lucene_and_skips_embedding():
         )
     assert result.exit_code == 0, result.output
     params = driver.execute_query.call_args.kwargs["parameters_"]
-    # Lucene special chars are stripped; no embedding is computed for full-text search.
-    assert ":" not in params["queryText"]
-    assert "*" not in params["queryText"]
+    # Lucene special chars are backslash-escaped (not stripped), so they reach the
+    # index as literals rather than query syntax; no embedding for full-text search.
+    assert params["queryText"] == "a\\:b\\* \\(c\\)"
     assert "queryEmbedding" not in params
     mock_build.assert_not_called()
 
@@ -472,12 +472,16 @@ def test_generic_client_error_maps_to_upstream_error():
 
 @pytest.mark.usefixtures("_cli_env")
 def test_full_text_query_reduced_to_empty_is_usage_error():
-    """A query of only Lucene special chars sanitises to empty -> structured usage_error."""
+    """A whitespace-only query sanitises to empty -> structured usage_error.
+
+    (Special characters are now escaped rather than stripped, so only genuinely
+    blank input reduces to nothing.)
+    """
     with _mock_driver() as mock_driver_ctx:
         _bind(mock_driver_ctx)
         result = CliRunner().invoke(
             cli,
-            ["--json", "tool", "get-context-by-table-full-text-search", "--text-content", ":*()~"],
+            ["--json", "tool", "get-context-by-table-full-text-search", "--text-content", "   "],
         )
     assert result.exit_code == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
