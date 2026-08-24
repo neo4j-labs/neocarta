@@ -31,6 +31,25 @@ def test_metric_search_uses_metric_indexes_and_projection() -> None:
         assert "$maxMetrics" in cypher
 
 
+def test_metric_search_projects_backing_tables_and_columns() -> None:
+    """Every metric search builder surfaces the metric's backing tables/columns."""
+    for builder in _METRIC_SEARCH_BUILDERS:
+        cypher = builder()
+        assert "backing_tables" in cypher
+        assert "backing_columns" in cypher
+        assert "USES_TABLE" in cypher
+        assert "USES_COLUMN" in cypher
+
+
+def test_domain_context_projects_metric_backing() -> None:
+    """get_domain_context surfaces backing tables/columns on each embedded metric."""
+    cypher = get_domain_context_cypher()
+    assert "backing_tables" in cypher
+    assert "backing_columns" in cypher
+    assert "USES_TABLE" in cypher
+    assert "USES_COLUMN" in cypher
+
+
 def test_business_term_metric_search_bridges_business_terms() -> None:
     """The BT-hybrid metric builder bridges through the businessterm full-text index."""
     cypher = get_context_by_metric_business_term_hybrid_search_cypher()

@@ -342,6 +342,10 @@ class OsiConnector:
             loader.load_uses_column_relationships(transformer.uses_column_rels)
         if transformer.has_metric_rels:
             loader.load_has_metric_relationships(transformer.has_metric_rels)
+        if transformer.metric_uses_table_rels:
+            loader.load_metric_uses_table_relationships(transformer.metric_uses_table_rels)
+        if transformer.metric_uses_column_rels:
+            loader.load_metric_uses_column_relationships(transformer.metric_uses_column_rels)
         if transformer.has_aspect_rels:
             loader.load_has_aspect_relationships(transformer.has_aspect_rels)
         if transformer.has_expression_rels:
