@@ -11,7 +11,9 @@ and maps it onto the **LPG (Labeled Property Graph)** data model
 organized the way the other connectors expose relational sources.
 
 The source Neo4j and the target neocarta graph are both Neo4j, so the connector
-takes **two drivers** (they may point at the same instance).
+takes **two drivers**. They may point at the same instance, but must be **different
+databases** — the connector refuses to ingest the database it writes to (see
+[Known issues / limitations](#known-issues--limitations)).
 
 ## Connector type
 
@@ -107,22 +109,19 @@ absent. APOC Core ships with the official Neo4j Docker image and is enabled with
   no `Value` nodes.
 - **Re-ingest is additive.** Loads MERGE by id and never delete, so re-running
   updates the description in place.
-- **Reserved LPG namespace (repeated ingest is idempotent).** The Neo4j connector
-  reserves neocarta's own graph vocabulary and **never ingests it as source schema** —
-  always, regardless of how the drivers or databases are configured. Reserved are the
-  six node labels `Database` / `Schema` / `Node` / `Relationship` / `Property` /
-  `__neocarta_graph__`, the six relationship types `HAS_SCHEMA` / `HAS_NODE` /
-  `HAS_RELATIONSHIP` / `HAS_SOURCE_NODE` / `HAS_TARGET_NODE` / `HAS_PROPERTY`, and any
-  relationship endpoint touching either set. This guarantees that pointing the
-  connector at a source that shares a database with the target — or re-ingesting a
-  previous run's output — is idempotent: re-running never accumulates a description of
-  neocarta's own metadata. On single-database editions (Neo4j Community) the source and
-  target are necessarily the same database, so this protection is what keeps ingest
-  stable there. The single source of truth for the reserved set is
-  `neocarta.ingest.lpg.RESERVED_NODE_LABELS` / `RESERVED_RELATIONSHIP_TYPES`. The
-  trade-off is a genuine reservation: a source that legitimately uses one of these
-  names is indistinguishable from neocarta's metadata and is **dropped, with a
-  `Neo4jSchemaWarning`** — using a separate database or instance does **not** exempt it.
+- **Separate target required (never ingests the database it writes to).** Before any
+  write, the connector runs a **read-only preflight** — comparing the source and target
+  `databaseID` via `SHOW DATABASES` — and **refuses** (`ConfigError`) when the source and
+  target resolve to the same database. Configure the source and target as **distinct
+  databases** (e.g. separate `SOURCE_NEO4J_*` and `NEO4J_*` connections); on
+  single-database editions (Neo4j Community) that means a separate instance. Because the
+  connector never writes into the database it reads, genuine source labels and types that
+  happen to match neocarta's own vocabulary (`:Node` / `:Database` / `HAS_*`) are
+  **ingested faithfully** — nothing is dropped. As defense-in-depth, a source that already
+  contains a neocarta graph (its private `__neocarta_graph__` marker) is also refused:
+  you cannot catalog your own catalog. If identity cannot be verified — a non-online
+  database, or a user who cannot run `SHOW DATABASES` — the connector **fails closed** and
+  refuses rather than risk writing into the source.
 - **Case-sensitive identifiers.** Neo4j labels, relationship types, and property
   keys are case-sensitive, so `Person` and `person` map to distinct `Node`s and
   their ids preserve case verbatim. The `source_name` and source database name that
