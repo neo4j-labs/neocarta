@@ -446,3 +446,76 @@ def generate_custom_extension_id(semantic_model: str, vendor: str, data: str) ->
     """
     digest = hashlib.md5(f"{vendor}::{data}".encode(), usedforsecurity=False).hexdigest()[:32]
     return f"{_normalize(semantic_model)}.{digest}"
+
+
+def generate_node_id(database: str, schema: str, label: str) -> str:
+    """Generate a Node id (an LPG node label) scoped by database and schema.
+
+    Neo4j labels are case-sensitive (``Person`` and ``person`` are distinct
+    labels), so the ``label`` segment is kept verbatim rather than normalized —
+    lowercasing would collapse distinct labels onto the same id. The
+    ``database`` / ``schema`` segments are caller-supplied container names and
+    are still normalized.
+
+    Args:
+        database: The source DBMS identifier (``source_name``).
+        schema: The source database name introspected.
+        label: The node label (e.g. ``Person``).
+
+    Returns:
+        The node id in format ``{database}.{schema}.{label}``.
+
+    Examples:
+        >>> generate_node_id("my-dbms", "neo4j", "Person")
+        'my_dbms.neo4j.Person'
+    """
+    return f"{_normalize(database)}.{_normalize(schema)}.{label}"
+
+
+def generate_relationship_id(database: str, schema: str, relationship_type: str) -> str:
+    """Generate a Relationship id (an LPG relationship type) scoped by database and schema.
+
+    Neo4j relationship types are case-sensitive, so the ``relationship_type``
+    segment is kept verbatim (see :func:`generate_node_id`). The ``database`` /
+    ``schema`` segments are still normalized.
+
+    Args:
+        database: The source DBMS identifier (``source_name``).
+        schema: The source database name introspected.
+        relationship_type: The relationship type (e.g. ``KNOWS``).
+
+    Returns:
+        The relationship id in format ``{database}.{schema}.{relationship_type}``.
+
+    Examples:
+        >>> generate_relationship_id("my-dbms", "neo4j", "KNOWS")
+        'my_dbms.neo4j.KNOWS'
+    """
+    return f"{_normalize(database)}.{_normalize(schema)}.{relationship_type}"
+
+
+def generate_property_id(owner_id: str, property_name: str) -> str:
+    """Generate a Property id, scoped by its owning Node or Relationship.
+
+    The same property name can carry different types/constraints on different
+    owners, so each (owner, property) pair is a distinct node. ``owner_id`` MUST
+    already be a ``generate_node_id`` / ``generate_relationship_id`` output — it is
+    intentionally not re-normalized (it already is, and contains dotted segments),
+    mirroring :func:`generate_governance_tag_instance_id`.
+
+    Neo4j property keys are case-sensitive (``firstName`` and ``firstname`` are
+    distinct keys), so ``property_name`` is kept verbatim — lowercasing would
+    collapse distinct keys onto the same id.
+
+    Args:
+        owner_id: A pre-built node or relationship id.
+        property_name: The property key name.
+
+    Returns:
+        The property id in format ``{owner_id}.{property_name}``.
+
+    Examples:
+        >>> generate_property_id("my_dbms.neo4j.Person", "firstName")
+        'my_dbms.neo4j.Person.firstName'
+    """
+    return f"{owner_id}.{property_name}"

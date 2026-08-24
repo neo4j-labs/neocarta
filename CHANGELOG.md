@@ -1,6 +1,12 @@
 # Changelog of neocarta library and MCP server
 
 
+## Upcoming
+
+### Added
+- **LPG ingest path** (`neocarta.ingest.lpg.Neo4jLPGLoader`): the ingest path for the Labeled Property Graph data model (`Database` / `Schema` / `Node` / `Relationship` / `Property` nodes plus `HAS_SCHEMA` / `HAS_NODE` / `HAS_RELATIONSHIP` / `HAS_SOURCE_NODE` / `HAS_TARGET_NODE` / `HAS_PROPERTY` edges), a peer to `Neo4jRDBMSLoader` for the graph-source data model that #54 introduced. Adds the `NODE` / `RELATIONSHIP` / `PROPERTY` node labels and the matching relationship types to `neocarta.enums`; `generate_node_id` / `generate_relationship_id` / `generate_property_id` id generators (properties are owner-scoped, so the same key on different labels/types stays distinct; the label / relationship-type / property-key segments are kept case-verbatim because Neo4j identifiers are case-sensitive — `Person` and `person` must not collapse onto one id — while the database / schema container segments are still normalized); and a `property_name` argument to `create_name_range_index` (ordered after `database_name`) so `Node` / `Relationship` — whose searchable name is `label` / `type`, not `name` — get an equality index and full-text index at load time (backward compatible: the default keeps the existing `{label}_name_index` name and Cypher for all current callers). The previous "in-progress" import warning on `neocarta.data_model.schema.lpg` is removed now that the model has a consumer. First used by the Neo4j connector.
+
+
 ## v0.8.1
 
 ### Documentation

@@ -93,11 +93,12 @@ def create_name_range_index(
     neo4j_driver: Driver,
     node_label: str,
     database_name: str = "neo4j",
+    property_name: str = "name",
 ) -> dict:
     """
-    Create a range index on a node's ``name`` property.
+    Create a range index on a node's name-like property.
 
-    A range index backs exact-equality ``MATCH (n:Label {name: $value})`` lookups, such as the
+    A range index backs exact-equality ``MATCH (n:Label {prop: $value})`` lookups, such as the
     ones the MCP catalog queries issue. Vector and full-text indexes do not back equality
     matches, so a dedicated range index is required for these lookups to seek rather than scan.
 
@@ -106,10 +107,14 @@ def create_name_range_index(
     neo4j_driver: Driver
         The Neo4j driver to use.
     node_label: str
-        The label of the node to create a name range index for. Must be a label whose nodes
-        carry a ``name`` property.
+        The label of the node to create a range index for.
     database_name: str
         The name of the database to create the index in.
+    property_name: str
+        The property that holds the searchable name. Defaults to ``"name"``; pass ``"label"``
+        for ``Node`` and ``"type"`` for ``Relationship`` (LPG), whose searchable name is not
+        ``name``. The default keeps the generated index name (e.g. ``table_name_index``) and
+        Cypher identical to before, so existing callers are unaffected.
 
     Returns:
     -------
@@ -117,9 +122,9 @@ def create_name_range_index(
         The summary of the index created.
     """
     name_index_query = f"""
-CREATE INDEX {node_label.lower() + "_name_index"} IF NOT EXISTS
+CREATE INDEX {node_label.lower() + "_" + property_name.lower() + "_index"} IF NOT EXISTS
     FOR (n:{node_label})
-    ON (n.name)
+    ON (n.{property_name})
 """
     _, summary, _ = neo4j_driver.execute_query(
         query_=name_index_query,
