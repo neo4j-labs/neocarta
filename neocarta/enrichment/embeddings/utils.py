@@ -41,23 +41,30 @@ def get_nodes_to_embed(
         The nodes to embed.
         - id: The id of the node.
         - node_label: The label of the node.
-        - description: The description of the node.
+        - description: The text to embed, composed as ``name | type |
+          description``. Null or blank parts are dropped, so a node with no
+          description is still embedded from its name (and type, for columns).
     """
     if min_length <= 0:
         raise ConfigError("Minimum length must be greater than 0")
 
+    # A name is required by the schema model, while descriptions are optional.
+    # Build a stable, useful input from whatever metadata exists so a missing
+    # description never prevents semantic retrieval for an otherwise valid node.
+    # ``type`` is only present on Column nodes; Neo4j evaluates it as null for
+    # all other labels and it is consequently omitted.
     query = f"""
 MATCH (n:{node_label})
-WHERE n.description IS NOT NULL
-    AND n.embedding IS NULL
-    AND size(n.description) > 0
-RETURN n.id as id,
-    labels(n)[0] as node_label,
-    n.description as description
+WHERE n.embedding IS NULL
+WITH n, [part IN [n.name, n.type, n.description]
+         WHERE part IS NOT NULL AND trim(part) <> '' | trim(part)] AS parts
+WHERE size(parts) > 0
+RETURN n.id AS id,
+    labels(n)[0] AS node_label,
+    reduce(text = head(parts), p IN tail(parts) | text + ' | ' + p) AS description
 """
     results = neo4j_driver.execute_query(
         query_=query,
-        parameters_={"min_length": min_length},
         database_=database_name,
         routing_=RoutingControl.READ,
         result_transformer_=lambda x: x.data(),
