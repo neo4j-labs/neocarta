@@ -190,3 +190,35 @@ def test_extensions_scaffold_imports():
     import neocarta.extensions.enrichments
 
     assert neocarta.extensions.connectors
+
+
+def test_memory_capture_dependencies_import_without_optional_extras():
+    # capture_task_memory reaches into the connector layer for SQL parsing, id-gen, and
+    # canonicalization. These must import under a base / [mcp] install without dragging an
+    # optional warehouse extra (snowflake/databricks/bigquery-client) at module load, so the
+    # write tool works on any neocarta[mcp] deployment.
+    from neocarta.connectors.query_log.utils import parse_sql_query
+    from neocarta.connectors.utils.generate_id import (
+        create_query_id,
+        generate_phrase_id,
+        generate_task_id,
+    )
+    from neocarta.connectors.utils.sql_canonicalize import canonicalize_sql
+
+    assert all(
+        [parse_sql_query, create_query_id, generate_phrase_id, generate_task_id, canonicalize_sql]
+    )
+
+
+def test_memory_tool_modules_import():
+    # The two MCP memory tool modules must import and expose register(). fastmcp ships in the
+    # `mcp` extra; skip cleanly where it is absent. Neither module may import the server's
+    # env-backed Settings at module load (that would require NEO4J_* just to import).
+    import pytest
+
+    pytest.importorskip("fastmcp")
+
+    from neocarta._mcp.tools import capture_task_memory, recall_task_memory
+
+    assert hasattr(capture_task_memory, "register")
+    assert hasattr(recall_task_memory, "register")

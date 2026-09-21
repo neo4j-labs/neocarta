@@ -2,6 +2,7 @@
 
 from neo4j import Driver, RoutingControl
 
+from ..enums import NodeLabel
 from ..errors import ConfigError
 
 
@@ -127,3 +128,49 @@ CREATE INDEX {node_label.lower() + "_name_index"} IF NOT EXISTS
         database_=database_name,
     )
     return summary.counters.__dict__
+
+
+def create_memory_indexes(
+    neo4j_driver: Driver,
+    dimensions: int,
+    database_name: str = "neo4j",
+) -> dict:
+    """
+    Create the vector + full-text indexes backing the semantic-memory tools.
+
+    The recall tool searches ``Phrase`` nodes via ``phrase_vector_index`` over
+    their embeddings and ``phrase_full_text_index`` over their ``verbatim`` text,
+    then rolls the hits up to the owning ``Task``. Run once per graph (see
+    ``neocarta memory init-indexes``) before recall is used; capture writes the
+    Phrase nodes and their embeddings regardless of whether these indexes exist
+    yet, and a vector index built afterwards backfills over the existing nodes.
+
+    Parameters
+    ----------
+    neo4j_driver: Driver
+        The Neo4j driver to use.
+    dimensions: int
+        The embedding dimension the Phrase vectors are stored at. Must match the
+        embedder the MCP server uses, or vector recall will error at query time.
+    database_name: str
+        The name of the database to create the indexes in.
+
+    Returns:
+    -------
+    dict
+        The per-index creation summaries, keyed by index name.
+    """
+    return {
+        "phrase_vector_index": create_vector_index(
+            neo4j_driver,
+            NodeLabel.PHRASE,
+            dimensions=dimensions,
+            database_name=database_name,
+        ),
+        "phrase_full_text_index": create_full_text_index(
+            neo4j_driver,
+            [NodeLabel.PHRASE],
+            property_names=["verbatim"],
+            database_name=database_name,
+        ),
+    }

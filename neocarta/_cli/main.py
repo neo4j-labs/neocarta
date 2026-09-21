@@ -17,6 +17,7 @@ from .commands.databricks import databricks
 from .commands.dataplex import dataplex
 from .commands.jdbc import jdbc
 from .commands.mcp import mcp
+from .commands.memory import memory
 from .commands.osi import osi
 from .commands.query_log import query_log
 from .commands.snowflake import snowflake
@@ -95,6 +96,7 @@ cli.add_command(databricks)
 cli.add_command(dataplex)
 cli.add_command(jdbc)
 cli.add_command(mcp)
+cli.add_command(memory)
 cli.add_command(osi)
 cli.add_command(query_log)
 cli.add_command(snowflake)

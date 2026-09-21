@@ -210,3 +210,86 @@ class ListMetricRecord(BaseModel):
         default=None, description="The description of the metric"
     )
     domain_name: str = Field(..., description="The name of the domain that owns the metric")
+
+
+class RecalledMemory(BaseModel):
+    """A previously captured Task recalled from semantic memory."""
+
+    task_name: str = Field(..., description="The PascalCase name of the recalled task")
+    matched_phrase: str | None = Field(
+        default=None,
+        description="The stored phrasing that best matched the query in the vector branch; null "
+        "when the Task matched only via full-text",
+    )
+    phrasings: list[str] = Field(default=[], description="All stored phrasings of the task")
+    phrase_count: int = Field(default=0, description="The number of stored phrasings of the task")
+    observations: list[str] = Field(
+        default=[],
+        description="Analytical notes accumulated across captures of this task — the chosen "
+        "metric definition, join path or weighting. Read these before reusing the SQL: they "
+        "record why it is written the way it is",
+    )
+    vector_score: float = Field(
+        default=0.0,
+        description="The raw cosine of the best-matching phrasing in [0, 1]. This is the "
+        "calibrated confidence gate: >= 0.92 reuse the SQL; 0.85-0.92 confirm; < 0.85 treat as "
+        "no hit",
+    )
+    hybrid_score: float = Field(
+        default=0.0,
+        description="The fused vector + full-text score used only to order candidates; NOT "
+        "calibrated, so gate on vector_score instead",
+    )
+    query_description: str | None = Field(
+        default=None, description="One-sentence description of what the stored SQL computes"
+    )
+    sql: str | None = Field(default=None, description="The canonical stored SQL for the task")
+    tables: list[str] = Field(
+        default=[], description="Catalog table ids the stored SQL uses (USES_TABLE)"
+    )
+    columns: list[str] = Field(
+        default=[], description="Catalog column ids the stored SQL uses (USES_COLUMN)"
+    )
+
+
+class MemoryRecallResult(BaseModel):
+    """The result of recall_task_memory: ranked candidates plus optional diagnostics."""
+
+    candidates: list[RecalledMemory] = Field(
+        default=[], description="Recalled tasks, best-first by hybrid_score"
+    )
+    diagnostics: str | None = Field(
+        default=None,
+        description="Non-null when the vector search branch was degraded (e.g. a "
+        "phrase_vector_index embedding-dimension mismatch, or the embedding provider "
+        "returning no vector). When set, vector_score is an unreliable 0 and the >=0.85 reuse "
+        "gate cannot be trusted — surface this to the user and treat the ranking as full-text only.",
+    )
+
+
+class CaptureMemoryResult(BaseModel):
+    """The result of capturing a question/SQL pair into semantic memory."""
+
+    task_id: str = Field(..., description="The deterministic id of the merged task")
+    task_name: str = Field(..., description="The PascalCase name of the merged task")
+    phrase_id: str = Field(..., description="The deterministic id of the attached phrasing")
+    query_id: str = Field(..., description="The canonical-SQL hash id of the merged query")
+    canonical_sql: str = Field(
+        ..., description="The canonicalized SQL that was hashed, stored, and parsed for links"
+    )
+    linked_tables: list[str] = Field(
+        default=[], description="Catalog table ids the query was linked to (USES_TABLE)"
+    )
+    linked_columns: list[str] = Field(
+        default=[], description="Catalog column ids the query was linked to (USES_COLUMN)"
+    )
+    unmatched_tables: list[str] = Field(
+        default=[],
+        description="Table ids parsed from the SQL that no catalog Table node matched — surface "
+        "these to the user as objects the semantic layer does not know about",
+    )
+    unmatched_columns: list[str] = Field(
+        default=[],
+        description="Column ids parsed from the SQL that no catalog Column node matched — surface "
+        "these to the user as objects the semantic layer does not know about",
+    )
