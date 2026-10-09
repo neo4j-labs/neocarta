@@ -1,5 +1,7 @@
 # Neocarta
 
+> This is an experimental Neo4j Labs project and not part of Neo4j's supported product lineup. See the [Neo4j Labs disclaimer](./LABS_DISCLAIMER.txt).
+
 An end-to-end library for building a semantic layer in Neo4j — giving AI agents systemic understanding of how your data is organized, what it means, and where it lives.
 
 *Note: This library is not a Neo4j product. It is a Neo4j Labs project supported by the Neo4j field team.*
