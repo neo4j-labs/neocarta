@@ -48,7 +48,7 @@ performance = [
     "neo4j-rust-ext>=6.2.0.0",
 ]
 mcp = [
-    "fastmcp>=2.14.4,<3",
+    "fastmcp>=3.2.0,<4",
     "mcp>=1.26.0",
     "pydantic-settings>=2.12.0",
 ]
@@ -100,7 +100,7 @@ agent = [
     "langgraph>=1.0.7",
 ]
 eval = [
-    "fastmcp>=2.14.4",
+    "fastmcp>=3.2.0",
     "mcp>=1.26.0",
     "tiktoken>=0.12.0",
 ]
