@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -195,15 +195,19 @@ def load_settings() -> CLISettings:
     """
     Load CLI settings from the environment.
 
-    A ``.env`` file in the working directory is loaded into ``os.environ``
-    before reading.
+    A ``.env`` file in the working directory (or the nearest parent directory
+    containing one) is loaded into ``os.environ`` before reading. Variables
+    already set in the environment take precedence over the file.
 
     Returns:
     -------
     CLISettings
         Populated settings instance.
     """
-    load_dotenv()
+    # ``usecwd=True`` searches from the working directory. The default searches
+    # from this module's location, so an installed (non-editable) ``neocarta``
+    # would never find the user's ``.env`` and silently fall back to defaults.
+    load_dotenv(find_dotenv(usecwd=True))
     return CLISettings()
 
 

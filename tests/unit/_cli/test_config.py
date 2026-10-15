@@ -12,7 +12,7 @@ import json
 import pytest
 from pydantic import SecretStr
 
-from neocarta._cli.config import CLISettings, require_secret
+from neocarta._cli.config import CLISettings, load_settings, require_secret
 from neocarta._cli.errors import CLIError
 
 
@@ -77,3 +77,28 @@ def test_embedding_defaults_when_env_absent(monkeypatch):
     assert settings.embedding_model == "text-embedding-3-small"
     assert settings.embedding_dimensions is None
     assert settings.embedding_batch_size == 100
+
+
+def test_load_settings_reads_dotenv_from_working_directory(tmp_path, monkeypatch):
+    # The .env must be found relative to the working directory, not relative to
+    # the installed package (an installed CLI would otherwise never find it).
+    monkeypatch.delenv("NEO4J_DATABASE", raising=False)
+    (tmp_path / ".env").write_text("NEO4J_DATABASE=from_dotenv\n")
+    monkeypatch.chdir(tmp_path)
+    assert load_settings().neo4j_database == "from_dotenv"
+
+
+def test_load_settings_finds_dotenv_in_parent_directory(tmp_path, monkeypatch):
+    monkeypatch.delenv("NEO4J_DATABASE", raising=False)
+    (tmp_path / ".env").write_text("NEO4J_DATABASE=from_parent\n")
+    subdir = tmp_path / "sub"
+    subdir.mkdir()
+    monkeypatch.chdir(subdir)
+    assert load_settings().neo4j_database == "from_parent"
+
+
+def test_load_settings_exported_env_var_overrides_dotenv(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("NEO4J_DATABASE=from_dotenv\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("NEO4J_DATABASE", "from_shell")
+    assert load_settings().neo4j_database == "from_shell"
